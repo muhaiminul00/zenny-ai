@@ -1,0 +1,135 @@
+
+<h2 class="sr-only">Add-on library master plan — 36 add-ons across 5 task types, 19 marked MVP for first sprint</h2>
+<style>
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.counts{font-size:13px;color:var(--color-text-secondary)}
+.counts b{color:var(--color-text-primary);font-weight:500}
+.filters{display:flex;gap:6px}
+.fb{padding:4px 14px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);transition:all .12s}
+.fb.on{background:var(--color-background-secondary);border-color:var(--color-border-primary);color:var(--color-text-primary);font-weight:500}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+col.c1{width:36%}col.c2{width:13%}col.c3{width:16%}col.c4{width:13%}col.c5{width:22%}
+th{background:var(--color-background-secondary);padding:6px 10px;text-align:left;font-size:11px;font-weight:500;color:var(--color-text-secondary);letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--color-border-secondary)}
+td{padding:6px 10px;border-bottom:1px solid var(--color-border-tertiary);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sec td{padding:8px 10px 4px;font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;border-bottom:none;background:var(--color-background-secondary)}
+tr.mvp-row{background:rgba(14,111,86,.04)}
+tr.hidden{display:none}
+.aname{font-weight:500;font-size:13px;color:var(--color-text-primary);white-space:normal}
+.sb{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:500;white-space:nowrap}
+.mvp-b{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:500;background:#E1F5EE;color:#085041}
+.p2-t{font-size:12px;color:var(--color-text-tertiary)}
+.eff{font-size:12px;color:var(--color-text-secondary)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--color-text-secondary)}
+.legend-item{display:flex;align-items:center;gap:5px}
+</style>
+
+<div class="top">
+  <div class="counts"><b id="shown">36</b> add-ons &nbsp;·&nbsp; <b>19 MVP</b> (first sprint: C1 + C3 in parallel)</div>
+  <div class="filters">
+    <button class="fb on" onclick="filt('all',this)">All</button>
+    <button class="fb" onclick="filt('mvp',this)">MVP only</button>
+  </div>
+</div>
+
+<table>
+<colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"></colgroup>
+<thead><tr><th>Add-on</th><th>Scope</th><th>Clusters</th><th>Phase</th><th>Effort</th></tr></thead>
+<tbody id="tb"></tbody>
+</table>
+
+<div class="legend">
+  <span class="legend-item"><span class="sb" style="background:#E6F1FB;color:#0C447C">Universal</span> all 4 clusters</span>
+  <span class="legend-item"><span class="sb" style="background:var(--color-background-secondary);color:var(--color-text-secondary);border:1px solid var(--color-border-tertiary)">Cluster</span> 1–3 clusters</span>
+  <span class="legend-item"><span class="sb" style="background:#FAEEDA;color:#633806">Niche</span> one niche only</span>
+  <span class="legend-item" style="margin-left:8px">Effort: S = ½ day &nbsp; M = 1 day &nbsp; X = 2–3 days</span>
+</div>
+
+<script>
+const types=[
+  {label:"Lookup",   color:"#185FA5"},
+  {label:"Action",   color:"#1D9E75"},
+  {label:"Info",     color:"#534AB7"},
+  {label:"Lead capture", color:"#854F0B"},
+  {label:"Escalation",color:"#993C1D"}
+];
+
+const data=[
+  ["Lookup","Availability check","C","C1","MVP","M"],
+  ["Lookup","Booking status","C","C1","MVP","M"],
+  ["Lookup","Order status","C","C3","MVP","M"],
+  ["Lookup","Delivery & tracking status","C","C3","MVP","M"],
+  ["Lookup","Stock / inventory check","C","C3","MVP","M"],
+  ["Lookup","Job / service request status","C","C2","P2","M"],
+  ["Lookup","Account info lookup","C","C4","P2","M"],
+  ["Lookup","Subscription / plan info","C","C4","P2","M"],
+  ["Action","Book appointment","C","C1","MVP","X"],
+  ["Action","Cancel / reschedule appointment","C","C1","MVP","M"],
+  ["Action","Refund initiation","C","C3","MVP","M"],
+  ["Action","Cancel order","C","C3","MVP","M"],
+  ["Action","Return initiation","C","C3","P2","M"],
+  ["Action","Change delivery address","C","C3","P2","M"],
+  ["Action","Password / access reset","C","C4","P2","M"],
+  ["Action","Subscription change","C","C4","P2","X"],
+  ["Info","FAQ answer","U","All","MVP","S"],
+  ["Info","Business hours & location","U","All","MVP","S"],
+  ["Info","Pricing / rates","U","All","MVP","S"],
+  ["Info","Cancellation policy","U","All","MVP","S"],
+  ["Info","Service catalog","C","C1  C2","MVP","S"],
+  ["Info","Return & refund policy","C","C3","MVP","S"],
+  ["Info","Shipping / delivery info","C","C3","MVP","S"],
+  ["Info","Product / service specs","C","C2  C3  C4","P2","S"],
+  ["Info","Feature / how-to guide","C","C4","P2","S"],
+  ["Lead capture","Contact / callback request","U","All","MVP","S"],
+  ["Lead capture","Quote request form","C","C2","P2","S"],
+  ["Lead capture","Service inquiry form","C","C2","P2","S"],
+  ["Lead capture","Waitlist signup","C","C1","P2","S"],
+  ["Lead capture","Demo / trial request","C","C4","P2","S"],
+  ["Lead capture","Donation form","N","C2 (NGO)","P2","S"],
+  ["Escalation","Complaint log","U","All","MVP","S"],
+  ["Escalation","Dispute / chargeback flag","C","C3  C4","MVP","S"],
+  ["Escalation","Urgent / emergency flag","C","C2","P2","S"],
+  ["Escalation","VIP / priority flag","C","C3","P2","S"],
+  ["Escalation","Tech support intake","C","C4","P2","S"],
+];
+
+const scopeHTML={
+  U:'<span class="sb" style="background:#E6F1FB;color:#0C447C">Universal</span>',
+  C:'<span class="sb" style="background:var(--color-background-secondary);color:var(--color-text-secondary);border:1px solid var(--color-border-tertiary)">Cluster</span>',
+  N:'<span class="sb" style="background:#FAEEDA;color:#633806">Niche</span>'
+};
+const effLabel={S:"S · ½ day",M:"M · 1 day",X:"X · 2–3 days"};
+
+function build(mvpOnly){
+  const tb=document.getElementById('tb');
+  tb.innerHTML='';
+  let lastType='', count=0;
+  data.forEach(([type,name,scope,clusters,phase,eff])=>{
+    if(mvpOnly && phase!=='MVP') return;
+    count++;
+    if(type!==lastType){
+      lastType=type;
+      const t=types.find(t=>t.label===type);
+      const sr=document.createElement('tr');
+      sr.className='sec';
+      sr.innerHTML=`<td colspan="5" style="border-left:3px solid ${t.color};color:${t.color}">${type}</td>`;
+      tb.appendChild(sr);
+    }
+    const tr=document.createElement('tr');
+    tr.className=phase==='MVP'?'mvp-row':'';
+    const phaseHTML=phase==='MVP'
+      ?'<span class="mvp-b">MVP</span>'
+      :'<span class="p2-t">Phase 2</span>';
+    tr.innerHTML=`<td><span class="aname">${name}</span></td><td>${scopeHTML[scope]}</td><td style="font-size:12px;color:var(--color-text-secondary)">${clusters}</td><td>${phaseHTML}</td><td><span class="eff">${effLabel[eff]}</span></td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('shown').textContent=count;
+}
+
+function filt(mode,btn){
+  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  build(mode==='mvp');
+}
+
+build(false);
+</script>

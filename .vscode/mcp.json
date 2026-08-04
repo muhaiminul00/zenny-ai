@@ -1,0 +1,9 @@
+{
+	"servers": {
+		"Convocore": {
+			"url": "https://docs.convocore.ai/mcp",
+			"type": "http"
+		}
+	},
+	"inputs": []
+}

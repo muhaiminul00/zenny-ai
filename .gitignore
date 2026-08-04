@@ -1,0 +1,11 @@
+# Secrets — never commit real credentials
+.mcp.json
+.mcp.json.docker-backup-*
+*credential*.txt
+Zenny_production_credential*
+.env
+.env.*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db

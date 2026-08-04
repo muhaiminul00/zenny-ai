@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Architecture Explorer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="icon-button mobile-only" id="nav-toggle" aria-label="Toggle architecture map">☰</button>
+    <div class="brand"><span class="brand-mark">A</span><span>Architecture Explorer</span></div>
+    <div class="search-wrap">
+      <span aria-hidden="true">⌕</span>
+      <input id="search" type="search" placeholder="Search architecture…" autocomplete="off">
+      <kbd>Ctrl K</kbd>
+      <div id="search-results" class="search-results" hidden></div>
+    </div>
+    <button class="button" id="focus-toggle">Focus Mode</button>
+  </header>
+
+  <main class="workspace">
+    <aside class="sidebar left-panel" id="left-panel">
+      <div class="panel-heading">
+        <div><span class="eyebrow">Workspace</span><h2>Architecture map</h2></div>
+        <button class="icon-button mobile-only" id="nav-close" aria-label="Close architecture map">×</button>
+      </div>
+      <div class="tree-actions"><button id="expand-all">Expand all</button><button id="collapse-all">Collapse all</button></div>
+      <div class="filters" id="filters" aria-label="Section filters">
+        <button class="active" data-filter="all">All</button><button data-filter="unread">Unread</button>
+        <button data-filter="new">New</button><button data-filter="changed">Changed</button>
+        <button data-filter="bookmarked">Bookmarked</button>
+      </div>
+      <nav id="outline" class="outline" aria-label="Document outline"></nav>
+    </aside>
+
+    <section class="reader-panel">
+      <div id="loading" class="state-card"><div class="spinner"></div><h1>Loading architecture</h1><p>Parsing the system map…</p></div>
+      <div id="error" class="state-card error" hidden></div>
+      <article id="document" class="document"></article>
+      <nav id="focus-nav" class="focus-nav" hidden>
+        <button class="button" id="previous-section">← Previous</button><span id="focus-position"></span>
+        <button class="button primary" id="next-section">Next →</button>
+      </nav>
+    </section>
+
+    <aside class="sidebar right-panel" id="right-panel">
+      <section class="context-section">
+        <span class="eyebrow">Current context</span>
+        <dl class="context-list">
+          <div><dt>Module</dt><dd id="current-module">—</dd></div>
+          <div><dt>Section</dt><dd id="current-section">—</dd></div>
+          <div><dt>Subsection</dt><dd id="current-subsection">—</dd></div>
+        </dl>
+      </section>
+      <section>
+        <div class="section-title"><span class="eyebrow">Review dashboard</span><button class="text-button" id="export-progress">Export</button></div>
+        <div class="dashboard-grid">
+          <div><span>Total</span><strong id="section-count">0</strong></div>
+          <div><span>Reviewed</span><strong id="dashboard-reviewed">0</strong></div>
+          <div><span>Remaining</span><strong id="dashboard-remaining">0</strong></div>
+          <div><span>New</span><strong id="dashboard-new">0</strong></div>
+          <div><span>Changed</span><strong id="dashboard-changed">0</strong></div>
+          <div><span>Bookmarks</span><strong id="dashboard-bookmarks">0</strong></div>
+        </div>
+        <div class="progress-label"><span>Runtime Spec</span><strong id="progress-value">0%</strong></div>
+        <div class="progress-track"><span id="progress-bar"></span></div>
+        <p class="muted" id="review-count">0 of 0 sections reviewed</p>
+        <p class="muted" id="flowchart-progress">Flowcharts: 0 / 0 reviewed</p>
+      </section>
+      <section class="diagram-section" id="diagram-section" hidden>
+        <div class="section-title">
+          <div><span class="eyebrow">Visual companion</span><h3 id="diagram-title">Flowchart</h3></div>
+          <span id="diagram-status" class="change-badge"></span>
+        </div>
+        <div class="diagram-actions">
+          <button id="diagram-toggle">Hide</button><button id="diagram-zoom-out" aria-label="Zoom out">−</button>
+          <button id="diagram-zoom-in" aria-label="Zoom in">+</button><button id="diagram-fullscreen">Full screen</button>
+          <button id="diagram-copy">Copy source</button>
+        </div>
+        <div id="diagram-viewport" class="diagram-viewport"><div id="diagram" class="diagram"></div></div>
+      </section>
+      <section class="bookmarks-section">
+        <div class="section-title"><span class="eyebrow">Review later</span><span id="bookmark-count" class="badge">0</span></div>
+        <div id="bookmarks" class="bookmark-list"><p class="muted">No bookmarks yet.</p></div>
+      </section>
+      <section id="migrated-bookmarks-section" hidden>
+        <div class="section-title"><span class="eyebrow">Needs review / Migrated bookmarks</span><span id="migrated-bookmark-count" class="badge">0</span></div>
+        <div id="migrated-bookmarks" class="bookmark-list"></div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="scrim" class="scrim" hidden></div>
+  <dialog id="diagram-dialog" class="diagram-dialog">
+    <button class="dialog-close" id="diagram-dialog-close" aria-label="Close">×</button>
+    <div id="diagram-fullscreen-content"></div>
+  </dialog>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

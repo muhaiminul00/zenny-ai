@@ -1,0 +1,46 @@
+--> # Convocore Session Close-Out — v1
+1. human-handoff integration depth --> I think it would be better to keep escalation record in our database, maybe we already have workflow for that. WE will use Convocre's handoff tool + we may also use extra tool if required, Maybe our workflow will also be triggered. 
+
+2. Shopify credential exception — As we said, we will use convocre's features best way possible to make thing simple, So, convocre's natively support spopify read access, search product & etc.. So, IF our client is shopify based, we will just use convcore's intrigration for that. But, we still keep shopify Oauth + APi based dashboard in our credential platform. In future we may make our own live product fetch, update, & etc. workflow. Summary, We will use convocre's shopify tool but that nothing client facing, client still will go through our intiration platform, there will give access of their shopify Oauth + api (or only api ->(client id & secret). We will store those in our database. then will manually pick client id & secret, put that on convcore's system. --> Our client only see our own Oauth platform, Just put shopify credential into convocore to use convocore tool.(Mark this, we ahve to make own wf to fetch product catalog (scheduled or or update trigger), or ither info from shopify & woocomerce. In simply word both read & write workflow. we fetch from store, update that of convcore Kb via api. will  not store product or inventory in our db, our db is only for FAQ & business knowledge not product. 
+
+3. runtime_module inference (Part 3.2) — Convocore node's prompt explicitly sets a variable like runtime_module: "conversion_engine" before calling the tool. 
+
+4. Tool Key = Runtime tool_name naming convention — > Yeah, Covncore tool will be the runtime provided tool name, same no change.
+
+5.MCP connection method for the future checklist phase —> npx is better, mark not to use that tool anyway. 
+6. Convocore's Lead Qualification Funnel vs. your own lead scoring —>> I think we should first continue with convocre funnel. I think, it will be less work, better result. If not good result, then we can use our funnel. Mark, convocre lead funnel need quit extra setup in he settings. 
+7. Convocore's AI-generated conversation summary vs. your own — >> Same as before. Also, we can fetch other metric like token usages, cost, & dedicated metrics of convocre. Convcore's itself has good metric page, IF we need extra we can fetch those & make our metric dashboard.
+8. Recovery messaging has NO working API solution as of now. --> Yeah, Until we get any solution from convore, we only have email option. 
+9. KB fetch design, final version:--> Confirm, Need proper mention in the docs, specially Convocore_Findings_Required_Updates_v1. 
+10. Preemptive convo/convo_id column  --> confirm, we will keep these in our database, mention properly in docs to make this addition.
+11. PATCH .../messages endpoint's true behavior — > already mentioned in the api test doc. NO need extra mention. 
+12. 3. Convo ID / Conversation ID — Preemptive Column--> right, IT will be added in leads table, & most of the leads will come through convcore. Also, mention that current id format & how to get that.
+13. SMS tool —> For this, first we need client's twillo number + credentials. mark this, our database needs new addition. on the module selection column we have to add 2 more, voice agent, sms agent. & on client info table we need extra column for client voice number, client sms number (also both can be same) & the credential for twillo will be stored in credential platform's database schema. Means, credential platfrom needs extra fields. if client wants voice agent or SMS, they have to give their twillo number, credintal. we needs client number, Account SID, Auth token (all from twillo, both for voice agent & sms)
+14. API-created agent's "simpler interface" —> it was a mistake, they updated their interface. I alter noticed that. 
+15. The MCP Bug Report v2 + Discord message rewrite —> We will run test again with manully created agent. Then will send report.
+16. The workspace-secret mix-up flag — > Both was mine. 
+17. Tool Key = Runtime Tool Name as a binding convention —> currect
+18. You never answered this one —> that was me in messenger. I was also running test previously. 
+19. Convocore Auto-Generated Data — Utilization Review -->> AI-generated conversation summary + token usage + cost , Per-message feedback/sentiment, Lead Qualification Funnel , Analytics. we will store these in out database per lead(except analysis). WE have to think when & how this will trigger. Nothing will overlap, rather first choice will be convocre. if fails, then own stack.
+
+20. Recommendation: before building Growth Agent's lead-scoring --> Agree with recommendation.
+
+--> # Convocore Adapter Spec v1
+21. 8.1 human-handoff (Convocore system tool) --> I would go with the deem option. on human handoff, we will first try with convocore email + our kb store, If only email no sufficient, we will then add extra notification method. 
+22. Shopify system tool's credential model (Part 4.3) --> already answered above.
+23. runtime_module inference (Part 3.2) —-> Keep the system simple to run & maintain. Convocore node's prompt explicitly sets a variable like runtime_module: "conversion_engine" before calling the tool. Also, we can keep kindoff, embedded module logic into convocore pormpts. (still logic comes from runtime, covncore jsut holds execution instructions). another option would be variable based, if {module_varaible} active got his part else thta, but with this type of LLM based system, I think LLM with hallucinate with this logic based, SO, For starting embedded logic will be better. WE can make a system of our own. WE can make template based on logics, like a simple agent template dashboard. WE will insert witch modules are active, our system will give us what to put in the covnore. simple copy pest task. (but add more task).[already we have added new 2 dashboard concept].
+
+24. control.convocore_agent_map table —-> Confirmed, but IF it seems to create & maintain another tale with difficult, we can add extra columns in the main client info table. (it maybe breaks our rule, but it will work & keep simple) --> Also we have to store agent name in our database + We have to make a Agent naming convention. Note: agent name = name on web chat wigert, 
+25. 10.2 Required client-side setup --> 1, A Twilio number (purchased via Convocore, or the client's own imported number) --> It must be twillo, but It maybe client provided number from twillo or our purchased number from direct twillo(not via convocre). So, either way, we will just put twillo number, account sid, & auth into convocre. (Also this should be intigrated into our integration platform); 2, That number assigned to the specific Convocore agent --> All setup will be done by us, not client facing. Cleint will just put their info in our credential platform. 3, Twilio Account SID + Auth Token --> Yes, in all cases of voice agent we need this, as we are not using convocore provided numbers.
+26.10.3 Voice configuration fields --> Per agent -> 1, We will decide later whether it would be templated or per client, Even if templated, we need real test with different config then can make, Not template option is out of scope in this build phase. 2, Transcriber (Speech-to-Text) , Speech Generation (Text-to-Speech). Advanced/Call Behavior, All exists but not required in this scope to know. WE will manual configure & test, then let you know to make those documented, Just for now, currently there is no record call option & there are much more variety of model option + language (that's why hard to make it templated) -->  
+27. 10.4 System variables likely relevant to voice --> yeah, agree also mind those from SS. 
+
+28. Server URL + Server URL Secret(on advance settings)--> as long as I understand, this creates a end call trigger & pass call data, SS added (info from their agent, but it mentioned about multiple event, but there isn't multiple event option, Voice agent also can run usual custom tools. So, I think we shouldn't use this for now, Mark this for later addition, WE also need to update database for this. 
+29. Cost tracking —-> cost is per minute(fixed platform charge + llm + twillow cost)
+30, forward-call destination numbers —-> I think it's instruction based, like in prompt we have to define, if that happens, use {forward-call} tool & forward the call to X(fixed or variable) number.
+31, Required Before Build: Live Verification Pass --> WE need just number & agent configuration + node by node instruction as like chat agent. Every node including start node has 2 slots for instruction. One for text, another voice. (ss added). so, To configure a voice agent, 2 work, add number & configure agent (voice tab settings, just model, language selection) another give proper voice based prompt in every node. One node can handle both chat & voice agent, no need for extra node for each one. another think, we can't use google-live model cause we use multiple node.
+
+.....................
+
+
+

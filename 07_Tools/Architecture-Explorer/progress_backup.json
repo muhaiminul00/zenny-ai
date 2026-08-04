@@ -1,0 +1,12 @@
+{
+  "createdAt": "2026-07-09",
+  "source": "repository snapshot created before the v1 document/flowchart migration",
+  "storageKey": "architecture-explorer:v1",
+  "browserLocalStorageAvailable": false,
+  "completedSections": [],
+  "currentReadingPosition": null,
+  "bookmarks": [],
+  "notes": {},
+  "timestamps": {},
+  "important": "Browser localStorage is origin-specific and cannot be read from the project filesystem. On first load, the updated explorer copies the live legacy value to architecture-explorer:v1:backup:<timestamp> before migrating it. Use the in-app Export progress button to download a populated snapshot."
+}
