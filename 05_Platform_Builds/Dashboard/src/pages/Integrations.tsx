@@ -129,7 +129,7 @@ export function Integrations() {
             <div className="integration-card" key={category}>
               <div className="provider-name">
                 {CATEGORY_LABELS[category] ?? category}
-                {existing && (
+                {existing && existing.status !== 'revoked' && (
                   <div className="note">
                     {existing.provider}
                     {existing.provider_account_id ? ` · ${existing.provider_account_id}` : ''}
