@@ -142,48 +142,68 @@ export function Integrations() {
     return () => stopPopupPoll();
   }, []);
 
-  // BC-020 REVISION — real platform constraint found live: Supabase Edge
-  // Functions cannot serve script-executing HTML (the gateway forces
-  // Content-Type: text/plain + a `sandbox` CSP on real GET responses —
-  // a `curl -I` HEAD request misleadingly showed text/html, which is
-  // what made the first version of this fix look correct until tested
-  // in a real browser). oauth-callback went back to a plain redirect
-  // (v5). The popup's own landing page IS this same /integrations
-  // route — when it loads with a window.opener AND a connect_result
-  // param, that means THIS load is the popup completing, not the
-  // parent dashboard. It postMessages its own opener (now same-origin,
-  // dashboard.zeromanuals.com — not the Supabase origin, since the
-  // message now comes from our own app, not the Edge Function) and
-  // closes itself, rather than rendering the full dashboard UI.
-  const isPopupLanding =
-    typeof window !== 'undefined' && !!window.opener && searchParams.has('connect_result');
+  // BC-020 REVISION 2 — a second real platform constraint found live,
+  // after fixing the first (Edge Functions can't serve executable HTML —
+  // see below). Confirmed via curl that Google's own sign-in pages send
+  // a Cross-Origin-Opener-Policy header — a well-documented, industry-
+  // wide cause of `window.opener` going null partway through a real
+  // Google OAuth redirect chain, independent of anything in this app's
+  // code (it's why Google's own newer identity libraries moved away from
+  // relying on window.opener for popup flows at all). Relying on
+  // window.opener + postMessage alone is NOT reliable enough here.
+  //
+  // Real fix: localStorage + the `storage` event as the PRIMARY signal.
+  // Unlike postMessage, it doesn't need an opener reference at all —
+  // `storage` events fire in every other same-origin window/tab purely
+  // because the origin matches, regardless of how that window was
+  // opened or whether COOP severed the opener link. postMessage is kept
+  // as a secondary, best-effort signal (fires immediately when opener
+  // IS available; harmless no-op otherwise).
+  //
+  // oauth-callback itself is a plain redirect (v5) — Edge Functions
+  // can't serve script-executing HTML at all: the gateway forces
+  // Content-Type: text/plain + a `sandbox` CSP on real GET responses (a
+  // `curl -I` HEAD request misleadingly showed text/html, which is what
+  // made an earlier version of this fix look correct until tested in a
+  // real browser). This same /integrations route is what oauth-callback
+  // redirects to — including inside the popup.
+  const OAUTH_RESULT_KEY = 'zenny_oauth_result';
+  const hasConnectResult = searchParams.has('connect_result');
 
   useEffect(() => {
-    if (!isPopupLanding) return;
+    if (!hasConnectResult) return;
     const success = searchParams.get('connect_result') === 'success';
     const category = searchParams.get('category');
     const reason = searchParams.get('reason');
+    const payload = { type: 'zenny-oauth-result', success, category, reason, at: Date.now() };
+
     try {
-      window.opener?.postMessage(
-        { type: 'zenny-oauth-result', success, category, reason },
-        window.location.origin,
-      );
+      localStorage.setItem(OAUTH_RESULT_KEY, JSON.stringify(payload));
     } catch (_e) {
-      // opener gone or a cross-origin restriction — nothing more to do
+      // localStorage unavailable (private browsing etc.) — postMessage
+      // below is still attempted as a fallback.
     }
+    try {
+      window.opener?.postMessage(payload, window.location.origin);
+    } catch (_e) {
+      // opener gone or a cross-origin restriction — localStorage above
+      // is the real signal now, this was always best-effort.
+    }
+    // Only a genuine popup (opened via script) can close itself — if
+    // this URL was hit directly in a normal tab, close() is a silent
+    // no-op and the component falls through to the full dashboard
+    // render below instead of hanging on a blank "Finishing up" page.
     window.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Parent-window listener: receives the message the popup landing page
-  // above sends. Origin-checked against our OWN origin (the popup is
-  // another instance of this same dashboard, not the Supabase project).
+  // Parent-window listener: 'storage' is the primary, reliable signal
+  // (see above); 'message' is a secondary best-effort one for the case
+  // where window.opener did survive. Both funnel into the same handler;
+  // harmless if both fire for the same result.
   useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) return;
-      const data = event.data as { type?: string; success?: boolean; category?: string; reason?: string };
+    function handleResult(data: { type?: string; success?: boolean; category?: string; reason?: string }) {
       if (data?.type !== 'zenny-oauth-result') return;
-
       stopPopupPoll();
       setBusyProvider(null);
       if (data.success) {
@@ -193,8 +213,27 @@ export function Integrations() {
       }
       load();
     }
+
+    function onStorage(event: StorageEvent) {
+      if (event.key !== OAUTH_RESULT_KEY || !event.newValue) return;
+      try {
+        handleResult(JSON.parse(event.newValue));
+      } catch (_e) {
+        // malformed value — ignore
+      }
+    }
+
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      handleResult(event.data as { type?: string; success?: boolean; category?: string; reason?: string });
+    }
+
+    window.addEventListener('storage', onStorage);
     window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('message', onMessage);
+    };
   }, [load]);
 
   // Fallback path: oauth-callback redirected a full page here (no
@@ -341,10 +380,13 @@ export function Integrations() {
     }
   };
 
-  // BC-020: this load IS the popup completing — postMessage + close()
-  // already fired in the effect above. Render a minimal message in case
-  // window.close() is delayed or blocked, rather than the full dashboard.
-  if (isPopupLanding) return <p>Finishing up… you can close this window.</p>;
+  // BC-020: if this load IS a popup completing, window.close() already
+  // fired in the effect above and the tab vanishes before this even
+  // paints. If close() was a no-op (this wasn't actually a script-opened
+  // window — e.g. the raw callback URL was hit directly), falling
+  // through to the normal dashboard render below — complete with the
+  // existing connectResult banner — is the correct fallback, not a
+  // separate "finishing up" state.
 
   if (error) return <p className="error-text">Failed to load integrations: {error}</p>;
   if (!client || !connections) return <p>Loading integrations…</p>;
