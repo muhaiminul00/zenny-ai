@@ -15,10 +15,13 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 2 (BC-002)
+2026-08-05 — by Claude Code, Session 3 (BC-003, partial — 2 items pending human input)
 
 ## Current Phase
-Phase 0 — Environment Setup — MCP CONFIG COMPLETE. Phase 1 (BC-003) not yet started.
+Phase 1 — Close Credential Platform Gaps — IN PROGRESS. Steps 0/2/3/4/5
+of BC-003 complete and live-verified. Step 1 (auth cleanup) and Step 6
+(seed real credentials) both paused pending human decisions — see
+Blockers.
 
 ---
 
@@ -43,18 +46,77 @@ Phase 13 — Template Dashboard .................... DEFERRED (per Part 2.6)
 
 ---
 
-## Database — Real Current State
+## Database — Real Current State (BC-003 live audit, project zenny-vault ONLY)
 
 ```
-control.oauth_apps:              NOT YET BUILT
-control.client_connections:      NOT YET BUILT
-control.oauth_state:             NOT YET BUILT
-control.connection_audit_log:    NOT YET BUILT
-control.convocore_agent_map:     NOT YET BUILT
-leads (Convocore columns):       NOT YET ADDED
-escalations.escalation_team:     NOT YET ADDED
+control.oauth_apps:              EXISTS, MATCHES SPEC (Part 4.2). 7-value
+                                  provider CHECK (google, calendly,
+                                  cal_com, shopify, slack, gmail,
+                                  woocommerce) — a reasonable, spec-
+                                  consistent extension, not a violation.
+                                  6 rows, all PLACEHOLDER values
+                                  (client_id = "PENDING_<PROVIDER>_
+                                  CLIENT_ID" or "NOT_APPLICABLE"; each
+                                  row's client_secret_id points to a
+                                  real Vault UUID — decrypted contents
+                                  NOT read directly, per the harness's
+                                  own classifier blocking that action;
+                                  assumed placeholder text given the
+                                  client_id pattern, not confirmed).
+                                  app_status: 5 rows 'testing', 1 row
+                                  ('woocommerce') 'not_applicable'. No
+                                  cal_com row exists as 'pending' yet —
+                                  BC-003 Step 6 sets this.
+control.client_connections:      EXISTS, MATCHES SPEC (Part 4.2) +1
+                                  reasonable extension: secondary_secret_id
+                                  (nullable uuid, documented in-column
+                                  comment — holds a second simultaneous
+                                  credential part, e.g. WooCommerce
+                                  Consumer Secret). UNIQUE(client_id,
+                                  category) constraint confirmed present.
+                                  last_error: plain text, nullable —
+                                  matches Part 5.3/2.9's resolved
+                                  decision exactly. 0 rows (expected,
+                                  no live client yet).
+control.oauth_state:             EXISTS, MATCHES SPEC (Part 4.2) exactly.
+                                  0 rows (expected).
+control.connection_audit_log:    EXISTS, MATCHES SPEC (Part 6.3) exactly,
+                                  including reason as plain text nullable
+                                  (no structured category — confirmed
+                                  decision, Part 2.9). 0 rows (expected).
+control.convocore_agent_map:     NOT YET BUILT (Phase 2, out of scope)
+leads (Convocore columns):       NOT YET ADDED (Phase 2, out of scope)
+escalations.escalation_team:     NOT YET ADDED (Phase 2, out of scope)
+
+RPC layer (Part 4.4 SECURITY DEFINER pattern) — ALREADY BUILT, confirmed
+live: store_credential_secret(value,name,description)->uuid,
+read_credential_secret(secret_id)->text, get_oauth_app, upsert_client_
+connection, insert_audit_log_event, update_connection_tokens,
+update_connection_status, get_client_connection, get_connections_due_
+for_refresh, get_google_testing_connections_near_7day_expiry,
+insert_oauth_state, consume_oauth_state — all SECURITY DEFINER, all
+found via live pg_proc query, none assumed.
+
+Edge Functions (project zenny-vault) — ALL 3 CONFIRMED DEPLOYED + ACTIVE,
+real (non-stub) implementations read in full:
+  oauth-initiate       ACTIVE, v2 — builds provider authorize URLs for
+                        google/shopify/slack/calendly/cal_com via
+                        get_oauth_app+insert_oauth_state RPCs
+  oauth-callback        ACTIVE, v2 — live-tested with a bare GET (no
+                        state param): returned real 302 redirect to
+                        https://dashboard.zenny.pending/?connect_result=
+                        error&reason=missing_state, exactly matching its
+                        own source logic. Note: ZENNY_DASHBOARD_URL env
+                        var appears unset (using the ".pending" fallback
+                        default) — informational, not blocking.
+  woocommerce-connect    ACTIVE, v1 — validates Consumer Key/Secret via
+                        a live GET against the client's own store's
+                        /wp-json/wc/v3/system_status before storing
+                        anything; stores Key in access_token_secret_id,
+                        Secret in secondary_secret_id, refresh_token_
+                        secret_id NULL (correctly derives as api_key
+                        per Part 4.2.1).
 ```
-*(Replace with real state each session — add/remove rows as schema grows)*
 
 ## Workflows — Real Current State
 
@@ -65,27 +127,48 @@ UTIL-003 Error Logger:            NOT STARTED
 UTIL-004 Notification Router:     NOT STARTED
 UTIL-005 Stop Checker:            NOT STARTED
 UTIL-006 Credential Resolver:     BUILT — tested w/ placeholder creds
-SCH-006 Token Refresh Sweep:      BUILT — NOT live-tested (blocked on creds)
+SCH-006 Token Refresh Sweep:      BUILT, interval CONFIRMED LIVE = exactly
+                                  6 hours (n8n get_workflow_details:
+                                  "Every 6 Hours" node, rule.interval =
+                                  [{field:"hours", hoursInterval:6}]) —
+                                  matches Part 2.9's decision exactly, no
+                                  correction needed. Workflow is
+                                  active:false in n8n (built, not yet
+                                  turned on) — reasonable given no real
+                                  credentials exist yet to refresh.
 [... add every WF/SCH/INT/ADP as it's touched, never remove a line]
 ```
 
 ## Credentials — Real Current State
 
 ```
-Google:     client ID + secret captured, test users added,
-            verification SUBMITTED (pending)
-Shopify:    client ID + secret captured
-Slack:      bot token (xoxb-...) captured
-Calendly:   client ID, secret, webhook signing key captured
-Cal.com:    NOT STARTED — waiting on business email from human
-WooCommerce: no registration needed — onboarding guide NOT written
-control.oauth_apps seeded:        UNKNOWN ROW SHAPE — table EXISTS with 6
-                                   rows (see correction below), contents
-                                   not inspected this session (out of
-                                   BC-002 scope)
-Vault storage round-trip:         WALKED THROUGH, NOT CONFIRMED
+Google:     client ID + secret NOT YET seeded into oauth_apps (row still
+            holds PENDING_GOOGLE_CLIENT_ID placeholder) — BC-003 Step 6
+            paused at the credential gate, waiting on real values
+Shopify:    same — PENDING_SHOPIFY_CLIENT_ID placeholder, not yet seeded
+Slack:      same — PENDING_SLACK_CLIENT_ID placeholder, not yet seeded
+Calendly:   same — PENDING_CALENDLY_CLIENT_ID placeholder, not yet seeded
+Cal.com:    row exists, app_status currently 'testing' — BC-003 Step 6
+            will set this to 'pending' once acted on (not yet changed
+            this session); still waiting on business email per prior
+            session notes
+WooCommerce: row exists, app_status = 'not_applicable', matches Part 8.3
+            fallback pattern (no OAuth registration needed) — CONFIRMED
+            correct as-is, nothing to seed
+control.oauth_apps seeded:        NO real secret values yet — all 6 rows
+                                   still placeholder (see above). Existing
+                                   client_secret_id UUIDs were NOT deleted
+                                   or touched this session.
+Vault storage round-trip:         CONFIRMED LIVE this session — wrote a
+                                   disposable test secret via
+                                   store_credential_secret(), read it back
+                                   via read_credential_secret(), exact
+                                   match confirmed, then deleted the test
+                                   secret via DELETE FROM vault.secrets.
 Redirect URI:                     kmhzosyljpzheqvfuyzm.supabase.co/
-                                   functions/v1/oauth-callback — CONFIRMED
+                                   functions/v1/oauth-callback — RE-
+                                   CONFIRMED live this session (real 302
+                                   response, not just DB-row text match).
 ```
 
 ## MCP Configuration — Real Current State (BC-002)
@@ -131,19 +214,31 @@ directly.
 ## Blockers Right Now
 
 ```
-- Supabase MCP and n8n MCP are now CONFIGURED and LIVE-VERIFIED (BC-002,
-  this session) — no longer a blocker. See "MCP Configuration" above.
+- CREDENTIAL GATE (BC-003 Step 6): waiting on the human to supply the
+  real secret VALUES (Google client ID+secret, Shopify client ID+secret,
+  Slack bot token, Calendly client ID+secret+webhook signing key) through
+  the agreed secure channel before any Vault write / oauth_apps UPDATE
+  happens. Not proceeding on placeholder values. Cal.com needs no secret
+  value yet — just app_status flipped to 'pending', can be done without
+  the gate if Commander confirms. WooCommerce needs nothing (confirmed
+  correct as 'not_applicable' already).
+- DECISION NEEDED (BC-003 Step 1): auth.users has exactly 2 rows, not
+  confirmed-both-demo. Row 1 (teyoyo8820@rapplo.com, created 2026-07-22)
+  matches a disposable-email-service pattern, reasonably classified as
+  demo/test. Row 2 (zeromanualtech@gmail.com, created 2026-07-22) is —
+  per this session's own system context — the actual human operator's
+  real email address, NOT demo data. No FK references exist from any
+  control.* table to auth.users either way (checked live, zero results),
+  so nothing downstream depends on either row. Did NOT delete either row
+  this session — flagging per the card's own "if any ambiguity, flag and
+  wait rather than guess" instruction, since deleting a real user's own
+  account would be a serious, hard-to-reverse mistake if my read is
+  wrong. Needs explicit human confirmation before any deletion.
 - Two Supabase projects exist under this org (zenny-vault AND an
   undocumented zenny-dashboard) — every future MCP call in this project
   MUST explicitly target project_id kmhzosyljpzheqvfuyzm (zenny-vault).
-  Flagging as a standing risk: an unqualified/wrong-project call could
-  silently hit the wrong database. Not itself a blocker, a discipline
-  note for every future session.
-- control.oauth_apps and 3 related tables already exist but their real
-  row-level state (schema correctness, whether the 6 oauth_apps rows are
-  seeded correctly) is UNVERIFIED — BC-003's first action should be
-  inspecting these directly rather than assuming they need to be built
-  from scratch.
+  Confirmed again this session — every BC-003 query targeted zenny-vault
+  explicitly, zenny-dashboard was never touched.
 ```
 
 ## Deviations From Build Card / Open Questions for Commander
@@ -185,6 +280,46 @@ directly.
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 3 — 2026-08-05 — BC-003: Credential Platform Gaps (partial)
+- What was done: Step 0 — full live audit of all 4 credential-platform
+  tables (columns, constraints, RLS, real row contents of oauth_apps)
+  against Client_Integration_and_Credential_Platform_v1.md and
+  Database_Structure_v4_FINAL.md before any write. All 4 tables:
+  MATCHES SPEC (2 with reasonable, documented additive extensions —
+  client_connections.secondary_secret_id, oauth_apps' 7-value provider
+  CHECK). Discovered the full SECURITY DEFINER RPC layer (Part 4.4) and
+  all 3 Edge Functions (Part 5) already exist and are real, deployed
+  implementations, not stubs — read every one in full. Step 2 — live
+  Vault round-trip test (store_credential_secret -> read_credential_
+  secret -> match -> cleanup), confirmed working, test secret deleted.
+  Step 3 — redirect URI re-confirmed via a real HTTP call (302 response
+  matching source code exactly), all 3 Edge Functions confirmed ACTIVE.
+  Step 4 — SCH-006's live n8n interval confirmed = exactly 6 hours, no
+  correction needed. Step 5 — last_error/reason confirmed plain text,
+  nullable, no structured category, matching the already-resolved
+  decision. Step 1 and Step 6 both stopped short of action — see
+  Blockers — per the card's own explicit "flag and wait" / credential
+  gate instructions, not silently resolved either way.
+- What was verified live vs. assumed: Everything in this session's
+  Database/Workflows/Credentials sections above is live-verified (real
+  SQL query output, real n8n workflow JSON, real HTTP response, real
+  Edge Function source code) — nothing in this update is assumed. The
+  one deliberate non-verification: existing oauth_apps rows' decrypted
+  client_secret_id values were NOT read (the harness's own permission
+  classifier blocked a direct vault.decrypted_secrets query) — classified
+  as "assumed placeholder" based on the client_id column's own PENDING_*
+  pattern, not confirmed by reading the secret itself, and explicitly
+  labeled as an assumption in the Database section above.
+- What broke / changed from plan: Two of BC-003's six steps could not be
+  completed in this session without further human input (Step 1's
+  ambiguous auth row, Step 6's credential gate) — both are genuine stops
+  required by the card's own text, not scope creep or a missed step.
+- Files touched: PROJECT_STATE.md only. One disposable Vault test secret
+  was created and deleted (control.oauth_apps and all 4 credential-
+  platform tables' real rows were read but not written to).
+
+---
 
 ### Session 2 — 2026-08-05 — BC-002: MCP Configuration
 - What was done: Confirmed Supabase MCP (claude_ai_Supabase) and n8n MCP
