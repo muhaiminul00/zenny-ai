@@ -14,6 +14,13 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function LoginRoute() {
+  const { session, loading } = useAuth();
+  if (loading) return <p>Loading…</p>;
+  if (session) return <Navigate to="/orders" replace />;
+  return <Login />;
+}
+
 function Layout({ children }: { children: ReactNode }) {
   const { session, signOut } = useAuth();
   return (
@@ -46,7 +53,7 @@ function Layout({ children }: { children: ReactNode }) {
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={<LoginRoute />} />
       <Route
         path="/*"
         element={
