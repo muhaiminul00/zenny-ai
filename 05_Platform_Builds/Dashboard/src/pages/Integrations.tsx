@@ -5,18 +5,20 @@ import type { ClientConnection, DashboardClient } from '../lib/types';
 
 // Which categories are shown per archetype, and which provider(s) can
 // fill each category. This is a UI-only display judgment call (BC-016,
-// widened BC-018), not a documented product decision — no source doc
-// specifies this mapping. Flagged in the Implementation Report; easy to
-// revise. BC-018: added 'notification' to every archetype (ops
-// notifications aren't really archetype-specific) and cal_com to
-// 'calendar' (it was missing entirely — the real bug this card fixes).
+// widened BC-018/BC-019), not a documented product decision — no source
+// doc specifies this mapping. Flagged in the Implementation Report; easy
+// to revise. BC-019: added 'email' to every archetype (Gmail — the
+// existing 'google' oauth_apps row already requests gmail.modify
+// alongside calendar scope, per Client_Integration_and_Credential_
+// Platform_v1.md Part 8.1's "one shared app" design; no separate
+// oauth_apps row needed, confirmed live before building this).
 const ARCHETYPE_CATEGORIES: Record<string, string[]> = {
-  emergency: ['calendar', 'notification'],
-  commerce_ecom: ['ecommerce', 'calendar', 'notification'],
-  commerce_restaurant: ['ecommerce', 'calendar', 'notification'],
-  appointment: ['calendar', 'notification'],
-  consultation: ['calendar', 'notification'],
-  engagement: ['notification'],
+  emergency: ['calendar', 'notification', 'email'],
+  commerce_ecom: ['ecommerce', 'calendar', 'notification', 'email'],
+  commerce_restaurant: ['ecommerce', 'calendar', 'notification', 'email'],
+  appointment: ['calendar', 'notification', 'email'],
+  consultation: ['calendar', 'notification', 'email'],
+  engagement: ['notification', 'email'],
 };
 
 interface ProviderOption {
@@ -25,11 +27,15 @@ interface ProviderOption {
   // BC-018: whether this provider actually works today, independent of
   // control.oauth_apps.app_status (which can be stale/misleading — e.g.
   // Slack's app_status says 'testing' but its client_id is a literal
-  // placeholder, per BC-004 Step C). Shown, never hidden, per this
-  // card's Step 2 resolution — see the Implementation Report for the
-  // Slack reasoning specifically.
+  // placeholder, per BC-004 Step C). Shown, never hidden, per BC-018's
+  // Step 2 resolution.
   ready: boolean;
   unavailableReason?: string;
+  // BC-019: 'oauth' (default, goes through oauth-initiate/oauth-callback)
+  // or 'api_key' (a direct client-side form + Edge Function POST, no
+  // OAuth round-trip — WooCommerce has no OAuth mechanism at all, per
+  // Client_Integration_and_Credential_Platform_v1.md Part 8.3).
+  kind?: 'oauth' | 'api_key';
 }
 
 const CATEGORY_PROVIDERS: Record<string, ProviderOption[]> = {
@@ -43,7 +49,10 @@ const CATEGORY_PROVIDERS: Record<string, ProviderOption[]> = {
       unavailableReason: 'Cal.com app registration is still pending (no real client yet).',
     },
   ],
-  ecommerce: [{ provider: 'shopify', label: 'Shopify', ready: true }],
+  ecommerce: [
+    { provider: 'shopify', label: 'Shopify', ready: true },
+    { provider: 'woocommerce', label: 'WooCommerce', ready: true, kind: 'api_key' },
+  ],
   email: [{ provider: 'google', label: 'Gmail', ready: true }],
   notification: [
     {
@@ -72,12 +81,27 @@ function normalizeShopifyShop(input: string): string {
   return s;
 }
 
+interface WooForm {
+  storeUrl: string;
+  consumerKey: string;
+  consumerSecret: string;
+}
+
+const EMPTY_WOO_FORM: WooForm = { storeUrl: '', consumerKey: '', consumerSecret: '' };
+
 export function Integrations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [client, setClient] = useState<DashboardClient | null>(null);
   const [connections, setConnections] = useState<ClientConnection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
+
+  // BC-019: which category's API-key form is currently open, and its
+  // field values. Only one provider (WooCommerce) uses this today —
+  // kept generic in case a second api_key provider shows up later.
+  const [apiKeyFormCategory, setApiKeyFormCategory] = useState<string | null>(null);
+  const [wooForm, setWooForm] = useState<WooForm>(EMPTY_WOO_FORM);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -128,6 +152,42 @@ export function Integrations() {
     url.searchParams.set('provider', provider);
     if (shop) url.searchParams.set('shop', shop);
     window.location.href = url.toString();
+  };
+
+  const openWooForm = (category: string) => {
+    setApiKeyError(null);
+    setWooForm(EMPTY_WOO_FORM);
+    setApiKeyFormCategory(category);
+  };
+
+  const submitWooForm = async () => {
+    if (!client) return;
+    if (!wooForm.storeUrl || !wooForm.consumerKey || !wooForm.consumerSecret) {
+      setApiKeyError('All 3 fields are required.');
+      return;
+    }
+    setBusyProvider('woocommerce');
+    setApiKeyError(null);
+    // Minimal UI per the card's explicit "functionality over polish"
+    // instruction — plain form, direct call to the real Edge Function
+    // (woocommerce-connect), same {client_id, store_url, consumer_key,
+    // consumer_secret} shape its real source expects (re-read live, not
+    // guessed).
+    const { data, error } = await supabase.functions.invoke('woocommerce-connect', {
+      body: {
+        client_id: client.client_id,
+        store_url: wooForm.storeUrl,
+        consumer_key: wooForm.consumerKey,
+        consumer_secret: wooForm.consumerSecret,
+      },
+    });
+    setBusyProvider(null);
+    if (error || data?.error) {
+      setApiKeyError(data?.error?.message ?? error?.message ?? 'Connection failed.');
+      return;
+    }
+    setApiKeyFormCategory(null);
+    load();
   };
 
   const handleDisconnect = async (connectionId: string) => {
@@ -181,49 +241,104 @@ export function Integrations() {
           const options = CATEGORY_PROVIDERS[category] ?? [];
           const existing = connections.find((c) => c.category === category);
           return (
-            <div className="integration-card" key={category}>
-              <div className="provider-name">
-                {CATEGORY_LABELS[category] ?? category}
-                {existing && existing.status !== 'revoked' && (
-                  <div className="note">
-                    {existing.provider}
-                    {existing.provider_account_id ? ` · ${existing.provider_account_id}` : ''}
-                  </div>
+            <div className="integration-card" key={category} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div className="provider-name">
+                  {CATEGORY_LABELS[category] ?? category}
+                  {existing && existing.status !== 'revoked' && (
+                    <div className="note">
+                      {existing.provider}
+                      {existing.provider_account_id ? ` · ${existing.provider_account_id}` : ''}
+                    </div>
+                  )}
+                </div>
+
+                {existing && existing.status !== 'revoked' ? (
+                  <>
+                    <span className={`status-pill status-${statusKey(existing)}`}>
+                      {statusLabel(existing)}
+                    </span>
+                    <button
+                      className="reject-button"
+                      disabled={busyProvider === existing.connection_id}
+                      onClick={() => handleDisconnect(existing.connection_id)}
+                    >
+                      Disconnect
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="status-pill status-not_connected">Not connected</span>
+                    {options.map((opt) =>
+                      !opt.ready ? (
+                        <span key={opt.provider} className="note" title={opt.unavailableReason}>
+                          {opt.label}: <span className="status-pill status-expired">Not yet available</span>
+                        </span>
+                      ) : opt.kind === 'api_key' ? (
+                        <button
+                          key={opt.provider}
+                          disabled={busyProvider === opt.provider}
+                          onClick={() => openWooForm(category)}
+                        >
+                          Connect {opt.label}
+                        </button>
+                      ) : (
+                        <button
+                          key={opt.provider}
+                          disabled={busyProvider === opt.provider}
+                          onClick={() => handleConnect(opt.provider, category)}
+                        >
+                          Connect {opt.label}
+                        </button>
+                      ),
+                    )}
+                  </>
                 )}
               </div>
 
-              {existing && existing.status !== 'revoked' ? (
-                <>
-                  <span className={`status-pill status-${statusKey(existing)}`}>
-                    {statusLabel(existing)}
-                  </span>
-                  <button
-                    className="reject-button"
-                    disabled={busyProvider === existing.connection_id}
-                    onClick={() => handleDisconnect(existing.connection_id)}
-                  >
-                    Disconnect
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="status-pill status-not_connected">Not connected</span>
-                  {options.map((opt) =>
-                    opt.ready ? (
-                      <button
-                        key={opt.provider}
-                        disabled={busyProvider === opt.provider}
-                        onClick={() => handleConnect(opt.provider, category)}
-                      >
-                        Connect {opt.label}
-                      </button>
-                    ) : (
-                      <span key={opt.provider} className="note" title={opt.unavailableReason}>
-                        {opt.label}: <span className="status-pill status-expired">Not yet available</span>
-                      </span>
-                    ),
-                  )}
-                </>
+              {apiKeyFormCategory === category && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <p className="note">
+                    WooCommerce has no OAuth flow — generate these in your store's wp-admin under
+                    WooCommerce → Settings → Advanced → REST API, then paste them here.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 420 }}>
+                    <label>
+                      Store URL
+                      <input
+                        type="text"
+                        placeholder="https://yourstore.com"
+                        value={wooForm.storeUrl}
+                        onChange={(e) => setWooForm({ ...wooForm, storeUrl: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Consumer Key
+                      <input
+                        type="text"
+                        value={wooForm.consumerKey}
+                        onChange={(e) => setWooForm({ ...wooForm, consumerKey: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Consumer Secret
+                      <input
+                        type="password"
+                        value={wooForm.consumerSecret}
+                        onChange={(e) => setWooForm({ ...wooForm, consumerSecret: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                  {apiKeyError && <p className="error-text">{apiKeyError}</p>}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <button disabled={busyProvider === 'woocommerce'} onClick={submitWooForm}>
+                      {busyProvider === 'woocommerce' ? 'Validating…' : 'Connect'}
+                    </button>
+                    <button className="secondary" onClick={() => setApiKeyFormCategory(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           );
