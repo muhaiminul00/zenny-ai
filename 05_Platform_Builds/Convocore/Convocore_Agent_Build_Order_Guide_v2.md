@@ -72,7 +72,7 @@ This applies whether the builder is a human going through Zenny's own project fi
 
 1. **List what this agent needs to capture**, per Part 1 step 5's findings.
 2. **Decide type per Variable** — Local (per-conversation, most common), Global (business-wide, 10-cap), ENV (secrets).
-3. **Create them**, using names sourced per the Doc-Search-First check above — not invented.
+3. **Create them**, using names sourced per the Doc-Search-First check above — not invented. Also add porper Description to clearly signal to the LLM What to calture in this variable, if possible add few-shot example.
 4. **Remember:** `email`, `name`, `address` as exact Keys are auto-captured by Convocore's lead system.
 5. **Capture is never automatic** — every Variable needing a value from conversation needs an explicit instruction in a node's Instructions later (Part 6).
 
