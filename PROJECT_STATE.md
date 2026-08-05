@@ -15,17 +15,15 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 7 (BC-005 — Phase 2 NOT COMPLETE, 1 item genuinely open)
+2026-08-05 — by Claude Code, Session 8 (BC-007 — Phase 2 COMPLETE)
 
 ## Current Phase
-Phase 2 — Convocore Database Changes — 6 of 7 BC-005 items closed with
-real migrations. 1 item (escalations.escalation_team) correctly NOT
-resolved — Convocore_Findings_Required_Updates_FINAL.md Part 1.8 itself
-still reads DECISION NEEDED, and the card explicitly instructed a hard
-STOP rather than unilateral resolution for that specific step. See
-Blockers for the fast-path (Planning_to_Build_Transition_v1.md Part 2.3
-already has the real column check + a proposed answer, just needs
-Commander sign-off). Phase 1 (BC-004) remains COMPLETE, unchanged.
+Phase 2 — Convocore Database Changes — **COMPLETE.** BC-007 closed the
+one item BC-005 left correctly open: escalations.escalation_team, added
+to public + all 5 tpl_* schemas per Commander-approved sign-off on
+Planning_to_Build_Transition_v1.md Part 2.3's proposed resolution.
+Phase 1 (BC-004) remains COMPLETE, unchanged. Phase 3 (Remaining Shared
+Utilities — UTIL-001–005) is next, not yet started.
 
 ---
 
@@ -34,7 +32,7 @@ Commander sign-off). Phase 1 (BC-004) remains COMPLETE, unchanged.
 ```
 Phase 0  — Environment Setup .................... IN PROGRESS
 Phase 1  — Close Credential Platform Gaps ........ COMPLETE
-Phase 2  — Convocore Database Changes ............ 6/7 DONE, 1 flagged open
+Phase 2  — Convocore Database Changes ............ COMPLETE
 Phase 3  — Remaining Shared Utilities ............ NOT STARTED
 Phase 4  — Convocore Adapter (ADP-002) ........... NOT STARTED
 Phase 5  — 4 New Dashboard Systems (Directus) .... NOT STARTED
@@ -133,34 +131,29 @@ leads (Convocore columns):       ADDED (BC-005, migration 028) — all 6
                                   COMMENT ON COLUMN (public only) warning
                                   it's WebSocket-origin ONLY, per
                                   Convocore_Adapter_Spec_FINAL.md Part 12.
-escalations.escalation_team:     NOT ADDED — genuinely flagged, not a
-                                  gap Claude Code left incomplete by
-                                  oversight. Convocore_Findings_Required_
-                                  Updates_FINAL.md Part 1.8 itself still
-                                  reads DECISION NEEDED (its own text says
-                                  the author didn't have the live column
-                                  list to check team_key/issue_summary
-                                  compatibility against). BC-005's card
-                                  explicitly instructed a hard STOP for
-                                  this specific step ("do not resolve a
-                                  genuinely open architectural question
-                                  unilaterally") — a stricter instruction
-                                  than the naming-convention step got.
-                                  **Fast path for the Commander:**
-                                  Planning_to_Build_Transition_v1.md Part
-                                  2.3 already did the exact live column
-                                  check Findings doc said it lacked
-                                  (escalation_id, lead_id, customer_id,
-                                  escalation_type, escalation_reason,
-                                  escalation_priority, origin_module,
-                                  trigger_condition, ownership_state,
-                                  status, created_date, resolved_date —
-                                  confirmed live-matching, BC-002/BC-003's
-                                  own audits) and proposes: escalation_
-                                  reason maps reasonably onto issue_
-                                  summary, but team_key has no home →
-                                  ADD COLUMN escalation_team text NULL.
-                                  Just needs explicit sign-off to apply.
+escalations.escalation_team:     ADDED (BC-007, migration 032),
+                                  Commander-approved per Planning_to_
+                                  Build_Transition_v1.md Part 2.3.
+                                  Applied to public + all 5 tpl_* schemas
+                                  — confirmed LIVE first (not assumed)
+                                  that escalations follows the same
+                                  mirroring pattern as leads/client_config
+                                  (public + tpl_*, not control-only), per
+                                  the card's explicit instruction not to
+                                  assume this. escalation_reason's mapping
+                                  onto Convocore's issue_summary
+                                  re-confirmed live before the migration
+                                  (still text NOT NULL, unchanged) — no
+                                  change needed there. Column has a
+                                  COMMENT ON COLUMN (public only)
+                                  explaining its origin. A throwaway test
+                                  client schema (client_test_001_acme_
+                                  emergency_test, from earlier Phase C
+                                  onboarding testing per Client_
+                                  Onboarding_Sequence_Spec.md) also has an
+                                  escalations table — deliberately left
+                                  untouched, out of scope, matching how
+                                  BC-005 treated non-template schemas.
 client_config voice/SMS fields:  ADDED (BC-005, migrations 029 + 030) —
                                   voice_agent_enabled boolean NOT NULL
                                   DEFAULT false, sms_agent_enabled
@@ -399,20 +392,13 @@ directly.
 ## Blockers Right Now
 
 ```
-BLOCKING Phase 2 closure (1 item, genuine, not oversight):
-- escalations.escalation_team — Convocore_Findings_Required_Updates_
-  FINAL.md Part 1.8 itself still reads DECISION NEEDED. BC-005's card
-  explicitly required a hard STOP on this specific step rather than
-  cross-referencing another document unilaterally (unlike the naming-
-  convention item, which the same card explicitly allowed resolving via
-  a later document). FAST PATH: Planning_to_Build_Transition_v1.md Part
-  2.3 already did the live column check Findings doc said it lacked, and
-  proposes `ALTER TABLE {client_schema}.escalations ADD COLUMN
-  escalation_team text NULL;` (escalation_reason maps onto issue_summary,
-  team_key has no home). Needs explicit Commander sign-off, not a new
-  investigation — the next Build Card can likely just say "apply it."
+NONE blocking Phase 2 closure. Phase 2 is COMPLETE as of BC-007.
 
 NONE blocking Phase 1 closure. Phase 1 remains COMPLETE as of BC-004.
+
+Resolved this session (BC-007), no longer open:
+- escalations.escalation_team — added (migration 032), Commander-
+  approved, confirmed live in public + all 5 tpl_* schemas.
 
 Open, non-blocking follow-up (BC-004 Step C):
 - Slack needs a real OAuth app (client_id+secret, chat:write scope only
@@ -486,6 +472,29 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 8 — 2026-08-05 — BC-007: Phase 2 closure
+- What was done: Confirmed live (not assumed) that escalations mirrors
+  the same public + 5 tpl_* pattern as leads/client_config, not
+  control-only. Re-confirmed live that escalation_reason (text NOT NULL)
+  is unchanged, so its mapping onto Convocore's issue_summary still
+  holds. Applied migration 032: escalation_team text NULL added to
+  public + all 5 tpl_* escalations, per Planning_to_Build_Transition_
+  v1.md Part 2.3's Commander-approved resolution. Confirmed the new
+  column live in all 6 schemas via information_schema. Ran get_advisors
+  (security) — only the same pre-existing RLS-no-policy advisory, nothing
+  new. Left the throwaway client_test_001_acme_emergency_test schema's
+  escalations table untouched, out of scope (matches BC-005's precedent
+  for non-template schemas).
+- What was verified live vs. assumed: Both explicit "confirm live, don't
+  assume" instructions in the card were honored with real queries before
+  any write — escalations' schema-mirroring pattern and escalation_
+  reason's current shape.
+- What broke / changed from plan: Nothing. Straightforward close-out of
+  the one item BC-005 correctly left open.
+- Files touched: PROJECT_STATE.md. Database: 1 new migration (032)
+  applied to zenny-vault, 6 schemas touched (public + 5 tpl_*).
+- **Phase 2 verdict: COMPLETE.** All 7 BC-005/BC-007 items closed.
 
 ### Session 7 — 2026-08-05 — BC-005: Phase 2 (6/7 items closed)
 - What was done: Step 0 — live audit found no drift (convocore_agent_map
