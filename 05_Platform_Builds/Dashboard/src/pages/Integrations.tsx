@@ -183,7 +183,22 @@ export function Integrations() {
     });
     setBusyProvider(null);
     if (error || data?.error) {
-      setApiKeyError(data?.error?.message ?? error?.message ?? 'Connection failed.');
+      // supabase-js's FunctionsHttpError doesn't auto-parse the response
+      // body into `error.message` (that stays a generic "non-2xx status
+      // code") — the real reason lives in the raw Response on
+      // `error.context`, per supabase-js's own error shape. Caught via
+      // live testing: the generic message alone told the user nothing
+      // useful (e.g. which real WooCommerce validation actually failed).
+      let message = data?.error?.message;
+      if (!message && error && 'context' in error) {
+        try {
+          const body = await (error as { context: Response }).context.json();
+          message = body?.error?.message;
+        } catch {
+          // context wasn't valid JSON — fall through to the generic message
+        }
+      }
+      setApiKeyError(message ?? error?.message ?? 'Connection failed.');
       return;
     }
     setApiKeyFormCategory(null);
