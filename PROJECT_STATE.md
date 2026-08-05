@@ -15,15 +15,23 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 11 (BC-010 — Phase 4 COMPLETE)
+2026-08-05 — by Claude Code, Session 12 (BC-011 — standing rule change, no build work)
 
 ## Current Phase
-Phase 4 — Convocore Adapter (ADP-002) — **COMPLETE.** BC-010 closed the
-one item BC-009 left open: human-handoff's staged-fallback Stage 2
-trigger, built per the Commander's exact operational definition. ADP-002
-registered in n8n_Workflow_Specification_v1.md Part 17 (BC-009 — also
-closed the gap that ADP-001/Voiceflow was never registered either). All
-3 stale "Prospective" lines updated to real status (BC-009). Phases 1-3
+Still Phase 4 COMPLETE (BC-010, unchanged) — BC-011 performed NO build
+work by its own explicit scope. It read a new document
+(Convocore_Agent_Build_Order_Guide_v2.md) and wrote a new standing rule
+(Document Resolution Authority) into CLAUDE.md and Claude_Build_Command_
+Protocol_v2.md. This rule is NOT yet in effect for BC-011 itself — it
+takes effect starting the next Build Card, per the card's own explicit
+wording. Phase 5 has not started; awaiting Commander acknowledgment per
+this card's own gate before Phase 5 begins (see Blockers). Convocore
+Adapter (ADP-002) — **COMPLETE.** BC-010 closed the one item BC-009 left
+open: human-handoff's staged-fallback Stage 2 trigger, built per the
+Commander's exact operational definition. ADP-002 registered in
+n8n_Workflow_Specification_v1.md Part 17 (BC-009 — also closed the gap
+that ADP-001/Voiceflow was never registered either). All 3 stale
+"Prospective" lines updated to real status (BC-009). Phases 1-3
 remain COMPLETE, unchanged. Phase 5 (4 New Dashboard Systems) is next.
 
 ---
@@ -621,6 +629,20 @@ directly.
 ## Blockers Right Now
 
 ```
+BLOCKING all further work (by this card's own explicit gate, not a
+normal blocker):
+- BC-011's Document Resolution Authority standing rule is written into
+  CLAUDE.md and Claude_Build_Command_Protocol_v2.md but is NOT yet in
+  effect — it takes effect starting the NEXT Build Card, per the card's
+  own wording. No self-resolved document-level items occurred this
+  session (BC-011 performed no build work at all, per its own scope —
+  nothing to log under the new rule's gate). Phase 5 (or any other
+  build work) does not begin until the Commander has explicitly
+  acknowledged this card's completion in a follow-up message, per the
+  card's own Step 2/gate instruction (this is BC-011's own stop
+  condition, not a triggered instance of the new rule's gate, since the
+  new rule wasn't active yet during this session).
+
 NONE blocking Phase 4 closure. Phase 4 is COMPLETE as of BC-010.
 
 Resolved this session (BC-010), no longer open:
@@ -777,6 +799,64 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 12 — 2026-08-05 — BC-011: Document Resolution Authority (standing rule change, no build work)
+- What was done: Read Convocore_Agent_Build_Order_Guide_v2.md in full,
+  including Part 0.1's Doc-Search-First Rule (the precedent this card's
+  new authority generalizes) and Part 0.2's multi-node correction (noted
+  as future context, not actionable — Canvas lane still paused). Verified
+  live that Claude_Build_Command_Protocol_v2.md is the only build-
+  procedure-shaped file in the active root (no separate document exists)
+  before writing to it. Added the Document Resolution Authority standing
+  rule to CLAUDE.md (new section, plus an update to the existing
+  Commander/Executor paragraph so it no longer flatly contradicts the
+  new authority) and to Claude_Build_Command_Protocol_v2.md (new
+  subsection after "Claude Code — Executor", plus a v2.1 changelog
+  entry and a rewording of the old "never changes architecture" line to
+  "never invents architecture" with a cross-reference to the new
+  section, so the two don't read as contradictory). Both versions
+  written to stand alone for a cold future session — no "per BC-011"
+  references inside the operative rule text itself, per the card's
+  explicit instruction.
+- Understanding check, using this project's own real history (per the
+  card's Definition of Done): under the NEW rule, BC-004's Cal.com
+  chk_oauth_apps_status constraint mismatch is a clean "resolve it
+  yourself" case — the live constraint was a stale artifact contradicted
+  by Planning_to_Build_Transition_v1.md Part 2.9, which already had the
+  real answer ('pending' was always the intended value); no Commander
+  round-trip would be needed under the new rule, just the migration,
+  cited and logged. By contrast, BC-009's human-handoff "insufficient"
+  trigger condition (before BC-010's Commander decision) is a genuine
+  "still needs Commander" case even under the new rule — Convocore_
+  Findings_Required_Updates_FINAL.md Part 2.1 explicitly flagged it
+  DECISION NEEDED, and at that point in the project's history no OTHER
+  document anywhere had already answered what "insufficient" means
+  operationally — it required real new product judgment, which is
+  exactly what the Commander supplied in BC-010's card. A third,
+  subtler case worth naming: BC-005 Step 4's escalation_team was ALSO
+  flagged DECISION NEEDED in the Findings doc at the time, but Planning_
+  to_Build_Transition_v1.md Part 2.3 had, in fact, already resolved it
+  elsewhere (the real column check + a proposed answer) — under the OLD
+  model this still required a round-trip (BC-007) despite the answer
+  already existing; under the NEW rule, per the rule's own item 4 ("an
+  open-decision flag is binding unless a *different* document already
+  resolves it"), this would have been resolvable in the same session as
+  BC-005, since Planning doc Part 2.3 is exactly that different,
+  resolving document. This distinction — a DECISION NEEDED flag is
+  binding only until checked against the REST of the system's
+  documents, not binding in isolation — is the part of the rule most
+  likely to be gotten wrong, and is why it's called out explicitly here.
+- What broke / changed from plan: Nothing — this card's entire scope was
+  reading + writing the standing rule, no build work performed, per its
+  own explicit instruction.
+- Files touched: CLAUDE.md, Claude_Build_Command_Protocol_v2.md,
+  PROJECT_STATE.md. No n8n or Supabase changes this session.
+- **This session performed zero build work and logged zero self-
+  resolved document-level items** — the new rule's logging/
+  acknowledgment gate was not triggered (it wasn't in effect yet).
+  BC-011's OWN stop condition applies instead: awaiting explicit
+  Commander acknowledgment before Phase 5 or any other build work
+  begins.
 
 ### Session 11 — 2026-08-05 — BC-010: Phase 4 closure (Stage 2 trigger)
 - What was done: Re-confirmed live (grep against the real file, not

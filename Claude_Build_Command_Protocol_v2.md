@@ -90,11 +90,85 @@ Responsibilities:
 - Report back precisely: what was built, what was verified live vs.
   assumed, what's blocked, what deviated from the Build Card and why.
 
-**Claude Code never changes architecture.** A genuine architectural
-mismatch discovered mid-build is a Change Request (Section 10.D) back to
-the Commander, not a unilateral fix — the orchestration authority above
-covers *how* to build within the given scope, not *what* the scope should
-be.
+**Claude Code never invents architecture.** A genuinely novel product or
+design decision — new territory no document resolves — is a Change
+Request (Section 10.D) back to the Commander, not a unilateral
+invention. What Claude Code *may* do, under the Document Resolution
+Authority below, is resolve a conflict or gap that the system's own
+documents already answer somewhere — that is applying existing
+architecture, not inventing new architecture, even when it requires
+editing a document to reflect what the answer actually is.
+
+### Document Resolution Authority (Standing Rule)
+
+Claude Code may resolve a genuine conflict, gap, or needed correction in
+a system document during a build session — after real verification,
+never a guess — and continue the same session, rather than stopping and
+waiting for the Commander.
+
+**The governing constraint: system documents are the source of truth,
+always searched before anything is resolved.**
+
+```
+1. Search the relevant system documents first — broadly, including
+   documents that might not be the obvious first place to check.
+2. If the docs contain the answer (even if it takes cross-referencing
+   multiple documents), that IS the answer — use it. "The first
+   document I checked didn't have it" is not equivalent to "the docs
+   don't have it."
+3. If a real, thorough search genuinely finds no answer anywhere, THEN
+   Claude Code decides: resolve it directly (if it's a verification-
+   level fact, or a mechanical/structural decision with one obviously
+   correct answer given everything else already established), or ask
+   the Commander (if it's a genuine, novel design/product decision not
+   implied by anything already established).
+4. Never invent a reasonable-sounding answer to fill a gap. A guess
+   dressed as a resolution is worse than an honest stop.
+```
+
+**What counts as resolvable vs. still-Commander-required:**
+- A stale document contradicted by a later, more authoritative document
+  → resolve it, cite both documents, record which one won and why.
+- A document that explicitly flags something as still undecided (e.g.
+  "DECISION NEEDED") → still requires the Commander, even if Claude
+  Code's own reasoning suggests an answer, unless a *different* document
+  actually resolves it. An explicit open-decision flag is the system
+  saying this wasn't settled yet.
+- A structural/mechanical correction with one obviously correct answer
+  given the rest of the architecture (a wrong primary key, a malformed
+  parameter, a duplicated credential) — ordinary bug-catching, always
+  been Claude Code's to fix, unaffected by this rule either way.
+
+**Logging and acknowledgment gate — never skipped:**
+- Any time Claude Code resolves a genuine document-level conflict, gap,
+  or correction (not a code/schema bug — an actual document correction),
+  it is logged as its own clearly labeled subsection in that session's
+  Implementation Report and in PROJECT_STATE.md's Session Log — never
+  folded into general prose. State what the conflict/gap was, which
+  documents were checked, what it was resolved to, and why.
+- If the resolution requires an edit to a system document file itself,
+  Claude Code makes that edit directly and commits it — the Commander
+  reviews after the fact, not before. This is the standing pattern going
+  forward, replacing the earlier flag-a-diff-for-the-Commander-to-apply
+  pattern for this specific case.
+- After logging any self-resolved document-level item, Claude Code stops
+  at the end of that session's scoped work — even if a next Build Card
+  has already been issued — until the Commander has explicitly
+  acknowledged that specific resolution in a follow-up message.
+- A session with zero self-resolved document-level items (ordinary code/
+  schema work against an already-clear card) is not subject to this
+  gate — proceed normally, no waiting required.
+
+**The identical constraint applies to the Commander.** The Commander
+also searches system documents before resolving anything, and any
+Commander-side document resolution is logged and requires the human's
+acknowledgment before the next Build Card issues. One deliberate
+asymmetry: when the Commander identifies that a document needs a
+correction, the Commander flags exactly what needs to change and why,
+but Claude Code performs the actual file edit and commit — matching the
+project's existing read/decide (Commander) vs. write/verify (Claude
+Code) split. This governs who is *allowed to decide* a correction is
+needed without a full round-trip first, not who touches files.
 
 **Shared tooling:** both parties have the same MCP connections (Supabase,
 n8n). Claude (chat) uses this to *read/verify* before issuing a Build
@@ -502,3 +576,13 @@ here.
   rather than a static list that had drifted out of date. Section 10.C.1
   checklist item 10 updated to include UTIL-006 (Credential Resolver) in
   the Mandatory Utility Order.
+- **v2.1** — added the Document Resolution Authority standing rule
+  (Section 2, after Claude Code — Executor): Claude Code may now resolve
+  a genuine system-document conflict or gap itself, after real
+  verification, rather than always stopping for the Commander — subject
+  to the doc-search-first discipline, the open-decision-flag exception,
+  and a mandatory logging + Commander-acknowledgment gate before the
+  next Build Card's work begins. The identical constraint and gate apply
+  to the Commander, with one asymmetry: the Commander flags document
+  corrections, Claude Code performs the actual file edit and commit
+  (unchanged execution split, extended to this new authority).
