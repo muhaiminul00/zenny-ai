@@ -991,6 +991,17 @@ Fallback chain:   B → C  (silent retry; then graceful redirect to next Mode
 { "available": true, "alternatives": [] }
 ```
 
+**Read source (`calendar`/`table_slot` check_type only — added per Phase 5C's
+parallel-write pattern, Planning_to_Build_Transition_v1.md Part 4 Phase 5,
+Change Request applied BC-013):** the client's real, live calendar/booking
+system is checked FIRST (source of truth when reachable) — `public.appointments`
+/ `tpl_appointment.appointments` / `tpl_commerce.appointments`'s stored
+record is consulted only as a fallback, when the live read fails or the
+client has no calendar connected at all. This is the opposite direction
+from CreateAppointment/CreateReservation's write behavior below (client-first
+reads, parallel writes) — never assume the stored `appointments` row is
+current without checking `authoritative_source`.
+
 **Tests:** Success · Failure (invalid `check_type`) · Security · Retry ·
 N/A for Duplicate (read-only). **Status: Planned — Emergency/Consultation/
 Engagement `check_type` values (`team`/`specialist`/`capacity`) are v2
@@ -1018,12 +1029,33 @@ Fallback chain:   B → C → D
 }
 ```
 
+**Write behavior (PARALLEL, not sequential — Phase 5C, Planning_to_Build_
+Transition_v1.md Part 4 Phase 5, Change Request applied BC-013):** every
+create/update writes to BOTH the client's real calendar (Google/Calendly/
+Cal.com, via the Provider Router pattern) AND `public.appointments` /
+`tpl_appointment.appointments`, as part of the same operation — not
+"client calendar first, our DB later." If the client-calendar write
+succeeds, both systems agree; our row is a synced mirror. If it fails
+(Tool Execution Fallback trigger, `Client_Integration_and_Credential_
+Platform_v1.md` Part 7), our row still succeeds as the resilient fallback
+record (`authoritative_source = 'our_db_fallback'`, `alert_fired = true`,
+immediate alert per Part 7) — nothing is silently lost.
+
 **Response `result`:**
 ```json
-{ "appointment_id": "uuid", "calendar_event_id": "string", "status": "confirmed" }
+{
+  "appointment_id": "uuid",
+  "calendar_event_id": "string, nullable if client-calendar write failed",
+  "client_calendar_write_status": "pending | success | failed",
+  "our_db_write_status": "pending | success | failed",
+  "authoritative_source": "client_calendar | our_db_fallback",
+  "status": "confirmed | pending_review"
+}
 ```
 
-**Tests:** Full 5-category set. **Status: Planned.**
+**Tests:** Full 5-category set, plus explicit client-calendar-write-failure
+case (confirm `our_db_write_status = 'success'`, `authoritative_source =
+'our_db_fallback'`, alert fired). **Status: Planned.**
 
 ## 13.4 CreateBookingRequest — WF-004
 
@@ -1090,12 +1122,28 @@ Fallback chain:   B → C  (→ CreateWaitlistEntry if no slot, per
 }
 ```
 
+**Write behavior (PARALLEL, not sequential — same Phase 5C pattern as
+CreateAppointment §13.3, Change Request applied BC-013):** writes to BOTH
+the client's real reservation/booking system AND `tpl_commerce.appointments`
+(the same generic appointments-tracking table CreateAppointment uses,
+mirrored into `tpl_commerce` specifically to cover restaurant reservations
+— it holds no restaurant-specific columns, purely conversion_id + write-
+status tracking, same shape everywhere it's deployed). Failure/fallback
+behavior identical to CreateAppointment §13.3.
+
 **Response `result`:**
 ```json
-{ "reservation_id": "uuid", "table_confirmed": true }
+{
+  "reservation_id": "uuid",
+  "table_confirmed": true,
+  "client_calendar_write_status": "pending | success | failed",
+  "our_db_write_status": "pending | success | failed",
+  "authoritative_source": "client_calendar | our_db_fallback"
+}
 ```
 
-**Tests:** Full 5-category set. **Status: Planned.**
+**Tests:** Full 5-category set, plus the same client-calendar-write-failure
+case as CreateAppointment §13.3. **Status: Planned.**
 
 ## 13.7 CreateWaitlistEntry — WF-007
 
@@ -1171,12 +1219,25 @@ Fallback chain:   B → C → D  (Emergency Mode B, non-emergency/quote branch)
 }
 ```
 
+**Write behavior (PARALLEL, not sequential — same Phase 5C pattern as
+CreateAppointment §13.3, Change Request applied BC-013):** writes to BOTH
+the client's real calendar AND `tpl_emergency.appointments` (same generic
+table shape as §13.3/§13.6, deployed BC-013). Failure/fallback behavior
+identical to CreateAppointment §13.3.
+
 **Response `result`:**
 ```json
-{ "inspection_slot_id": "uuid", "status": "confirmed" }
+{
+  "inspection_slot_id": "uuid",
+  "status": "confirmed",
+  "client_calendar_write_status": "pending | success | failed",
+  "our_db_write_status": "pending | success | failed",
+  "authoritative_source": "client_calendar | our_db_fallback"
+}
 ```
 
-**Tests:** Full 5-category set. **Status: Planned — depends on the same
+**Tests:** Full 5-category set, plus the same client-calendar-write-failure
+case as CreateAppointment §13.3. **Status: Planned — depends on the same
 calendar-infrastructure-availability confirmation flagged as an open
 architect-review item in the Runtime doc (Appendix C gap 15).**
 
@@ -1201,15 +1262,29 @@ Fallback chain:   A → B → D  (fires only after Score Gate passes, per
 }
 ```
 
+**Write behavior (PARALLEL, not sequential — same Phase 5C pattern as
+CreateAppointment §13.3, Change Request applied BC-013):** writes to BOTH
+the client's real calendar AND `tpl_consultation.appointments` (same
+generic table shape as §13.3/§13.6/§13.9, deployed BC-013). Failure/
+fallback behavior identical to CreateAppointment §13.3.
+
 **Response `result`:**
 ```json
-{ "booking_id": "uuid", "opportunity_score": 0, "status": "confirmed" }
+{
+  "booking_id": "uuid",
+  "opportunity_score": 0,
+  "status": "confirmed",
+  "client_calendar_write_status": "pending | success | failed",
+  "our_db_write_status": "pending | success | failed",
+  "authoritative_source": "client_calendar | our_db_fallback"
+}
 ```
 
 **Tests:** Full 5-category set, plus explicit Score Gate rejection case
 (`lead_score < 50` for Consultation, per the old build guide's
 CONSULTATION SCORE GATE pattern — reference only, re-verify the exact
-threshold against current Runtime doc config before building).
+threshold against current Runtime doc config before building), plus the
+same client-calendar-write-failure case as CreateAppointment §13.3.
 **Status: Planned.**
 
 ## 13.11 CreateRegistration — WF-011

@@ -15,21 +15,24 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 13 (BC-012 — cleanup + Phase 5 discovery, 1 self-resolved item under new authority)
+2026-08-05 — by Claude Code, Session 14 (BC-013 — Phase 5 data layer built, 1 new self-resolved item)
 
 ## Current Phase
-Still Phase 4 COMPLETE (BC-010, unchanged). BC-012 is the FIRST card
-under the new Document Resolution Authority (BC-011) — one genuine
-document-level item was self-resolved this session (Build Order Guide
-v1's archive location — see Blockers/Deviations for the full logged
-entry). Per the new rule's gate: this session stops here, awaiting
-Commander acknowledgment of that specific resolution before Phase 5 (or
-any other build work) begins — this is a REAL instance of the gate, not
-BC-011's own separate no-build-work scope. Phase 5 discovery (Step 1
-reading + Step 2 summary) is complete and reported below/in the
-Implementation Report, but no Phase 5 build work has started. Convocore
-Adapter (ADP-002) — **COMPLETE.** BC-010 closed the one item BC-009 left
-open: human-handoff's staged-fallback Stage 2 trigger, built per the
+Phase 5 (Dashboard Data Layer) — schema built: `orders` (public +
+tpl_commerce) and `appointments` (public, tpl_appointment, tpl_commerce,
+tpl_emergency, tpl_consultation — see this session's self-resolved item
+below for why 3 of those 5 weren't in the original card). Parallel-write
+Change Request applied to all 5 affected Tool entries in
+n8n_Workflow_Specification_v1.md Part 13. Data-flow doc written
+(`06_Infrastructure/Database/Phase5_Dashboard_Data_Flow.md`). BC-012's
+prior gate was implicitly acknowledged by the Commander issuing BC-013
+directly (Phase 5 schema work) — noted, not assumed silently. Per the
+new rule's gate, this session stops again: 1 new self-resolved item
+occurred (see Blockers), awaiting Commander acknowledgment before Phase
+5 UI work (the next card) begins. No dashboard UI built — schema +
+data-flow doc only, per this card's explicit scope. Convocore Adapter
+(ADP-002) — **COMPLETE.** BC-010 closed the one item BC-009 left open:
+human-handoff's staged-fallback Stage 2 trigger, built per the
 Commander's exact operational definition. ADP-002 registered in
 n8n_Workflow_Specification_v1.md Part 17 (BC-009 — also closed the gap
 that ADP-001/Voiceflow was never registered either). All 3 stale
@@ -713,9 +716,54 @@ directly.
 
 ```
 BLOCKING all further work — REAL instance of the new Document
-Resolution Authority gate (BC-011), first time it has actually fired:
+Resolution Authority gate (BC-011), second occurrence:
 
-### Self-resolved document-level item (BC-012 Step 0)
+### Self-resolved document-level item (BC-013 Step 2/3)
+- **What:** BC-013's card Step 2 instructed mirroring the new
+  `public.appointments` table only into `tpl_appointment`. BC-013's own
+  Step 3, in the same card, listed the "5 Tools" needing the parallel-
+  write pattern as CreateAppointment, CreateReservation,
+  CreateInspectionSlotBooking, CreateScoredBooking, CheckAvailability —
+  directly quoting Planning_to_Build_Transition_v1.md Part 4 Phase 5C's
+  own list. 3 of those 5 Tools (CreateReservation, CreateInspectionSlot
+  Booking, CreateScoredBooking) belong to conversions_restaurant/
+  conversions_emergency/conversions_consultation — none of which live in
+  tpl_appointment. Step 2's literal scope and Step 3's literal scope did
+  not line up with each other.
+- **Documents/evidence checked:** Planning_to_Build_Transition_v1.md
+  Part 4 Phase 5C (the original source of the "5 Tools" list BC-013
+  Step 3 itself cites); live confirmation that the `appointments`
+  table's FK was already written generically (references the schema's
+  own `conversions` table via a parameterized migration, never
+  hardcoded to `conversions_appointment` specifically) — meaning
+  extending deployment required no schema redesign, only running the
+  same already-correct pattern against 3 more schemas.
+- **Resolved to:** deployed `appointments` (identical 9-column shape) to
+  `tpl_commerce`, `tpl_emergency`, and `tpl_consultation` as well —
+  confirmed live via `information_schema.columns` across all 5 schemas
+  now. Updated all 5 Tool entries' Workflow Spec sections consistently
+  (no entry left with a "not yet deployed" caveat the other 4 don't
+  have).
+- **Why:** per the new rule's item 3 (mechanical/structural decision
+  with an obviously correct answer given the rest of the architecture),
+  this is squarely resolvable directly — the table shape doesn't change,
+  only which schemas already-decided architecture (Planning doc's own
+  Phase 5C list) says need it. Leaving 3 of 5 explicitly-named Tools
+  with a disclosed-but-unresolved gap, in the very same card that
+  updated all 5 Tools' contracts, would have been an internally
+  inconsistent deliverable.
+- Migrations 035/036 applied and committed already — the schema work
+  itself is not blocked on acknowledgment, only PROCEEDING TO PHASE 5
+  UI WORK is.
+
+Per the new rule: this session stops here. Do not begin Phase 5 UI work
+(the next card) or any other build work until the Commander has
+explicitly acknowledged this specific resolution in a follow-up
+message.
+
+### Self-resolved document-level item (BC-012 Step 0) — RESOLVED,
+ACKNOWLEDGED (Commander issued BC-013 directly, Phase 5 schema work,
+implicitly confirming this resolution — noted, not silently assumed)
 - **What:** BC-012's card instructed archiving Convocore_Agent_Build_
   Order_Guide_v1.md into root's `_archive_planning_phase/` (Phase 0's
   general-purpose archive). Live investigation found the file had
@@ -911,6 +959,52 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 14 — 2026-08-05 — BC-013: Phase 5 data layer (1 new self-resolved item)
+- What was done: Step 0 — live audit confirmed no drift in conversions_
+  ecom/conversions_restaurant/conversions_appointment across public +
+  relevant tpl_* schemas, and confirmed no orders/appointments table
+  existed anywhere. Step 1 — built order_status_enum + public.orders +
+  tpl_commerce.orders (migration 033), with a UNIQUE(conversion_id)
+  constraint added beyond the card's literal spec (one review-row per
+  conversion) and no client_id column (verified live that no other
+  client-schema common table carries one). Step 2 — built calendar_
+  write_status_enum + authoritative_source_enum + public.appointments +
+  tpl_appointment.appointments (migration 034), with a
+  client_calendar_provider column added beyond the card's literal spec
+  (audit-trail value beyond client_config's current-value-only field),
+  flagged not silently added. Mid-Step-2/3, found and self-resolved a
+  real internal inconsistency in the card itself (full log in Blockers
+  above) — extended appointments to tpl_commerce (migration 035),
+  tpl_emergency and tpl_consultation (migration 036). Step 3 — applied
+  the parallel-write Change Request to all 5 Tool entries in n8n_
+  Workflow_Specification_v1.md Part 13 (CheckAvailability's read-
+  direction note, CreateAppointment/CreateReservation/
+  CreateInspectionSlotBooking/CreateScoredBooking's write-direction
+  contracts), all 5 consistently deployed, none left with a disclosed
+  gap. Step 4 — wrote 06_Infrastructure/Database/Phase5_Dashboard_Data_
+  Flow.md, genuinely short, table-based, cross-referencing rather than
+  duplicating existing docs.
+- What was verified live vs. assumed: Every table's real saved column
+  set confirmed via information_schema.columns across all schemas after
+  each migration, not assumed from the migration SQL succeeding. get_
+  advisors run after all schema changes — only the pre-existing,
+  deliberate RLS-no-policy posture, nothing new introduced.
+- What broke / changed from plan: BC-012's prior gate was implicitly
+  acknowledged by the Commander issuing this card directly (Phase 5
+  schema work) — noted explicitly rather than silently assumed. This
+  session's own new self-resolved item (appointments' schema-coverage
+  gap) triggers the same gate again — a real, working instance of the
+  new rule catching a genuine internal inconsistency the card itself
+  contained, not a hypothetical.
+- Files touched: n8n_Workflow_Specification_v1.md (5 Tool entries in
+  Part 13), 06_Infrastructure/Database/Phase5_Dashboard_Data_Flow.md
+  (new), PROJECT_STATE.md. Database: 4 new migrations (033-036) applied
+  to zenny-vault, 2 new tables (orders, appointments) across 7 schema
+  locations total.
+- **This session: 1 self-resolved document-level item, logged per the
+  standing rule. Awaiting explicit Commander acknowledgment before
+  Phase 5 UI work or any other build work begins.**
 
 ### Session 13 — 2026-08-05 — BC-012: cleanup + Phase 5 discovery (1 self-resolved item, new authority)
 - What was done: Step 0 — live-checked git status of both files BC-011
