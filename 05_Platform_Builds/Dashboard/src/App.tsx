@@ -1,9 +1,11 @@
-import { Navigate, Route, Routes, Link } from 'react-router-dom';
+import { Navigate, Route, Routes, NavLink } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useAuth } from './lib/AuthContext';
+import { EnsoMark } from './components/EnsoMark';
 import { Login } from './pages/Login';
 import { OrdersList } from './pages/OrdersList';
 import { OrderDetail } from './pages/OrderDetail';
+import { Integrations } from './pages/Integrations';
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth();
@@ -17,9 +19,17 @@ function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <span className="brand">Zenny Dashboard</span>
+        <span className="brand">
+          <EnsoMark size={22} />
+          Zenny<span className="dot">.</span>
+        </span>
         <nav>
-          <Link to="/orders">Orders</Link>
+          <NavLink to="/orders" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Orders
+          </NavLink>
+          <NavLink to="/integrations" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Integrations
+          </NavLink>
         </nav>
         {session && (
           <div className="header-right">
@@ -46,6 +56,7 @@ export default function App() {
                 <Route path="/" element={<Navigate to="/orders" replace />} />
                 <Route path="/orders" element={<OrdersList />} />
                 <Route path="/orders/:orderId" element={<OrderDetail />} />
+                <Route path="/integrations" element={<Integrations />} />
               </Routes>
             </Layout>
           </RequireAuth>

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../lib/AuthContext';
+import { EnsoMark } from '../components/EnsoMark';
 
 export function Login() {
   const { signIn } = useAuth();
@@ -20,7 +21,13 @@ export function Login() {
   return (
     <div className="login-page">
       <form className="login-form" onSubmit={handleSubmit}>
-        <h1>Zenny Dashboard</h1>
+        <div className="login-brand">
+          <EnsoMark />
+          <h1>
+            Zenny<span className="dot">.</span>
+          </h1>
+        </div>
+        <p className="note">Sign in to manage your orders and connections.</p>
         <label>
           Email
           <input
