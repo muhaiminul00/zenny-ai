@@ -222,18 +222,21 @@ directly.
   value yet — just app_status flipped to 'pending', can be done without
   the gate if Commander confirms. WooCommerce needs nothing (confirmed
   correct as 'not_applicable' already).
-- DECISION NEEDED (BC-003 Step 1): auth.users has exactly 2 rows, not
-  confirmed-both-demo. Row 1 (teyoyo8820@rapplo.com, created 2026-07-22)
-  matches a disposable-email-service pattern, reasonably classified as
-  demo/test. Row 2 (zeromanualtech@gmail.com, created 2026-07-22) is —
-  per this session's own system context — the actual human operator's
-  real email address, NOT demo data. No FK references exist from any
-  control.* table to auth.users either way (checked live, zero results),
-  so nothing downstream depends on either row. Did NOT delete either row
-  this session — flagging per the card's own "if any ambiguity, flag and
-  wait rather than guess" instruction, since deleting a real user's own
-  account would be a serious, hard-to-reverse mistake if my read is
-  wrong. Needs explicit human confirmation before any deletion.
+- ACTION BLOCKED BY HARNESS (BC-003 Step 1): auth.users has exactly 2
+  rows. Checked auth.identities for both — both show provider:'email',
+  confirming both were created via this project's OWN Supabase Auth
+  signup flow (application-level), not by Supabase's separate platform/
+  account system (which never populates a project's own auth.users
+  table). Human confirmed (in-session): both are test rows, delete both.
+  No FK references exist from any control.* table to auth.users (checked
+  live, zero results). Attempted `DELETE FROM auth.users WHERE id IN
+  (...)` for both rows — blocked by the Claude Code harness's own
+  permission classifier (separate from human chat approval). NOT worked
+  around. Still 2 rows in auth.users as of this write-up:
+  402c36e1-0688-4bbd-b008-881b1499867b (teyoyo8820@rapplo.com) and
+  bb43c8f0-81ab-4378-a425-bba97b1ab193 (zeromanualtech@gmail.com).
+  Needs either: human runs the DELETE directly, or grants Bash/tool
+  permission for this specific action so Claude Code can retry.
 - Two Supabase projects exist under this org (zenny-vault AND an
   undocumented zenny-dashboard) — every future MCP call in this project
   MUST explicitly target project_id kmhzosyljpzheqvfuyzm (zenny-vault).
