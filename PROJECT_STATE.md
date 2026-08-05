@@ -15,14 +15,15 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 4 (BC-003 complete except 3 flagged items)
+2026-08-05 — by Claude Code, Session 5 (BC-004 — Phase 1 COMPLETE)
 
 ## Current Phase
-Phase 1 — Close Credential Platform Gaps — Steps 0-6 of BC-003 all acted
-on. 4 of 6 oauth_apps providers fully seeded with real credentials
-(Google, Shopify, Calendly, Slack — Slack with a flagged schema
-mismatch). Cal.com and one auth.users cleanup blocked on real gaps, not
-guessed around — see Blockers. WooCommerce confirmed correct as-is.
+Phase 1 — Close Credential Platform Gaps — **COMPLETE.** All BC-004
+items closed: Cal.com's status constraint migrated and set to 'pending',
+Calendly's webhook signing key given a real schema home, auth.users
+confirmed at 0 rows, 4 orphaned Vault secrets confirmed deleted, Slack's
+real-OAuth-app gap logged as a non-blocking follow-up (see Blockers).
+Phase 2 (Convocore Database Changes) is next, not yet started.
 
 ---
 
@@ -30,7 +31,7 @@ guessed around — see Blockers. WooCommerce confirmed correct as-is.
 
 ```
 Phase 0  — Environment Setup .................... IN PROGRESS
-Phase 1  — Close Credential Platform Gaps ........ NOT STARTED
+Phase 1  — Close Credential Platform Gaps ........ COMPLETE
 Phase 2  — Convocore Database Changes ............ NOT STARTED
 Phase 3  — Remaining Shared Utilities ............ NOT STARTED
 Phase 4  — Convocore Adapter (ADP-002) ........... NOT STARTED
@@ -50,24 +51,27 @@ Phase 13 — Template Dashboard .................... DEFERRED (per Part 2.6)
 ## Database — Real Current State (BC-003 live audit, project zenny-vault ONLY)
 
 ```
-control.oauth_apps:              EXISTS, MATCHES SPEC (Part 4.2). 7-value
-                                  provider CHECK (google, calendly,
-                                  cal_com, shopify, slack, gmail,
-                                  woocommerce) — a reasonable, spec-
-                                  consistent extension, not a violation.
-                                  6 rows, all PLACEHOLDER values
-                                  (client_id = "PENDING_<PROVIDER>_
-                                  CLIENT_ID" or "NOT_APPLICABLE"; each
-                                  row's client_secret_id points to a
-                                  real Vault UUID — decrypted contents
-                                  NOT read directly, per the harness's
-                                  own classifier blocking that action;
-                                  assumed placeholder text given the
-                                  client_id pattern, not confirmed).
-                                  app_status: 5 rows 'testing', 1 row
-                                  ('woocommerce') 'not_applicable'. No
-                                  cal_com row exists as 'pending' yet —
-                                  BC-003 Step 6 sets this.
+control.oauth_apps:              EXISTS, MATCHES SPEC (Part 4.2), NOW
+                                  FULLY CURRENT as of BC-004. 7-value
+                                  provider CHECK unchanged (google,
+                                  calendly, cal_com, shopify, slack,
+                                  gmail, woocommerce). app_status CHECK
+                                  migrated (023) to 4 values: testing,
+                                  published, not_applicable, pending.
+                                  New column (024): webhook_signing_key_id
+                                  uuid, nullable. 6 rows: google/shopify/
+                                  calendly SEEDED real (app_status
+                                  'testing'); slack SEEDED real with a
+                                  confirmed schema-shape mismatch
+                                  (bot token, not OAuth client_id+secret
+                                  — non-blocking follow-up logged below);
+                                  cal_com app_status now 'pending',
+                                  client_id/secret still placeholder (no
+                                  real Cal.com credential exists yet —
+                                  correct); woocommerce 'not_applicable'
+                                  (correct, untouched). See Credentials
+                                  section below for full per-provider
+                                  detail and exact Vault UUIDs.
 control.client_connections:      EXISTS, MATCHES SPEC (Part 4.2) +1
                                   reasonable extension: secondary_secret_id
                                   (nullable uuid, documented in-column
@@ -153,42 +157,51 @@ Google:     SEEDED, real. client_id = real Google Cloud OAuth client ID
 Shopify:    SEEDED, real. client_id = real Shopify Dev Client ID,
             client_secret_id -> Vault UUID 02957b66-82f0-49d1-898d-
             de532d8bc4ab. app_status 'testing'.
-Slack:      SEEDED, real, WITH A FLAGGED SCHEMA MISMATCH — what was
-            captured is a bot user OAuth token (xoxb-...), not an OAuth
-            app client_id+secret pair (which is what oauth_apps' schema
-            structurally expects for the "Add to Slack" multi-tenant
-            flow, Part 8.4). client_id set to the literal string
-            'SLACK_BOT_TOKEN_MODE_NO_OAUTH_APP' (honest placeholder, not
-            a fabricated OAuth client ID) rather than force-fitting a
-            fake value. client_secret_id -> Vault UUID 8e8c4638-85b0-
-            40e4-b02b-a69798b3acfb (holds the real bot token).
-            **Needs a Commander decision:** either a real Slack OAuth
-            app gets registered later (then this row gets properly
-            reseeded), or the schema/architecture doc gets amended to
-            document bot-token mode as a real, intentional pattern for
-            single-workspace Slack setups.
-Calendly:   SEEDED, real. client_id = real Calendly OAuth Client ID,
-            client_secret_id -> Vault UUID 6060ef36-e48a-44dc-bb87-
-            c9564afbd7be. app_status 'testing'. Webhook signing key
-            ALSO stored in Vault (UUID 44e988d4-403b-48ce-b15e-
-            5c7f9edfefd0, name calendly_webhook_signing_key) but **NOT
-            referenced anywhere in oauth_apps — no column exists for
-            it.** Genuine schema gap, not invented around — flagged for
-            Commander (likely needs a new
-            oauth_apps.webhook_signing_key_id uuid column, or an
-            equivalent, via Template_Migration_Process.md).
-Cal.com:    NOT seeded — blocked, not guessed around. Planning_to_Build_
-            Transition_v1.md Part 2.9 says set app_status='pending'; the
-            LIVE chk_oauth_apps_status CHECK constraint only allows
-            ('testing','published','not_applicable') — 'pending' is
-            REJECTED by the live database. Attempted the UPDATE, got a
-            real constraint-violation error, did not alter the
-            constraint unilaterally. Row unchanged: still app_status=
-            'testing', client_id='PENDING_CALCOM_CLIENT_ID', old
-            placeholder secret untouched. **Needs Commander decision:**
-            migrate the CHECK constraint to add 'pending', or use a
-            different already-valid value as the "don't route real
-            traffic yet" signal.
+Slack:      SEEDED, real, WITH A CONFIRMED (not just flagged) SCHEMA
+            MISMATCH — BC-004 Step C confirmed: captured bot token is
+            NOT a substitute for a real Slack OAuth app in this
+            multi-tenant model (Part 8.4 assumes a shared "Add to Slack"
+            app). Row left EXACTLY as committed in BC-003, no change
+            this session — client_id = literal
+            'SLACK_BOT_TOKEN_MODE_NO_OAUTH_APP', client_secret_id ->
+            Vault UUID 8e8c4638-85b0-40e4-b02b-a69798b3acfb (real bot
+            token). Confirmed NON-BLOCKING for Phase 1 closure — logged
+            as a follow-up (see Blockers) for whenever Slack notification
+            is actually built (Phase 3/UTIL-004 or later).
+Calendly:   SEEDED, real, FULLY WIRED (BC-004 Step D). client_id = real
+            Calendly OAuth Client ID, client_secret_id -> Vault UUID
+            6060ef36-e48a-44dc-bb87-c9564afbd7be. app_status 'testing'.
+            Webhook signing key now has a real schema home: migration
+            024_add_webhook_signing_key_id_to_oauth_apps.sql added
+            oauth_apps.webhook_signing_key_id (uuid, nullable, same
+            non-FK Vault-reference pattern as client_secret_id) and the
+            row was updated to reference Vault UUID 44e988d4-403b-48ce-
+            b15e-5c7f9edfefd0 — confirmed via RETURNING. get_advisors
+            (security) run after: no new issue introduced, only the
+            pre-existing documented "RLS enabled, no policies" posture
+            (Database_Structure_v4_FINAL.md §9, service_role bypasses
+            RLS by design). **Doc diff still owed by Commander:**
+            Client_Integration_and_Credential_Platform_v1.md Part 4.2's
+            oauth_apps schema block needs webhook_signing_key_id added
+            to its column list — Claude Code does not edit that document.
+Cal.com:    RESOLVED (BC-004 Step B). Corrected understanding from BC-003:
+            'pending' was always the deliberate, confirmed decision
+            (Planning_to_Build_Transition_v1.md Part 2.9 / Part 6 item 2)
+            — the live chk_oauth_apps_status CHECK constraint was the
+            stale artifact, never updated to match that decision, not
+            the other way around. Migration
+            023_add_pending_to_oauth_apps_status.sql applied (additive
+            only — dropped and re-added the constraint with 'pending'
+            appended, no existing valid value removed; exact prior
+            definition verified live via pg_get_constraintdef before
+            writing the ALTER). app_status now 'pending', confirmed via
+            RETURNING. client_id left as 'PENDING_CALCOM_CLIENT_ID'
+            placeholder — correct, no real Cal.com credential exists yet
+            (business email still pending). get_advisors run after: same
+            result as Calendly above, nothing new. **Doc diff still owed
+            by Commander:** Client_Integration_and_Credential_Platform_
+            v1.md Part 4.2's app_status column comment needs 'pending'
+            added to its documented value list.
 WooCommerce: row exists, app_status = 'not_applicable', matches Part 8.3
             fallback pattern (no OAuth registration needed) — CONFIRMED
             correct as-is, nothing to seed, nothing changed.
@@ -262,39 +275,39 @@ directly.
 ## Blockers Right Now
 
 ```
-- RESOLVED (BC-003 Step 6): human directed Claude Code to
-  Zenny_production_credential(claude_code_can_use).txt as the intended
-  secure channel. Google, Shopify, Calendly seeded cleanly. Slack seeded
-  with a flagged schema-shape mismatch (bot token vs. expected OAuth
-  client_id+secret — see Credentials section). Calendly's webhook signing
-  key stored in Vault but orphaned (no oauth_apps column exists for it —
-  flagged, not invented around). Cal.com BLOCKED — live CHECK constraint
-  chk_oauth_apps_status rejects 'pending', the value Part 2.9 explicitly
-  calls for; not altered unilaterally, needs a Commander decision
-  (migrate the constraint, or use a different valid value). WooCommerce
-  confirmed correct, untouched. 4 old placeholder Vault secrets are now
-  orphaned (harmless) — a cleanup DELETE was blocked by the harness's own
-  classifier, not worked around.
-- ACTION BLOCKED BY HARNESS (BC-003 Step 1): auth.users has exactly 2
-  rows. Checked auth.identities for both — both show provider:'email',
-  confirming both were created via this project's OWN Supabase Auth
-  signup flow (application-level), not by Supabase's separate platform/
-  account system (which never populates a project's own auth.users
-  table). Human confirmed (in-session): both are test rows, delete both.
-  No FK references exist from any control.* table to auth.users (checked
-  live, zero results). Attempted `DELETE FROM auth.users WHERE id IN
-  (...)` for both rows — blocked by the Claude Code harness's own
-  permission classifier (separate from human chat approval). NOT worked
-  around. Still 2 rows in auth.users as of this write-up:
-  402c36e1-0688-4bbd-b008-881b1499867b (teyoyo8820@rapplo.com) and
-  bb43c8f0-81ab-4378-a425-bba97b1ab193 (zeromanualtech@gmail.com).
-  Needs either: human runs the DELETE directly, or grants Bash/tool
-  permission for this specific action so Claude Code can retry.
+NONE blocking Phase 1 closure. Phase 1 is COMPLETE as of BC-004.
+
+Open, non-blocking follow-up (BC-004 Step C):
+- Slack needs a real OAuth app (client_id+secret, chat:write scope only
+  per External_Integration_Strategy_v1.md Part 6.2) registered before
+  multi-tenant Slack notification is viable — the bot token captured is
+  a single-workspace credential, wired into oauth_apps as an honest
+  placeholder (client_id='SLACK_BOT_TOKEN_MODE_NO_OAUTH_APP'), not a
+  real multi-tenant credential. Not blocking Phase 1 closure; blocks
+  whenever Slack notification is actually built (Phase 3/UTIL-004 or
+  later).
+
+Standing discipline note (not a blocker, carried forward):
 - Two Supabase projects exist under this org (zenny-vault AND an
-  undocumented zenny-dashboard) — every future MCP call in this project
-  MUST explicitly target project_id kmhzosyljpzheqvfuyzm (zenny-vault).
-  Confirmed again this session — every BC-003 query targeted zenny-vault
-  explicitly, zenny-dashboard was never touched.
+  undocumented zenny-dashboard, per an earlier reference build) — every
+  future MCP call in this project MUST explicitly target project_id
+  kmhzosyljpzheqvfuyzm (zenny-vault). Human confirmed directly (BC-004
+  context) that zenny-vault is canonical and zenny-dashboard belongs to
+  a different, earlier build — not re-investigating further. Every
+  BC-002/BC-003/BC-004 query targeted zenny-vault explicitly.
+
+Resolved this session (BC-004), no longer open:
+- Cal.com's app_status constraint — migrated (023), set to 'pending'.
+- Calendly's webhook signing key — real column added (024), wired.
+- auth.users — confirmed live at 0 rows.
+- 4 orphaned placeholder Vault secrets — confirmed live at 0 remaining.
+
+2 doc-diffs still owed by the Commander (not Claude Code's job per this
+card's own instruction — flagged, not applied):
+- Client_Integration_and_Credential_Platform_v1.md Part 4.2's app_status
+  column comment: add 'pending' to the documented value list.
+- Same document, same Part, oauth_apps schema block: add
+  webhook_signing_key_id to the column list.
 ```
 
 ## Deviations From Build Card / Open Questions for Commander
@@ -336,6 +349,46 @@ directly.
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 5 — 2026-08-05 — BC-004: Phase 1 closure
+- What was done: Step A — re-verified auth.users live, confirmed 0 rows
+  (human had run the delete outside this session by the time this card
+  started). Step B — verified the exact live chk_oauth_apps_status
+  definition via pg_get_constraintdef before writing anything, applied
+  migration 023 (additive: dropped+re-added the constraint with
+  'pending' appended, no existing value removed), set cal_com's
+  app_status to 'pending' via UPDATE, confirmed via RETURNING. Step C —
+  confirmed Slack's bot-token-vs-OAuth-app mismatch is non-blocking,
+  logged the exact follow-up text the card specified. Step D — applied
+  migration 024 (added oauth_apps.webhook_signing_key_id uuid, nullable,
+  same non-FK pattern as client_secret_id), wired Calendly's row to
+  reference the already-stored Vault secret, confirmed via RETURNING.
+  Ran get_advisors (security) after both migrations — no new issue
+  introduced by either, only the pre-existing documented RLS-no-policy
+  posture. Step E — first check found the 4 orphaned Vault secrets still
+  present despite the human believing they'd deleted them; retried the
+  DELETE myself (not blocked this time, unlike BC-003's attempt),
+  confirmed 0 remaining via a follow-up count query.
+- What was verified live vs. assumed: Every step's real end-state was
+  confirmed with its own live query (RETURNING, COUNT, or
+  pg_get_constraintdef) — nothing in this session was assumed correct
+  from the card's own text without an independent check. The Step E
+  discrepancy (human believed deleted, live query showed otherwise) is
+  a concrete example of why that discipline matters — a report was
+  trusted-but-verified, not taken at face value.
+- What broke / changed from plan: Nothing broke. Both real ambiguities
+  from BC-003 (Cal.com's constraint, Calendly's missing column) were
+  resolved as real migrations per the card's explicit authorization,
+  not worked around informally. Two document diffs remain genuinely
+  owed to the Commander (not applied by Claude Code, per the card's own
+  instruction) — see Blockers/Open Questions.
+- Files touched: PROJECT_STATE.md. Database: 2 new migrations (023, 024)
+  applied to zenny-vault; control.oauth_apps rows for cal_com and
+  calendly updated; 4 vault.secrets rows deleted; 0 rows remain in
+  auth.users (deleted outside this session, independently confirmed).
+- **Phase 1 verdict: COMPLETE.** All BC-004 Definition of Done items
+  closed; the one remaining open item (Slack's real OAuth app) is
+  explicitly non-blocking per the card's own Step C instruction.
 
 ### Session 4 — 2026-08-05 — BC-003 Steps 1 & 6: auth cleanup attempt + credential seeding
 - What was done: Human confirmed both auth.users rows were test data
