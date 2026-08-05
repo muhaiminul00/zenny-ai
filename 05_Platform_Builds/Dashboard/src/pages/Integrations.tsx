@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl } from '../lib/supabase';
 import type { ClientConnection, DashboardClient } from '../lib/types';
+
+const SUPABASE_ORIGIN = new URL(supabaseUrl).origin;
 
 // Which categories are shown per archetype, and which provider(s) can
 // fill each category. This is a UI-only display judgment call (BC-016,
@@ -103,6 +105,17 @@ export function Integrations() {
   const [wooForm, setWooForm] = useState<WooForm>(EMPTY_WOO_FORM);
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
 
+  // BC-020: popup-based OAuth. popupNote is a transient status line
+  // ("waiting…", "closed before finishing", success/error from the
+  // postMessage) — separate from the old connectResult URL-param path,
+  // which still exists as oauth-callback's fallback for any hit that
+  // arrives without a window.opener (direct link, non-JS, etc.).
+  const [popupNote, setPopupNote] = useState<{ kind: 'info' | 'error' | 'success'; text: string } | null>(
+    null,
+  );
+  const popupRef = useRef<Window | null>(null);
+  const popupPollRef = useRef<number | null>(null);
+
   const load = useCallback(async () => {
     setError(null);
     const [{ data: clientData, error: clientErr }, { data: connData, error: connErr }] =
@@ -126,7 +139,46 @@ export function Integrations() {
     load();
   }, [load]);
 
+  // Stop the popup-closed poll if the page itself unmounts mid-flow.
+  useEffect(() => {
+    return () => stopPopupPoll();
+  }, []);
+
+  // BC-020: primary OAuth completion path — oauth-callback's popup page
+  // postMessages the result here instead of navigating the dashboard
+  // away. Origin-checked against the real Supabase project origin (not
+  // '*') before trusting anything in the payload.
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== SUPABASE_ORIGIN) return;
+      const data = event.data as { type?: string; success?: boolean; category?: string; reason?: string };
+      if (data?.type !== 'zenny-oauth-result') return;
+
+      stopPopupPoll();
+      setBusyProvider(null);
+      if (data.success) {
+        setPopupNote({ kind: 'success', text: 'Connected. Refreshing status…' });
+      } else {
+        setPopupNote({ kind: 'error', text: `Couldn't connect (${data.reason ?? 'unknown reason'}).` });
+      }
+      load();
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [load]);
+
+  // Fallback path: oauth-callback redirected a full page here (no
+  // window.opener was present when it ran — e.g. this URL was opened
+  // directly rather than via a popup). Kept working, not the primary
+  // path anymore as of BC-020.
   const connectResult = searchParams.get('connect_result');
+
+  function stopPopupPoll() {
+    if (popupPollRef.current !== null) {
+      window.clearInterval(popupPollRef.current);
+      popupPollRef.current = null;
+    }
+  }
 
   const handleConnect = (provider: string, category: string) => {
     if (!client) return;
@@ -145,13 +197,48 @@ export function Integrations() {
       if (!shop) return;
     }
 
-    setBusyProvider(provider);
     const url = new URL(`${supabaseUrl}/functions/v1/oauth-initiate`);
     url.searchParams.set('client_id', client.client_id);
     url.searchParams.set('category', category);
     url.searchParams.set('provider', provider);
     if (shop) url.searchParams.set('shop', shop);
-    window.location.href = url.toString();
+
+    // BC-020: popup instead of a full-page redirect. Explicit width/
+    // height, not a new tab (per the card's explicit instruction).
+    setPopupNote(null);
+    setBusyProvider(provider);
+    const popup = window.open(
+      url.toString(),
+      'zenny-oauth',
+      'width=520,height=680,menubar=no,toolbar=no,location=yes',
+    );
+
+    if (!popup) {
+      setBusyProvider(null);
+      setPopupNote({ kind: 'error', text: 'Popup blocked — allow popups for this site and try again.' });
+      return;
+    }
+
+    popupRef.current = popup;
+    setPopupNote({ kind: 'info', text: 'Waiting for you to finish in the popup…' });
+
+    // BC-020 Step 4: the popup closing (postMessage already handles the
+    // success/error case and calls stopPopupPoll() itself) is the only
+    // signal available for "user closed it manually before finishing" —
+    // there's no server-side event for that. Poll rather than hang
+    // forever waiting for a message that will never come.
+    popupPollRef.current = window.setInterval(() => {
+      if (popup.closed) {
+        stopPopupPoll();
+        setBusyProvider((current) => {
+          if (current === provider) {
+            setPopupNote({ kind: 'info', text: 'Window closed before finishing — nothing was connected.' });
+            return null;
+          }
+          return current;
+        });
+      }
+    }, 500);
   };
 
   const openWooForm = (category: string) => {
@@ -230,6 +317,15 @@ export function Integrations() {
         Connect the tools {client.business_name} already uses — Zenny reads and writes through
         them directly, nothing is duplicated.
       </p>
+      <p className="note">
+        Connecting Google (Calendar or Gmail) opens a popup showing "Google hasn't verified this
+        app" — that's Google's own trust warning, not a bug here. It goes away once Google's
+        verification review finishes; nothing in this dashboard can remove it sooner.
+      </p>
+
+      {popupNote && (
+        <p className={popupNote.kind === 'error' ? 'error-text' : 'note'}>{popupNote.text}</p>
+      )}
 
       {connectResult === 'success' && (
         <p className="note" style={{ color: 'var(--sage)' }}>
