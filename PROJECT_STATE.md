@@ -15,15 +15,17 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 5 (BC-004 — Phase 1 COMPLETE)
+2026-08-05 — by Claude Code, Session 7 (BC-005 — Phase 2 NOT COMPLETE, 1 item genuinely open)
 
 ## Current Phase
-Phase 1 — Close Credential Platform Gaps — **COMPLETE.** All BC-004
-items closed: Cal.com's status constraint migrated and set to 'pending',
-Calendly's webhook signing key given a real schema home, auth.users
-confirmed at 0 rows, 4 orphaned Vault secrets confirmed deleted, Slack's
-real-OAuth-app gap logged as a non-blocking follow-up (see Blockers).
-Phase 2 (Convocore Database Changes) is next, not yet started.
+Phase 2 — Convocore Database Changes — 6 of 7 BC-005 items closed with
+real migrations. 1 item (escalations.escalation_team) correctly NOT
+resolved — Convocore_Findings_Required_Updates_FINAL.md Part 1.8 itself
+still reads DECISION NEEDED, and the card explicitly instructed a hard
+STOP rather than unilateral resolution for that specific step. See
+Blockers for the fast-path (Planning_to_Build_Transition_v1.md Part 2.3
+already has the real column check + a proposed answer, just needs
+Commander sign-off). Phase 1 (BC-004) remains COMPLETE, unchanged.
 
 ---
 
@@ -32,7 +34,7 @@ Phase 2 (Convocore Database Changes) is next, not yet started.
 ```
 Phase 0  — Environment Setup .................... IN PROGRESS
 Phase 1  — Close Credential Platform Gaps ........ COMPLETE
-Phase 2  — Convocore Database Changes ............ NOT STARTED
+Phase 2  — Convocore Database Changes ............ 6/7 DONE, 1 flagged open
 Phase 3  — Remaining Shared Utilities ............ NOT STARTED
 Phase 4  — Convocore Adapter (ADP-002) ........... NOT STARTED
 Phase 5  — 4 New Dashboard Systems (Directus) .... NOT STARTED
@@ -89,9 +91,131 @@ control.connection_audit_log:    EXISTS, MATCHES SPEC (Part 6.3) exactly,
                                   including reason as plain text nullable
                                   (no structured category — confirmed
                                   decision, Part 2.9). 0 rows (expected).
-control.convocore_agent_map:     NOT YET BUILT (Phase 2, out of scope)
-leads (Convocore columns):       NOT YET ADDED (Phase 2, out of scope)
-escalations.escalation_team:     NOT YET ADDED (Phase 2, out of scope)
+control.convocore_agent_map:     BUILT (BC-005, migration 025 + 026 fix).
+                                  PK is a surrogate id uuid, NOT client_id
+                                  — migration 025 originally used
+                                  PRIMARY KEY(client_id), caught as a real
+                                  mistake mid-session (would have forced a
+                                  1:1 client-agent relationship, directly
+                                  contradicting Planning_to_Build_
+                                  Transition_v1.md Part 2.1's own stated
+                                  reasoning for choosing a dedicated table
+                                  in the first place — "not guaranteed 1:1
+                                  forever"). Fixed same session, confirmed
+                                  live. Columns: client_id (plain FK, not
+                                  unique), convocore_agent_id,
+                                  convocore_agent_secret_id (Vault ref),
+                                  convocore_region, agent_display_name,
+                                  created_at, id (PK). RLS enabled, zero
+                                  policies, service_role only — same
+                                  posture as every other control table.
+                                  agent_display_name naming convention
+                                  documented via COMMENT ON COLUMN
+                                  (migration 027): "{ClientBusinessName}
+                                  Assistant", citing Planning_to_Build_
+                                  Transition_v1.md Part 2.5 — Convocore_
+                                  Findings_Required_Updates_FINAL.md Part
+                                  1.2/6.2 alone still read DECISION
+                                  NEEDED, resolved via the later,
+                                  authoritative Planning doc instead. 0
+                                  rows (no live Convocore agent yet, per
+                                  card's explicit out-of-scope).
+leads (Convocore columns):       ADDED (BC-005, migration 028) — all 6
+                                  columns (convocore_conversation_id,
+                                  convocore_summary, convocore_sentiment,
+                                  convocore_token_usage, convocore_cost,
+                                  convocore_lead_score), applied to public
+                                  + all 5 tpl_* schemas (Phase B's clone
+                                  was one-time, not auto-synced — same
+                                  reasoning applied consistently in every
+                                  Phase 2 migration touching a mirrored
+                                  table). convocore_conversation_id has a
+                                  COMMENT ON COLUMN (public only) warning
+                                  it's WebSocket-origin ONLY, per
+                                  Convocore_Adapter_Spec_FINAL.md Part 12.
+escalations.escalation_team:     NOT ADDED — genuinely flagged, not a
+                                  gap Claude Code left incomplete by
+                                  oversight. Convocore_Findings_Required_
+                                  Updates_FINAL.md Part 1.8 itself still
+                                  reads DECISION NEEDED (its own text says
+                                  the author didn't have the live column
+                                  list to check team_key/issue_summary
+                                  compatibility against). BC-005's card
+                                  explicitly instructed a hard STOP for
+                                  this specific step ("do not resolve a
+                                  genuinely open architectural question
+                                  unilaterally") — a stricter instruction
+                                  than the naming-convention step got.
+                                  **Fast path for the Commander:**
+                                  Planning_to_Build_Transition_v1.md Part
+                                  2.3 already did the exact live column
+                                  check Findings doc said it lacked
+                                  (escalation_id, lead_id, customer_id,
+                                  escalation_type, escalation_reason,
+                                  escalation_priority, origin_module,
+                                  trigger_condition, ownership_state,
+                                  status, created_date, resolved_date —
+                                  confirmed live-matching, BC-002/BC-003's
+                                  own audits) and proposes: escalation_
+                                  reason maps reasonably onto issue_
+                                  summary, but team_key has no home →
+                                  ADD COLUMN escalation_team text NULL.
+                                  Just needs explicit sign-off to apply.
+client_config voice/SMS fields:  ADDED (BC-005, migrations 029 + 030) —
+                                  voice_agent_enabled boolean NOT NULL
+                                  DEFAULT false, sms_agent_enabled
+                                  boolean NOT NULL DEFAULT false,
+                                  client_voice_number text NULL,
+                                  client_sms_number text NULL. Applied to
+                                  control.client_config (029) AND public +
+                                  all 5 tpl_* client_config (030, same
+                                  mirrored-table consistency reasoning as
+                                  leads above — client_config is one of
+                                  the 21 "common tables" per Database_
+                                  Structure_v4_FINAL.md §4).
+Twilio credential schema:        ADDED (BC-005, migration 031), SCHEMA
+                                  ONLY — no real Twilio credential
+                                  seeded, per the card's explicit
+                                  out-of-scope. Decided (not flagged):
+                                  Twilio has no Zenny-owned OAuth app —
+                                  every client brings their own Account
+                                  SID/Auth Token/number entirely
+                                  independently (Convocore_Adapter_Spec_
+                                  FINAL.md Part 13.3) — structurally
+                                  identical to WooCommerce's Part 8.3
+                                  pattern, not oauth_apps' shared-app
+                                  model. Added 'twilio' to oauth_apps'
+                                  provider CHECK (placeholder row,
+                                  app_status='not_applicable', same
+                                  shape as woocommerce's row) and
+                                  'telephony' to client_connections'
+                                  category CHECK — ONE category, not
+                                  separate 'voice'/'sms', since voice and
+                                  SMS confirmed to share the same
+                                  underlying Twilio credential/number
+                                  (Planning doc Part 2.9/4); voice_agent_
+                                  enabled/sms_agent_enabled stay separate
+                                  flags on client_config regardless. Real
+                                  per-client rows would use client_
+                                  connections' existing secondary_secret_id
+                                  (Account SID + Auth Token, same 2-part
+                                  pattern as WooCommerce's Consumer
+                                  Key+Secret) — no new column needed for
+                                  that when real seeding happens later.
+No product/inventory tables:     DOCUMENTED, PERMANENT NOTE (BC-005 Step
+                                  6, Planning doc Part 4 Phase 2 item 5):
+                                  Zenny's own database NEVER stores
+                                  product or inventory data, for any
+                                  client, under any archetype. Product
+                                  catalogue and inventory data flow
+                                  Shopify/WooCommerce → a sync workflow
+                                  (not yet built, Findings doc Part 3.3 /
+                                  Workflow Spec SCH item) → Convocore's KB
+                                  directly. A future session must NOT
+                                  introduce a products/inventory table
+                                  under any schema — if a real need
+                                  surfaces, that's a Change Request
+                                  against this note, not a silent add.
 
 RPC layer (Part 4.4 SECURITY DEFINER pattern) — ALREADY BUILT, confirmed
 live: store_credential_secret(value,name,description)->uuid,
@@ -275,7 +399,20 @@ directly.
 ## Blockers Right Now
 
 ```
-NONE blocking Phase 1 closure. Phase 1 is COMPLETE as of BC-004.
+BLOCKING Phase 2 closure (1 item, genuine, not oversight):
+- escalations.escalation_team — Convocore_Findings_Required_Updates_
+  FINAL.md Part 1.8 itself still reads DECISION NEEDED. BC-005's card
+  explicitly required a hard STOP on this specific step rather than
+  cross-referencing another document unilaterally (unlike the naming-
+  convention item, which the same card explicitly allowed resolving via
+  a later document). FAST PATH: Planning_to_Build_Transition_v1.md Part
+  2.3 already did the live column check Findings doc said it lacked, and
+  proposes `ALTER TABLE {client_schema}.escalations ADD COLUMN
+  escalation_team text NULL;` (escalation_reason maps onto issue_summary,
+  team_key has no home). Needs explicit Commander sign-off, not a new
+  investigation — the next Build Card can likely just say "apply it."
+
+NONE blocking Phase 1 closure. Phase 1 remains COMPLETE as of BC-004.
 
 Open, non-blocking follow-up (BC-004 Step C):
 - Slack needs a real OAuth app (client_id+secret, chat:write scope only
@@ -349,6 +486,53 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 7 — 2026-08-05 — BC-005: Phase 2 (6/7 items closed)
+- What was done: Step 0 — live audit found no drift (convocore_agent_map
+  didn't exist; leads/escalations had zero Convocore columns anywhere
+  across public + 5 tpl_* schemas; client_config confirmed as its own
+  table). Step 1 — created control.convocore_agent_map (migration 025).
+  Step 2 — resolved the agent-naming DECISION NEEDED via Planning_to_
+  Build_Transition_v1.md Part 2.5, documented as a COMMENT ON COLUMN
+  (migration 027). Step 3 — added all 6 Convocore columns to leads
+  across public + 5 tpl_* (migration 028). Step 4 — did NOT resolve
+  escalation_team; Findings doc Part 1.8 itself is still open and the
+  card's own instruction for this specific step required a hard stop —
+  flagged with a fast-path pointer instead of guessing. Step 5 — added
+  voice/SMS fields to control.client_config (029) AND, for consistency
+  with Step 3's mirrored-table reasoning, to public + 5 tpl_*
+  client_config too (030). Step 6 — documented the permanent no-product-
+  tables note in this file's Database section. Step 7 — decided (not
+  flagged) Twilio's schema shape: added 'twilio' to oauth_apps' provider
+  CHECK and 'telephony' to client_connections' category CHECK (migration
+  031), mirroring WooCommerce's no-Zenny-app pattern exactly; one shared
+  telephony category, not separate voice/sms, since Planning doc confirms
+  they share one credential. Schema only, no real Twilio credential
+  seeded. Ran get_advisors (security) after every migration in this
+  session — only pre-existing, documented RLS-no-policy advisories,
+  nothing new introduced anywhere.
+- What was verified live vs. assumed: Every migration's real end-state
+  was confirmed via a follow-up query (list_tables verbose, RETURNING,
+  or pg_get_constraintdef) before moving to the next step. Caught and
+  fixed a real mistake mid-session: migration 025 initially used PRIMARY
+  KEY(client_id) on convocore_agent_map, which would have silently
+  forced a 1:1 client-to-agent relationship — directly contradicting the
+  documented reasoning (Planning doc Part 2.1) for why a dedicated table
+  was chosen over columns-on-clients in the first place. Fixed via
+  migration 026 in the same session, confirmed live, before continuing.
+- What broke / changed from plan: Step 4 (escalation_team) is genuinely
+  not done — not a missed step, a deliberate stop per the card's own
+  stricter instruction for that item specifically. Everything else in
+  BC-005 was completed as scoped.
+- Files touched: PROJECT_STATE.md. Database: 7 new migrations (025-031)
+  applied to zenny-vault; 1 new Vault secret (Twilio placeholder); 1 new
+  oauth_apps row (twilio, placeholder); no client-facing rows written
+  anywhere (no live client exists yet).
+- **Phase 2 verdict: NOT COMPLETE.** 6 of 7 items closed with real,
+  live-verified migrations. The 1 remaining item (escalations.
+  escalation_team) is correctly, deliberately open per the card's own
+  explicit instruction — not an oversight, and has a clear, fast
+  resolution path once the Commander signs off.
 
 ### Session 6 — 2026-08-05 — BC-006: doc sync (owed from BC-004)
 - Applied both flagged doc diffs to Client_Integration_and_Credential_
