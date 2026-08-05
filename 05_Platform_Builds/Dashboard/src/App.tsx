@@ -6,6 +6,7 @@ import { Login } from './pages/Login';
 import { OrdersList } from './pages/OrdersList';
 import { OrderDetail } from './pages/OrderDetail';
 import { Integrations } from './pages/Integrations';
+import { AppointmentsList, AppointmentDetailPage } from './pages/Appointments';
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth();
@@ -33,6 +34,9 @@ function Layout({ children }: { children: ReactNode }) {
         <nav>
           <NavLink to="/orders" className={({ isActive }) => (isActive ? 'active' : '')}>
             Orders
+          </NavLink>
+          <NavLink to="/appointments" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Appointments
           </NavLink>
           <NavLink to="/integrations" className={({ isActive }) => (isActive ? 'active' : '')}>
             Integrations
@@ -63,6 +67,8 @@ export default function App() {
                 <Route path="/" element={<Navigate to="/orders" replace />} />
                 <Route path="/orders" element={<OrdersList />} />
                 <Route path="/orders/:orderId" element={<OrderDetail />} />
+                <Route path="/appointments" element={<AppointmentsList />} />
+                <Route path="/appointments/:appointmentId" element={<AppointmentDetailPage />} />
                 <Route path="/integrations" element={<Integrations />} />
               </Routes>
             </Layout>

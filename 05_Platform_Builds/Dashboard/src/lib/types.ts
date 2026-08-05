@@ -55,3 +55,24 @@ export interface DashboardClient {
   archetype: string;
   business_name: string;
 }
+
+export type CalendarWriteStatus = 'pending' | 'success' | 'failed';
+export type AuthoritativeSource = 'client_calendar' | 'our_db_fallback';
+
+export interface AppointmentListItem {
+  appointment_id: string;
+  conversion_id: string;
+  client_calendar_event_id: string | null;
+  client_calendar_provider: string | null;
+  client_calendar_write_status: CalendarWriteStatus;
+  our_db_write_status: CalendarWriteStatus;
+  authoritative_source: AuthoritativeSource;
+  alert_fired: boolean;
+  created_at: string;
+  conversation_summary: string;
+  intent: string;
+}
+
+export interface AppointmentDetail extends AppointmentListItem {
+  source_channel: string;
+}
