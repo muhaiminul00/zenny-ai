@@ -15,17 +15,19 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 12 (BC-011 — standing rule change, no build work)
+2026-08-05 — by Claude Code, Session 13 (BC-012 — cleanup + Phase 5 discovery, 1 self-resolved item under new authority)
 
 ## Current Phase
-Still Phase 4 COMPLETE (BC-010, unchanged) — BC-011 performed NO build
-work by its own explicit scope. It read a new document
-(Convocore_Agent_Build_Order_Guide_v2.md) and wrote a new standing rule
-(Document Resolution Authority) into CLAUDE.md and Claude_Build_Command_
-Protocol_v2.md. This rule is NOT yet in effect for BC-011 itself — it
-takes effect starting the next Build Card, per the card's own explicit
-wording. Phase 5 has not started; awaiting Commander acknowledgment per
-this card's own gate before Phase 5 begins (see Blockers). Convocore
+Still Phase 4 COMPLETE (BC-010, unchanged). BC-012 is the FIRST card
+under the new Document Resolution Authority (BC-011) — one genuine
+document-level item was self-resolved this session (Build Order Guide
+v1's archive location — see Blockers/Deviations for the full logged
+entry). Per the new rule's gate: this session stops here, awaiting
+Commander acknowledgment of that specific resolution before Phase 5 (or
+any other build work) begins — this is a REAL instance of the gate, not
+BC-011's own separate no-build-work scope. Phase 5 discovery (Step 1
+reading + Step 2 summary) is complete and reported below/in the
+Implementation Report, but no Phase 5 build work has started. Convocore
 Adapter (ADP-002) — **COMPLETE.** BC-010 closed the one item BC-009 left
 open: human-handoff's staged-fallback Stage 2 trigger, built per the
 Commander's exact operational definition. ADP-002 registered in
@@ -54,6 +56,87 @@ Phase 11 — Scheduled Workflows ................... NOT STARTED
 Phase 12 — Node-by-Node Outlines ................. NOT STARTED (cross-cutting)
 Phase 13 — Template Dashboard .................... DEFERRED (per Part 2.6)
 ```
+
+---
+
+## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
+
+Per Planning_to_Build_Transition_v1.md Part 4 Phase 5, 4 Directus-based
+dashboards, each with its own database:
+
+```
+5A. Inventory Dashboard — for clients WITHOUT Shopify/WooCommerce.
+    Client updates stock -> workflow syncs into that client's Convocore
+    KB. Agent's product lookup always hits Convocore KB, never our DB
+    directly. Not yet built; the underlying sync workflow (Shopify/
+    WooCommerce -> Convocore KB) is also not yet built (Findings doc
+    Part 3.3 / carried forward from BC-005/BC-009 as a known future
+    SCH-{NNN} item).
+5B. Order Lookup Dashboard — EVERY order lands here first, regardless
+    of provider. Human approve/reject gate BEFORE any real-store push.
+5C. Appointment Booking Dashboard — PARALLEL-WRITE pattern (client
+    calendar + our DB simultaneously, not sequential), READS
+    client-calendar-first/our-DB-fallback (the opposite direction from
+    writes). Confirmed a genuine architecture change from the original
+    per-Tool spec. **Live-checked this session: the Change Request
+    against n8n_Workflow_Specification_v1.md's CreateAppointment/
+    CreateReservation/CreateInspectionSlotBooking/CreateScoredBooking/
+    CheckAvailability entries has NOT yet been applied** — grepped the
+    live document, zero mentions of "parallel-write" anywhere in it.
+    Those 5 Tools' Part 13 entries still describe single-destination
+    writes. This CR needs applying before or during the real 5C Build
+    Card — flagged as a known prerequisite, not applied in this
+    discovery-only card.
+5D. Onboarding Form Dashboard — direct client-facing form writing
+    straight into control.clients/control.client_config, replacing
+    manual onboarding entry. This is the dashboard-facing front end for
+    Client_Onboarding_Sequence_Spec.md's 8-step backend provisioning
+    process (see below) — the form doesn't replace that sequence, it
+    needs to trigger/kick it off.
+```
+
+**The data layer underneath (Client_Onboarding_Sequence_Spec.md,
+already spec'd AND end-to-end tested against one throwaway client,
+client_test_001_acme_emergency_test, still live in zenny-vault):**
+8 steps — determine archetype (human/sales) -> copy template schema
+(`create_client_schema_from_template`, already built & tested) ->
+register exposed schemas -> insert control.clients/client_config rows
+-> initial sync (client_config/templates/email_categories/
+recovery_cadence_profiles, with real default-vs-override merge logic
+for the last one) -> apply/verify RLS -> Data API exposure re-check ->
+connect n8n workflows (documented handoff, not built by this spec).
+
+**Real, confirmed gap directly relevant to 5D:** Step 3 (Register
+Exposed Schemas) has **no SQL/MCP-level mechanism at all** in this
+managed Supabase project — confirmed empirically during the spec's own
+end-to-end test (checked `pg_roles`/`pg_catalog` for a `pgrst.
+db_schemas` GUC, none exists; no available Supabase MCP tool manages
+this). Must be done via the Supabase Dashboard manually, OR automated
+later via the Supabase Management API from within an n8n workflow using
+a project-admin-scoped service account. **If 5D's Onboarding Form is
+meant to fully automate client provisioning end-to-end, this is an
+unresolved implementation question the real Phase 5 Build Card needs to
+decide** (manual step remains human-in-the-loop even with an automated
+form vs. build the Management-API n8n workflow) — not decided anywhere
+in the source docs, flagged here rather than assumed.
+
+**Template_Migration_Process.md — explicitly NOT dashboard scope.**
+Deliberately MANUAL-only procedure (no scheduled job/UI/automation, by
+architect decision) for when `public`'s reference structure changes
+later and needs retrofitting into existing client schemas. Confirmed:
+none of the 4 Phase 5 dashboards need to expose UI for this — it stays
+a human-run SQL procedure, reusing `control.sync_log`'s existing shape
+for logging (no new table).
+
+**Open, not decided anywhere:** Directus itself has still never been
+live-verified as the current/fit tool — Planning doc Part 6 item 7
+flags this as "Phase 5 task, first action, Claude Code's call to
+confirm or swap." Not done in this discovery-only card; will be the
+real Phase 5 Build Card's first action.
+
+**No other explicit DECISION NEEDED flags found specific to Phase 5**
+in any of the 5 documents read this session, beyond the two items above
+(Step 3's automation approach, Directus verification).
 
 ---
 
@@ -629,19 +712,48 @@ directly.
 ## Blockers Right Now
 
 ```
-BLOCKING all further work (by this card's own explicit gate, not a
-normal blocker):
-- BC-011's Document Resolution Authority standing rule is written into
-  CLAUDE.md and Claude_Build_Command_Protocol_v2.md but is NOT yet in
-  effect — it takes effect starting the NEXT Build Card, per the card's
-  own wording. No self-resolved document-level items occurred this
-  session (BC-011 performed no build work at all, per its own scope —
-  nothing to log under the new rule's gate). Phase 5 (or any other
-  build work) does not begin until the Commander has explicitly
-  acknowledged this card's completion in a follow-up message, per the
-  card's own Step 2/gate instruction (this is BC-011's own stop
-  condition, not a triggered instance of the new rule's gate, since the
-  new rule wasn't active yet during this session).
+BLOCKING all further work — REAL instance of the new Document
+Resolution Authority gate (BC-011), first time it has actually fired:
+
+### Self-resolved document-level item (BC-012 Step 0)
+- **What:** BC-012's card instructed archiving Convocore_Agent_Build_
+  Order_Guide_v1.md into root's `_archive_planning_phase/` (Phase 0's
+  general-purpose archive). Live investigation found the file had
+  already been moved (by the human, outside git) to
+  `05_Platform_Builds/Convocore/Archieve/` instead — a folder already
+  holding 4 other superseded Convocore-family docs (Convocore_Adapter_
+  Spec_v1.md, Convocore_Canvas_Ground_Truth_v1.md, Convocore_Findings_
+  Required_Updates_v1.md, Convocore_Master_Reference_v1.md, plus 2
+  others) — a well-established, consistent local convention for this
+  exact document family.
+- **Documents/evidence checked:** live `ls` of both candidate archive
+  locations; confirmed via diff that the file's content is byte-
+  identical at the new location (pure move, no edits); confirmed v2's
+  own Status line ("Supersedes Convocore_Agent_Build_Order_Guide_v1.md")
+  as the supersession authority.
+- **Resolved to:** kept the file at `05_Platform_Builds/Convocore/
+  Archieve/` (formalized the human's already-made move via `git add -A`,
+  which correctly registered it as a rename) rather than moving it a
+  second time to match the card's more generic instruction.
+- **Why:** per the new rule's precedence logic, a more specific,
+  already-consistent local pattern (4+ sibling files) wins over a more
+  generic instruction referencing a different, less-specific precedent
+  (Phase 0's general archive). The human's own already-taken action is
+  additional evidence pointing the same direction, not just the
+  existing file pattern alone.
+- Committed and pushed already (ed0cc5f) — the file move itself is not
+  blocked on acknowledgment, only PROCEEDING TO PHASE 5 is.
+
+Per the new rule: this session stops here. Do not begin Phase 5 or any
+other build work until the Commander has explicitly acknowledged this
+specific resolution in a follow-up message.
+
+(Also confirmed, not a self-resolved item — just an investigation
+finding: Convocore_Adapter_Spec_FINAL.md's earlier BC-011-noted
+modification was a human commit (63686eb) that landed between BC-011
+and BC-012, a 1-line routing-table pointer update from v1 to v2 of the
+Build Order Guide. Already committed by the human; nothing for Claude
+Code to resolve or flag.)
 
 NONE blocking Phase 4 closure. Phase 4 is COMPLETE as of BC-010.
 
@@ -799,6 +911,43 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 13 — 2026-08-05 — BC-012: cleanup + Phase 5 discovery (1 self-resolved item, new authority)
+- What was done: Step 0 — live-checked git status of both files BC-011
+  had flagged. Convocore_Adapter_Spec_FINAL.md was already fully
+  resolved by a human commit (63686eb) between sessions — confirmed via
+  `git diff --stat` (clean) and `git show 63686eb` (a 1-line routing-
+  pointer update, v1->v2 of the Build Order Guide). Convocore_Agent_
+  Build_Order_Guide_v1.md's archive location was a genuine self-
+  resolved item under the new Document Resolution Authority — see the
+  full logged entry in Blockers above. Formalized the move via
+  `git add -A` (git correctly detected it as a rename) and committed/
+  pushed (ed0cc5f) before continuing. Step 1 — read all 5 required Phase
+  5 documents in full (Client_Onboarding_Sequence_Spec.md, Template_
+  Migration_Process.md, Client_Onboarding_Guide.md, plus re-confirmed
+  Database_Structure_v4_FINAL.md §1-2/§8.5 and Planning doc Part 4 Phase
+  5 from required reading already in context). Step 2 — compiled the
+  full Phase 5 discovery findings section above, including a live check
+  (grep) confirming 5C's parallel-write Change Request has NOT yet been
+  applied to n8n_Workflow_Specification_v1.md.
+- What was verified live vs. assumed: The archive-location resolution
+  was based on a real `ls` of both candidate folders (not memory) plus
+  a byte-identical diff confirming a pure move. The Adapter Spec
+  resolution was based on real `git diff`/`git show` output, not
+  assumed clean. The parallel-write CR status was a real grep against
+  the live document, not carried forward from earlier session context.
+- What broke / changed from plan: This is the first session where the
+  new Document Resolution Authority's gate genuinely fired (BC-011
+  itself had zero self-resolved items, since it performed no build
+  work). Per the rule: stopping here, not proceeding into any Phase 5
+  build work, until the Commander acknowledges the archive-location
+  resolution specifically.
+- Files touched: Convocore_Agent_Build_Order_Guide_v1.md (moved, no
+  content change), PROJECT_STATE.md. No n8n or Supabase changes this
+  session (discovery only, per the card's own Step 2 scope).
+- **This session: 1 self-resolved document-level item, logged per the
+  new standing rule. Awaiting explicit Commander acknowledgment before
+  Phase 5 or any other build work begins.**
 
 ### Session 12 — 2026-08-05 — BC-011: Document Resolution Authority (standing rule change, no build work)
 - What was done: Read Convocore_Agent_Build_Order_Guide_v2.md in full,
