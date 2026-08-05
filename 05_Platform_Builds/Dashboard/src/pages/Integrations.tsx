@@ -3,8 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl } from '../lib/supabase';
 import type { ClientConnection, DashboardClient } from '../lib/types';
 
-const SUPABASE_ORIGIN = new URL(supabaseUrl).origin;
-
 // Which categories are shown per archetype, and which provider(s) can
 // fill each category. This is a UI-only display judgment call (BC-016,
 // widened BC-018/BC-019), not a documented product decision — no source
@@ -144,13 +142,45 @@ export function Integrations() {
     return () => stopPopupPoll();
   }, []);
 
-  // BC-020: primary OAuth completion path — oauth-callback's popup page
-  // postMessages the result here instead of navigating the dashboard
-  // away. Origin-checked against the real Supabase project origin (not
-  // '*') before trusting anything in the payload.
+  // BC-020 REVISION — real platform constraint found live: Supabase Edge
+  // Functions cannot serve script-executing HTML (the gateway forces
+  // Content-Type: text/plain + a `sandbox` CSP on real GET responses —
+  // a `curl -I` HEAD request misleadingly showed text/html, which is
+  // what made the first version of this fix look correct until tested
+  // in a real browser). oauth-callback went back to a plain redirect
+  // (v5). The popup's own landing page IS this same /integrations
+  // route — when it loads with a window.opener AND a connect_result
+  // param, that means THIS load is the popup completing, not the
+  // parent dashboard. It postMessages its own opener (now same-origin,
+  // dashboard.zeromanuals.com — not the Supabase origin, since the
+  // message now comes from our own app, not the Edge Function) and
+  // closes itself, rather than rendering the full dashboard UI.
+  const isPopupLanding =
+    typeof window !== 'undefined' && !!window.opener && searchParams.has('connect_result');
+
+  useEffect(() => {
+    if (!isPopupLanding) return;
+    const success = searchParams.get('connect_result') === 'success';
+    const category = searchParams.get('category');
+    const reason = searchParams.get('reason');
+    try {
+      window.opener?.postMessage(
+        { type: 'zenny-oauth-result', success, category, reason },
+        window.location.origin,
+      );
+    } catch (_e) {
+      // opener gone or a cross-origin restriction — nothing more to do
+    }
+    window.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Parent-window listener: receives the message the popup landing page
+  // above sends. Origin-checked against our OWN origin (the popup is
+  // another instance of this same dashboard, not the Supabase project).
   useEffect(() => {
     function onMessage(event: MessageEvent) {
-      if (event.origin !== SUPABASE_ORIGIN) return;
+      if (event.origin !== window.location.origin) return;
       const data = event.data as { type?: string; success?: boolean; category?: string; reason?: string };
       if (data?.type !== 'zenny-oauth-result') return;
 
@@ -304,6 +334,11 @@ export function Integrations() {
       load();
     }
   };
+
+  // BC-020: this load IS the popup completing — postMessage + close()
+  // already fired in the effect above. Render a minimal message in case
+  // window.close() is delayed or blocked, rather than the full dashboard.
+  if (isPopupLanding) return <p>Finishing up… you can close this window.</p>;
 
   if (error) return <p className="error-text">Failed to load integrations: {error}</p>;
   if (!client || !connections) return <p>Loading integrations…</p>;
