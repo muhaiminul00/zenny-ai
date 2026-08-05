@@ -68,6 +68,7 @@ export interface AppointmentListItem {
   our_db_write_status: CalendarWriteStatus;
   authoritative_source: AuthoritativeSource;
   alert_fired: boolean;
+  scheduled_at: string;
   created_at: string;
   conversation_summary: string;
   intent: string;

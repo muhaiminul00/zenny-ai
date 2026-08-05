@@ -52,10 +52,10 @@ export function AppointmentsList() {
           <thead>
             <tr>
               <th>Appointment</th>
+              <th>Scheduled for</th>
               <th>Intent</th>
               <th>Source of truth</th>
               <th>Alert</th>
-              <th>Created</th>
             </tr>
           </thead>
           <tbody>
@@ -65,6 +65,9 @@ export function AppointmentsList() {
                   <Link to={`/appointments/${a.appointment_id}`}>
                     {a.appointment_id.slice(0, 8)}…
                   </Link>
+                </td>
+                <td>
+                  <strong>{new Date(a.scheduled_at).toLocaleString()}</strong>
                 </td>
                 <td>{a.intent}</td>
                 <td>
@@ -77,7 +80,6 @@ export function AppointmentsList() {
                     '—'
                   )}
                 </td>
-                <td>{new Date(a.created_at).toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
@@ -113,6 +115,10 @@ export function AppointmentDetailPage() {
       <h2>
         Appointment {appt.appointment_id.slice(0, 8)}… <SourcePill source={appt.authoritative_source} />
       </h2>
+      <p style={{ fontSize: 18 }}>
+        <strong>{new Date(appt.scheduled_at).toLocaleString()}</strong>
+        <span className="note"> · booked {new Date(appt.created_at).toLocaleString()}</span>
+      </p>
 
       {appt.alert_fired && (
         <section style={{ borderColor: 'var(--danger)' }}>

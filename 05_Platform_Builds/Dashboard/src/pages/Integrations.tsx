@@ -4,26 +4,56 @@ import { supabase, supabaseUrl } from '../lib/supabase';
 import type { ClientConnection, DashboardClient } from '../lib/types';
 
 // Which categories are shown per archetype, and which provider(s) can
-// fill each category. This is a UI-only display judgment call (BC-016),
-// not a documented product decision — no source doc specifies this
-// mapping. Flagged in the Implementation Report; easy to revise.
+// fill each category. This is a UI-only display judgment call (BC-016,
+// widened BC-018), not a documented product decision — no source doc
+// specifies this mapping. Flagged in the Implementation Report; easy to
+// revise. BC-018: added 'notification' to every archetype (ops
+// notifications aren't really archetype-specific) and cal_com to
+// 'calendar' (it was missing entirely — the real bug this card fixes).
 const ARCHETYPE_CATEGORIES: Record<string, string[]> = {
   emergency: ['calendar', 'notification'],
-  commerce_ecom: ['ecommerce', 'calendar'],
-  commerce_restaurant: ['ecommerce', 'calendar'],
-  appointment: ['calendar'],
-  consultation: ['calendar'],
+  commerce_ecom: ['ecommerce', 'calendar', 'notification'],
+  commerce_restaurant: ['ecommerce', 'calendar', 'notification'],
+  appointment: ['calendar', 'notification'],
+  consultation: ['calendar', 'notification'],
   engagement: ['notification'],
 };
 
-const CATEGORY_PROVIDERS: Record<string, { provider: string; label: string }[]> = {
+interface ProviderOption {
+  provider: string;
+  label: string;
+  // BC-018: whether this provider actually works today, independent of
+  // control.oauth_apps.app_status (which can be stale/misleading — e.g.
+  // Slack's app_status says 'testing' but its client_id is a literal
+  // placeholder, per BC-004 Step C). Shown, never hidden, per this
+  // card's Step 2 resolution — see the Implementation Report for the
+  // Slack reasoning specifically.
+  ready: boolean;
+  unavailableReason?: string;
+}
+
+const CATEGORY_PROVIDERS: Record<string, ProviderOption[]> = {
   calendar: [
-    { provider: 'google', label: 'Google Calendar' },
-    { provider: 'calendly', label: 'Calendly' },
+    { provider: 'google', label: 'Google Calendar', ready: true },
+    { provider: 'calendly', label: 'Calendly', ready: true },
+    {
+      provider: 'cal_com',
+      label: 'Cal.com',
+      ready: false,
+      unavailableReason: 'Cal.com app registration is still pending (no real client yet).',
+    },
   ],
-  ecommerce: [{ provider: 'shopify', label: 'Shopify' }],
-  email: [{ provider: 'google', label: 'Gmail' }],
-  notification: [{ provider: 'slack', label: 'Slack' }],
+  ecommerce: [{ provider: 'shopify', label: 'Shopify', ready: true }],
+  email: [{ provider: 'google', label: 'Gmail', ready: true }],
+  notification: [
+    {
+      provider: 'slack',
+      label: 'Slack',
+      ready: false,
+      unavailableReason:
+        "Slack isn't connectable yet — there's no real multi-tenant OAuth app behind it (a bot-token placeholder only, per BC-004).",
+    },
+  ],
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -32,6 +62,15 @@ const CATEGORY_LABELS: Record<string, string> = {
   email: 'Email',
   notification: 'Notifications',
 };
+
+/** Normalizes anything the user types into a bare myshopify.com subdomain. */
+function normalizeShopifyShop(input: string): string {
+  let s = input.trim().toLowerCase();
+  s = s.replace(/^https?:\/\//, '');
+  s = s.replace(/\.myshopify\.com\/?$/, '');
+  s = s.replace(/\/$/, '');
+  return s;
+}
 
 export function Integrations() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -67,11 +106,27 @@ export function Integrations() {
 
   const handleConnect = (provider: string, category: string) => {
     if (!client) return;
+
+    // BC-018 Step 1: Shopify's authorize URL needs the merchant's
+    // {shop}.myshopify.com subdomain — oauth-initiate correctly rejects
+    // the request without it (BUILD_URL_FAILED). Minimal UI per the
+    // card's explicit instruction: a plain prompt, not a styled form.
+    let shop: string | undefined;
+    if (provider === 'shopify') {
+      const raw = window.prompt(
+        "What's your store's Shopify subdomain? (the part before .myshopify.com)",
+      );
+      if (!raw) return;
+      shop = normalizeShopifyShop(raw);
+      if (!shop) return;
+    }
+
     setBusyProvider(provider);
     const url = new URL(`${supabaseUrl}/functions/v1/oauth-initiate`);
     url.searchParams.set('client_id', client.client_id);
     url.searchParams.set('category', category);
     url.searchParams.set('provider', provider);
+    if (shop) url.searchParams.set('shop', shop);
     window.location.href = url.toString();
   };
 
@@ -153,15 +208,21 @@ export function Integrations() {
               ) : (
                 <>
                   <span className="status-pill status-not_connected">Not connected</span>
-                  {options.map((opt) => (
-                    <button
-                      key={opt.provider}
-                      disabled={busyProvider === opt.provider}
-                      onClick={() => handleConnect(opt.provider, category)}
-                    >
-                      Connect {opt.label}
-                    </button>
-                  ))}
+                  {options.map((opt) =>
+                    opt.ready ? (
+                      <button
+                        key={opt.provider}
+                        disabled={busyProvider === opt.provider}
+                        onClick={() => handleConnect(opt.provider, category)}
+                      >
+                        Connect {opt.label}
+                      </button>
+                    ) : (
+                      <span key={opt.provider} className="note" title={opt.unavailableReason}>
+                        {opt.label}: <span className="status-pill status-expired">Not yet available</span>
+                      </span>
+                    ),
+                  )}
                 </>
               )}
             </div>
