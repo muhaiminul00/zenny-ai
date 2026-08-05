@@ -15,27 +15,32 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 19 (BC-018 — fixed 3 real defects found in manual testing)
+2026-08-05 — by Claude Code, Session 20 (BC-019 — Gmail + WooCommerce connections wired up, inventory sync logged, Supabase tier confirmed)
 
 ## Current Phase
-Phase 5 (Dashboard Systems) — 3 real defects found via the human's own
-manual click-through fixed this session (BC-018): (1) Shopify's Connect
-button now prompts for the merchant's shop subdomain before calling
-oauth-initiate (was silently building a request the Edge Function
-correctly rejected) — verified live, produces a real, correctly-formed
-`https://{shop}.myshopify.com/admin/oauth/authorize?...` URL; (2) the
-Integrations page now shows all 5 real, non-`not_applicable` oauth_apps
-providers relevant to the client's archetype (Cal.com was missing
-entirely) — Cal.com and Slack both shown as "Not yet available" rather
-than hidden, reasoning below; (3) `appointments.scheduled_at` added
-(the table only had `created_at` — when the row was created, not when
-the appointment occurs, a genuine missed requirement) across `public` +
-all 5 relevant `tpl_*` schemas + `client_test_002`'s live schema,
-surfaced prominently in the dashboard UI, seeded rows backfilled with
-real values matching their conversation content. 0 self-resolved
-document-level items this session — no gate applies. One doc diff
-flagged (Database_Structure_v4_FINAL.md has no `appointments` section
-at all — see Blockers). Convocore Adapter
+Phase 5 (Dashboard Systems) — Integrations page now supports Gmail
+(BC-019, reuses the existing `google` oauth_apps row via a new 'email'
+category — no separate row needed, per Client_Integration_and_
+Credential_Platform_v1.md Part 8.1's "one shared app" design) and
+WooCommerce (a real API-key form wired to the existing but
+never-before-used `woocommerce-connect` Edge Function). **2 real bugs
+caught and fixed via live Playwright testing of the WooCommerce form**:
+missing CORS headers (the function had only ever been exercised
+server-to-server, never from an actual browser) and a client-side error-
+message extraction bug (supabase-js doesn't auto-parse Edge Function
+error bodies). Confirmed via Client_Integration_and_Credential_
+Platform_v1.md Part 8.2 that Shopify does NOT need a separate API-key
+path — already resolved in that doc, no redundant path built. Logged
+`SCH-007 Inventory/Catalogue Sync` as a formal future-phase requirement
+(3 sources: Shopify, WooCommerce, AND Google Sheets — the last one new
+per explicit human instruction). Confirmed live: Supabase org is on the
+**free tier** — no custom domain possible for oauth-initiate/oauth-
+callback without upgrading to Pro, documented as an open human decision,
+not actioned. 0 self-resolved document-level items this session — no
+gate applies. Two doc diffs flagged, unapplied (see Blockers): BC-018's
+still-open `appointments` section gap in Database_Structure_v4_FINAL.md,
+and this session's new SCH-007 registry entry for
+n8n_Workflow_Specification_v1.md Part 8. Convocore Adapter
 (ADP-002) — **COMPLETE.** BC-010 closed the one item BC-009 left open:
 human-handoff's staged-fallback Stage 2 trigger, built per the
 Commander's exact operational definition. ADP-002 registered in
@@ -632,6 +637,96 @@ existing conversions_* sections, listing:
   alert_fired                                    boolean NOT NULL
   scheduled_at                                      timestamptz NOT NULL  -- new, BC-018
   created_at                                           timestamptz NOT NULL
+```
+
+## Phase 5 — Gmail/WooCommerce Connections, Inventory Sync Logged, Supabase Tier (BC-019)
+
+```
+**Step 1 — Gmail, no new oauth_apps row:** Confirmed live `control.
+oauth_apps` has 7 rows (cal_com, calendly, google, shopify, slack,
+twilio, woocommerce) — no 'gmail' row, even though the CHECK constraint
+allows it. Read Client_Integration_and_Credential_Platform_v1.md Part
+8.1 before deciding whether to add one: "One Google Cloud project, one
+OAuth 2.0 Client... Scopes: full read/write for BOTH Calendar and
+Gmail" — a single shared app, already exactly what the seeded `google`
+row's scopes reflect (`calendar` + `gmail.modify` together). Adding a
+second 'gmail' row with duplicate credentials would be redundant
+infrastructure for zero functional gain — `category` (not `provider`)
+is what distinguishes a Calendar connection from an Email connection in
+`control.client_connections`, and `oauth-initiate`'s authorize-URL
+logic never branches on category. Added 'email' to CATEGORY_PROVIDERS
+(already existed, unused since BC-016) and to ARCHETYPE_CATEGORIES for
+every archetype. **Verified live via Playwright:** Connect Gmail
+correctly reaches Google's real consent screen with the same client_id/
+scopes as the Calendar flow, and the resulting `control.oauth_state` row
+confirmed `category='email', provider='google'` — proving the shared-app
+design works exactly as the doc describes, not just in theory.
+
+**Step 2 — WooCommerce, real form + 2 real bugs fixed:** Re-read
+`woocommerce-connect`'s live deployed source (never guessed) — confirmed
+signature `{client_id, store_url, consumer_key, consumer_secret}`. Built
+a plain 3-field form (Store URL / Consumer Key / Consumer Secret, no
+styling pass per the card's explicit instruction), calling the function
+directly via `supabase.functions.invoke`. **First live Playwright test
+failed** with a browser CORS error — the function had no `Access-
+Control-Allow-Origin` header at all, meaning it had only ever been
+exercised server-to-server, never from an actual browser; genuinely
+would have blocked every real client from ever using it. Fixed by adding
+CORS headers + OPTIONS preflight handling, redeployed (v2). **Second
+live test surfaced a real but generic error** ("Edge Function returned a
+non-2xx status code") — supabase-js's `FunctionsHttpError` doesn't
+auto-parse the response body into `.message`; fixed by reading the real
+message from `error.context` (the raw Response). **Third live test
+succeeded end-to-end**: a fake store correctly produced the real,
+specific validation failure (`Could not reach store at ...: dns error:
+... No address associated with hostname`) — proving the full path
+(browser → Edge Function → live validation attempt → real error
+surfaced back to the UI) genuinely works, same disclosed-limitation
+pattern as every other provider test in this project (no real store
+exists to complete a full success case).
+
+**Shopify's API-key question — resolved via the doc, not built:**
+Client_Integration_and_Credential_Platform_v1.md Part 8.2 already
+resolved this ("RESOLVED during document review: Shopify's Custom App
+token model is deprecated/being phased out — Shopify now uses the same
+shared-app... Authorization Code Grant") and Part 8's own summary table
+states directly: "Google, Shopify, Slack — no meaningful API-key
+alternative exists". No second path built; would have been redundant
+against the doc's own explicit resolution.
+
+**Step 3 — SCH-007 Inventory/Catalogue Sync, logged as a real future
+item (not built):** Per explicit human instruction, formally logging
+(not just re-mentioning) a new required workflow:
+
+  SCH-007  Inventory/Catalogue Sync — Cron — Syncs product/inventory
+  data from Shopify, WooCommerce, AND Google Sheets (3 sources — Google
+  Sheets is a NEW requirement, not previously captured anywhere, added
+  per explicit human instruction this session, for clients without a
+  real e-commerce platform) into that client's Convocore KB via
+  Convocore's KB API. Referenced as a known gap since BC-005/BC-009/
+  BC-012 but never formally logged with an ID or the Google Sheets
+  source until now. Belongs in Phase 11 (Scheduled Workflows). NOT built
+  — schema/workflow design not started, this is a logging-only entry.
+
+  Doc diff flagged, not applied (Section 13 standing rule): n8n_
+  Workflow_Specification_v1.md Part 8's Scheduled Workflows table
+  (currently SCH-001 through SCH-006) needs a new row:
+  | SCH-007 | Inventory/Catalogue Sync | Cron | Pull product/inventory
+  data from Shopify, WooCommerce, and Google Sheets (per-client
+  configured source); push into that client's Convocore KB via the KB
+  API | 07 (Dashboard) or a new Inventory module — Build Card's call |
+
+**Step 4 — Supabase tier confirmed live, custom domain documented (not
+built):** `get_organization` on org `jltlethfyimcwhtbbeqj` ("Zenny AI")
+returns `"plan":"free"`. Per the card's explicit instruction, this was
+NOT actioned — no custom domain was configured. Noting for the record:
+oauth-initiate/oauth-callback currently run on
+kmhzosyljpzheqvfuyzm.supabase.co, visible on Google's OAuth consent
+screen — likely a factor in Google brand verification friction (the raw
+Supabase project-ref domain, not a branded zeromanuals.com one). Fixing
+this requires a custom domain mapped to Supabase Edge Functions (e.g.
+api.zeromanuals.com), which requires upgrading to Supabase Pro tier —
+a plan/cost decision for the human, not decided or actioned here.
 ```
 
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
@@ -1287,27 +1382,34 @@ directly.
 ## Blockers Right Now
 
 ```
-NONE blocking further work. BC-018 (this session) has 0 self-resolved
+NONE blocking further work. BC-019 (this session) has 0 self-resolved
 document-level items — the Document Resolution Authority gate does not
-apply. Fixing 3 confirmed real defects from manual testing isn't a
-document-level conflict/gap, it's ordinary bug-fixing (explicitly
-unaffected by the standing rule, per its own "ordinary bug-catching"
-carve-out).
+apply. Wiring up Gmail/WooCommerce, logging SCH-007, and confirming the
+Supabase tier are ordinary build/documentation work, not document-level
+conflicts.
 
-Doc diff flagged for Commander to apply (BC-018, not applied by Claude
-Code — Section 13 standing rule, same pattern as BC-006/009/010):
+2 doc diffs flagged for Commander to apply (not applied by Claude Code —
+Section 13 standing rule, same pattern as BC-006/009/010):
 - Database_Structure_v4_FINAL.md has no `appointments` section at all
-  (table added in BC-013, after that doc's authorship, never
-  backfilled in). Full column list + exact wording given in the new
-  "Phase 5 — 3 Defect Fixes From Manual Testing (BC-018)" section
-  above — ready to paste in as a new subsection alongside the existing
-  conversions_* entries.
+  (BC-018, still open — table added in BC-013, after that doc's
+  authorship, never backfilled in). Full column list + exact wording in
+  the "Phase 5 — 3 Defect Fixes From Manual Testing (BC-018)" section
+  above.
+- n8n_Workflow_Specification_v1.md Part 8's Scheduled Workflows table
+  needs the new SCH-007 row (BC-019, new) — exact row text in the
+  "Phase 5 — Gmail/WooCommerce Connections..." section above.
 
 Still open, unresolved by design (not this card's scope):
 - Client-schema-to-auth-user mapping mechanism (app_metadata stopgap,
   per BC-015) — still a Commander product decision, not touched.
 - Whether Integrations' Disconnect should also revoke access at the
   provider (BC-016, still open).
+- Supabase custom domain for oauth-initiate/oauth-callback (BC-019,
+  new) — requires a Pro-tier upgrade, a plan/cost decision for the
+  human, not actioned.
+- SCH-007 Inventory/Catalogue Sync itself (BC-019, new) — logged as a
+  real future-phase requirement, not built; schema/workflow design not
+  started.
 
 Prior gates, for reference (all previously resolved/acknowledged):
 
@@ -1619,6 +1721,67 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 20 — 2026-08-05 — BC-019: Gmail + WooCommerce connections wired up, SCH-007 logged, Supabase tier confirmed
+- Step 1 — confirmed live `control.oauth_apps` has no 'gmail' row (7
+  rows total, CHECK constraint allows it but nothing was seeded). Read
+  Client_Integration_and_Credential_Platform_v1.md Part 8.1 before
+  deciding whether to add one: the design is explicitly "one shared
+  [Google] app" requesting both Calendar and Gmail scopes together,
+  already reflected in the existing seeded `google` row's scopes.
+  Decided NOT to add a duplicate row — added Gmail as a new 'email'
+  category (CATEGORY_PROVIDERS.email already existed since BC-016,
+  unused) reusing `provider: 'google'`. Verified live via Playwright:
+  Connect Gmail correctly reached Google's real consent screen, and the
+  resulting oauth_state row confirmed category='email'/provider=
+  'google' as intended.
+- Step 2 — re-read woocommerce-connect's real deployed source (signature
+  confirmed: client_id/store_url/consumer_key/consumer_secret). Built a
+  plain 3-field form, no styling pass, per the card's explicit
+  instruction. Live Playwright testing caught 2 real bugs the function
+  had never surfaced before (only ever called server-to-server): (1) no
+  CORS headers at all — every real browser-based call would have been
+  blocked outright, fixed by adding CORS headers + OPTIONS handling,
+  redeployed woocommerce-connect v2; (2) supabase-js doesn't auto-parse
+  Edge Function error response bodies, so real validation failures
+  showed only a generic "non-2xx status" message — fixed by reading
+  error.context directly. Final live test succeeded end-to-end: a fake
+  store produced the real, specific DNS-lookup failure message, proving
+  the whole path (browser -> Edge Function -> live validation attempt ->
+  real error surfaced to the UI) genuinely works. Checked Client_
+  Integration_and_Credential_Platform_v1.md Part 8.2 before considering
+  a Shopify API-key path — already explicitly resolved there ("no
+  meaningful API-key alternative exists" for Shopify) — built nothing
+  redundant.
+- Step 3 — logged SCH-007 Inventory/Catalogue Sync in PROJECT_STATE.md
+  as a real, durable future-phase requirement (not a build), including
+  the Google Sheets source as a newly-captured requirement per explicit
+  human instruction (previously only Shopify/WooCommerce were ever
+  mentioned as sync sources across BC-005/009/012). Flagged the exact
+  n8n_Workflow_Specification_v1.md Part 8 registry row needed, not
+  applied directly, per the Section 13 standing rule.
+- Step 4 — confirmed live via get_organization that the Supabase org
+  ("Zenny AI") is on the free plan. Did not attempt any custom-domain
+  configuration, per the card's explicit instruction — documented the
+  constraint (oauth screens showing the raw supabase.co project-ref
+  domain, Pro tier required to fix) as an open human decision.
+- What was verified live vs. assumed: every claim in this session is
+  backed by a real check — the Gmail decision by actually reading Part
+  8.1 before deciding whether to seed a row, the WooCommerce CORS fix by
+  watching a real browser request fail then succeed, the Supabase tier
+  by a real get_organization call rather than assumed from context.
+- What broke / changed from plan: the WooCommerce form failed on first
+  deploy (CORS) — a genuine defect in code that predates this session
+  (woocommerce-connect was built in an earlier session and never
+  actually exercised from a browser until now), caught and fixed within
+  this same session rather than left for a future one.
+- Files touched: 05_Platform_Builds/Dashboard/src/pages/Integrations.tsx
+  (commits 1fbe8b7, 7bf150f); woocommerce-connect Edge Function
+  redeployed (v2, CORS fix); zenny-dashboard Docker Compose project on
+  srv1881104 redeployed twice; PROJECT_STATE.md.
+- **This session: 0 self-resolved document-level items — ordinary
+  build/documentation work. The Document Resolution Authority gate does
+  not apply. Proceeding to the next Build Card is fine.**
 
 ### Session 19 — 2026-08-05 — BC-018: fixed 3 real defects found in the human's manual testing
 - Step 1 — re-read oauth-initiate's real deployed source before
