@@ -15,17 +15,16 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 10 (BC-009 — Phase 4 NOT COMPLETE, 1 item genuinely open by design)
+2026-08-05 — by Claude Code, Session 11 (BC-010 — Phase 4 COMPLETE)
 
 ## Current Phase
-Phase 4 — Convocore Adapter (ADP-002) — built and internally verified,
-but human-handoff's staged-fallback trigger condition was correctly left
-unbuilt (genuine open decision, per the card's own instruction — see
-Blockers). ADP-002 registered in n8n_Workflow_Specification_v1.md Part
-17 (newly created — also closed the gap that ADP-001/Voiceflow was never
-registered either). All 3 stale "Prospective" lines updated to real
-status. Phase 3 remains COMPLETE, unchanged. Phase 5 (4 New Dashboard
-Systems) is next once the human-handoff sub-decision is resolved.
+Phase 4 — Convocore Adapter (ADP-002) — **COMPLETE.** BC-010 closed the
+one item BC-009 left open: human-handoff's staged-fallback Stage 2
+trigger, built per the Commander's exact operational definition. ADP-002
+registered in n8n_Workflow_Specification_v1.md Part 17 (BC-009 — also
+closed the gap that ADP-001/Voiceflow was never registered either). All
+3 stale "Prospective" lines updated to real status (BC-009). Phases 1-3
+remain COMPLETE, unchanged. Phase 5 (4 New Dashboard Systems) is next.
 
 ---
 
@@ -36,7 +35,7 @@ Phase 0  — Environment Setup .................... IN PROGRESS
 Phase 1  — Close Credential Platform Gaps ........ COMPLETE
 Phase 2  — Convocore Database Changes ............ COMPLETE
 Phase 3  — Remaining Shared Utilities ............ COMPLETE
-Phase 4  — Convocore Adapter (ADP-002) ........... BUILT, 1 sub-decision open
+Phase 4  — Convocore Adapter (ADP-002) ........... COMPLETE
 Phase 5  — 4 New Dashboard Systems (Directus) .... NOT STARTED
 Phase 6  — Core Agent ............................ NOT STARTED
 Phase 7  — Growth Agent .......................... NOT STARTED
@@ -403,9 +402,8 @@ ADP-002 Convocore Adapter:        BUILT (BC-009), n8n workflow ID
                                   ownership_state, status) via UTIL-001
                                   Schema Resolver + a direct Supabase
                                   insert — staged-fallback "insufficient"
-                                  trigger condition explicitly NOT built,
-                                  per the card's own instruction (Findings
-                                  doc Part 2.1 still DECISION NEEDED).
+                                  trigger condition BUILT (BC-010, see
+                                  below) — Phase 4 now COMPLETE.
                                   NOT end-to-end live-tested against a
                                   real Convocore agent (none exists —
                                   explicitly out of scope) or a real
@@ -413,8 +411,72 @@ ADP-002 Convocore Adapter:        BUILT (BC-009), n8n workflow ID
                                   still, per BC-005) — internal structural
                                   verification only (get_workflow_details
                                   confirms every node/wire matches
-                                  design), consistent with this card's own
-                                  scoping.
+                                  design), consistent with these cards'
+                                  own scoping.
+                                  **BC-010 addition — Stage 2 staged-
+                                  fallback trigger:** 4 new nodes added to
+                                  the human-handoff branch (20 nodes
+                                  total now). Per Commander decision
+                                  (BC-010): re-confirmed live first that
+                                  the Complaint Handler's "two resolution
+                                  attempts" precedent and Step 1D.2
+                                  Confidence Gate still hold in
+                                  Agent_Runtime_System_v1.md unchanged
+                                  since BC-009. Mechanism: since the
+                                  Adapter never sees raw conversation
+                                  turns (only discrete Tool calls), the
+                                  actual NLP-level signal detection
+                                  (customer indicates unresolved / re-
+                                  raises intent / Confidence Gate Low-
+                                  Conflicting) cannot live in the Adapter
+                                  — it belongs to Convocore's own embedded
+                                  prompt logic (Part 8), which DOES see
+                                  the conversation. The Adapter-buildable,
+                                  non-timer signal is: "Check Existing
+                                  Open Escalation" (HTTP GET, customer_id
+                                  + escalation_type + status='open') runs
+                                  before every escalation write; "
+                                  Escalation Already Open? (Stage 2
+                                  Signal)" (IF) treats a SECOND human-
+                                  handoff call for an already-open
+                                  escalation as Convocore's embedded logic
+                                  having already determined the Commander's
+                                  signal fired — the Adapter recognizes
+                                  the event, it doesn't re-derive the NLP
+                                  judgment. No timeout/timer anywhere,
+                                  matching the card's explicit
+                                  instruction. On trigger: "Fire Stage 2
+                                  Notification (UTIL-004)" (Execute
+                                  Workflow, mode:once, workflowId
+                                  fcilrbwldjnn92Yn) with notify_email:true
+                                  AND notify_slack:true — email
+                                  confirmed functional (BC-008), Slack
+                                  confirmed STILL credential-blocked
+                                  (BC-004 Step C / BC-008, re-verified,
+                                  not re-checked live this session but no
+                                  new Slack credential has been added
+                                  since) — fires anyway since UTIL-004's
+                                  Slack node already has onError:
+                                  continueRegularOutput (BC-008), so a
+                                  failed Slack attempt never blocks the
+                                  email delivery. Stage 1's response
+                                  wording updated to clarify it's Stage 1
+                                  specifically. Caught and fixed 2 real
+                                  bugs mid-session: (1) the new "Check
+                                  Existing Open Escalation" node's
+                                  Supabase credential didn't attach on
+                                  first attempt despite an explicit
+                                  credential object in the addNode
+                                  operation — fixed via a follow-up
+                                  setNodeCredential call; (2) a
+                                  setNodeParameter call with path
+                                  "/parameters/responseBody" created a
+                                  malformed DOUBLE-NESTED parameters
+                                  object instead of replacing the field —
+                                  caught via get_workflow_details,
+                                  corrected via updateNodeParameters with
+                                  replace:true. Full 20-node structure
+                                  reconfirmed live after both fixes.
 UTIL-006 Credential Resolver:     BUILT — tested w/ placeholder creds
 SCH-006 Token Refresh Sweep:      BUILT, interval CONFIRMED LIVE = exactly
                                   6 hours (n8n get_workflow_details:
@@ -559,15 +621,28 @@ directly.
 ## Blockers Right Now
 
 ```
-BLOCKING Phase 4 closure (1 item, genuine, by design — matches BC-005
-Step 4's precedent exactly):
-- human-handoff's staged-fallback "insufficient" trigger condition —
-  Convocore_Findings_Required_Updates_FINAL.md Part 2.1 explicitly still
-  reads DECISION NEEDED ("what 'insufficient' means operationally").
-  BC-009's card explicitly instructed building ONLY the confirmed part
-  (real escalations-row-write, done) and stopping on this specific
-  sub-decision rather than inventing a threshold. Needs a Commander
-  decision on what "insufficient" means before this can be built.
+NONE blocking Phase 4 closure. Phase 4 is COMPLETE as of BC-010.
+
+Resolved this session (BC-010), no longer open:
+- human-handoff's staged-fallback trigger condition — built per the
+  Commander's exact operational definition, confirmed live (20 nodes).
+
+Doc diff flagged for Commander to apply (BC-010 Step 2, not applied by
+Claude Code — Section 13's standing rule, same pattern as BC-006/BC-009):
+- Agent_Runtime_System_v1.md's "##### D. Human Handoff Handler" section
+  needs a new subsection documenting the Stage 2 staged-fallback
+  addition (Commander's BC-010 decision + the Adapter-level mechanism
+  actually used to detect it — see PROJECT_STATE.md's ADP-002 entry
+  above for the exact mechanism, or n8n workflow BOxeuH6ehv46FZL0
+  directly). Exact insertion point: after the existing "What context is
+  passed to human agent" paragraph (line ~3370) and before "Escalation
+  Priority Classification" — a natural place for a "Staged Fallback
+  (Stage 2)" subsection. Suggested content: the Commander's exact
+  3-condition definition from this card, the "silence is not a negative
+  signal" clarification, and a pointer to ADP-002 as the implementing
+  mechanism (Runtime docs describe behavior, not n8n wiring — full
+  technical detail belongs in the Adapter Spec / PROJECT_STATE.md, not
+  duplicated here).
 
 Open, non-blocking follow-up (BC-009):
 - ADP-002 has never been tested against real Convocore traffic — no live
@@ -702,6 +777,48 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 11 — 2026-08-05 — BC-010: Phase 4 closure (Stage 2 trigger)
+- What was done: Re-confirmed live (grep against the real file, not
+  memory) that the Complaint Handler's "two resolution attempts"
+  threshold and Step 1D.2 Confidence Gate precedent both still hold
+  unchanged in Agent_Runtime_System_v1.md since BC-009, per the card's
+  own instruction to verify rather than assume nothing shifted. Designed
+  the Stage 2 trigger around the real architectural constraint that the
+  Adapter never sees raw conversation content (only discrete Convocore
+  Tool calls) — the Commander's 3-condition signal genuinely can only be
+  evaluated by Convocore's own embedded prompt logic (Part 8), so the
+  Adapter's correct role is recognizing that signal's occurrence, not
+  re-deriving it. Implemented as: a second human-handoff call arriving
+  while an escalation is already open IS that recognition event. Added 4
+  nodes to ADP-002's human-handoff branch via update_workflow (existing
+  workflow, not rebuilt from scratch). Fired UTIL-004 with both
+  notify_email and notify_slack true — Slack still credential-blocked
+  (unchanged since BC-004/BC-008), fires anyway since UTIL-004's Slack
+  node already has onError:continueRegularOutput, so a failed Slack
+  attempt can't block email delivery. Drafted the exact doc diff for
+  Agent_Runtime_System_v1.md, did not apply it (Section 13).
+- What was verified live vs. assumed: The Complaint Handler/Confidence
+  Gate precedent check was a real grep against the current file content,
+  not an assumption carried from BC-009's context. Two real mistakes
+  were caught via get_workflow_details after the first update_workflow
+  call: a credential that didn't attach despite being explicitly passed
+  in the addNode operation, and a setNodeParameter path
+  ("/parameters/responseBody") that created a malformed nested
+  duplicate parameters object instead of replacing the field. Both
+  fixed via follow-up operations (setNodeCredential,
+  updateNodeParameters with replace:true) and reconfirmed live before
+  considering the card done.
+- What broke / changed from plan: The first update_workflow batch
+  technically "succeeded" (11 operations applied) but left 2 real
+  defects that weren't visible without a follow-up read — a concrete
+  instance of why this project's "confirm real end-state, don't trust
+  the tool's success response alone" discipline exists.
+- Files touched: PROJECT_STATE.md. n8n: ADP-002 (BOxeuH6ehv46FZL0)
+  updated in place, 20 nodes total now (was 16).
+- **Phase 4 verdict: COMPLETE.** Both BC-009 and BC-010 items closed;
+  the only remaining item is the doc diff, correctly flagged for the
+  Commander rather than self-applied.
 
 ### Session 10 — 2026-08-05 — BC-009: Phase 4 (ADP-002 Convocore Adapter)
 - What was done: Step 0 — verified live that NO ADP-{NNN} registry table
