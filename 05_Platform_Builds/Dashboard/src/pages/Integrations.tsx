@@ -234,12 +234,18 @@ export function Integrations() {
     if (shop) url.searchParams.set('shop', shop);
 
     // BC-020: popup instead of a full-page redirect. Explicit width/
-    // height, not a new tab (per the card's explicit instruction).
+    // height, not a new tab (per the card's explicit instruction). A
+    // unique target name per attempt, not a fixed 'zenny-oauth' —
+    // reusing one fixed name across repeated opens in the same session
+    // showed inconsistent same-tab-navigation behavior during testing
+    // instead of a genuine new popup; a fresh name each time avoids any
+    // browser-level named-window reuse entirely, which is the safer,
+    // more standard pattern for repeatable popup flows regardless.
     setPopupNote(null);
     setBusyProvider(provider);
     const popup = window.open(
       url.toString(),
-      'zenny-oauth',
+      `zenny-oauth-${Date.now()}`,
       'width=520,height=680,menubar=no,toolbar=no,location=yes',
     );
 
