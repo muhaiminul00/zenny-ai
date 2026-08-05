@@ -998,9 +998,9 @@ The Voiceflow Adapter is responsible only for request/response translation, auth
 
 ## 16.4 Convocore Integration
 
-**Current Status: 🔶 Prospective — NOT yet built or confirmed as the platform choice**
+**Current Status: 🟢 Built — ADP-002 (BC-009), see `Convocore_Adapter_Spec_FINAL.md` and `n8n_Workflow_Specification_v1.md` Part 17**
 
-Convocore is still under active development/evaluation — not yet a confirmed or built integration. This section describes the *intended* treatment if/when adopted, not a completed integration.
+Convocore is the confirmed, adopted conversation-layer platform (superseding this section's earlier "prospective" framing). The Adapter is built and internally verified against the frozen contract; not yet live-tested against a real Convocore agent (none exists yet — deliberately out of this Adapter build's scope). This section's description below of the *intended* treatment now describes the actual built integration, not a hypothetical one.
 
 If adopted, expected to follow the same architectural model as Voiceflow — only the adapter differs:
 

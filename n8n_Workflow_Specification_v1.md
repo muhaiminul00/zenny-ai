@@ -141,9 +141,10 @@ Business Workflows       — the actual per-Tool operation, organized by owning
                           Engine, Recovery Engine, Email Manager)
 Scheduled Workflows        — cron-triggered, no external caller (recovery
                           queue sweep, timeout/stale-call sweep, etc.)
-Platform Adapters            — Voiceflow Adapter (production), Convocore
-                          Adapter (prospective) — translation-only, per
-                          Integration Contract Part 17
+Platform Adapters            — Voiceflow Adapter (ADP-001, production),
+                          Convocore Adapter (ADP-002, built — BC-009, see
+                          Part 17) — translation-only, per Integration
+                          Contract Part 17
 ```
 
 This mirrors the canonical 01–08 folder structure (Part 4) exactly — the
@@ -1555,11 +1556,39 @@ as the phase itself starts only after its prerequisite phase is complete.
 
 ## 15.3 Handoff to Build Execution Plan
 
-This is the last content this document defines. Phase 1 (Shared Utilities,
-UTIL-001 through UTIL-005) is what the Build Execution Plan sequences first,
-and what the first Build Card and first Claude → Codex Build Prompt
-(`AI_Builder_Operating_Manual_v1.md` Section 6) are written against. Nothing
-past this point is architecture — everything from here forward is execution.
+This is the last content this document originally defined at freeze time.
+Phase 1 (Shared Utilities, UTIL-001 through UTIL-005) is what the Build
+Execution Plan sequences first, and what the first Build Card and first
+Claude → Codex Build Prompt (`AI_Builder_Operating_Manual_v1.md` Section 6)
+are written against. Part 17 below is a post-freeze addition (BC-009,
+2026-08-05) — the Platform Adapter Registry this document's own Part 3.1
+ID convention reserved a slot for but never populated.
+
+---
+
+# PART 17 — Platform Adapter Registry
+
+Added post-freeze (BC-009, 2026-08-05) — Part 3.1 defines the `ADP-{NNN}`
+ID convention; this table is where those IDs actually get assigned.
+Verified live before this addition: no `ADP-{NNN}` entry existed anywhere
+in this document prior to this table, including for the Voiceflow Adapter
+already in production — that gap is closed here at the same time as
+Convocore's registration, not left half-done.
+
+| ADP-ID | Adapter | Status | Folder | Spec Document |
+|---|---|---|---|---|
+| ADP-001 | Voiceflow Adapter | Production | 08 | `n8n_Execution_Architecture_v1.md` Part 16 (no standalone spec document exists) |
+| ADP-002 | Convocore Adapter | Built (BC-009) | 08 | `Convocore_Adapter_Spec_FINAL.md` |
+
+**ADP-002 detail:** n8n workflow ID `BOxeuH6ehv46FZL0` ("Zenny Platform
+Adapter - Convocore Adapter (ADP-002)"). Implements client resolution
+(Part 2), Standard Request Contract mapping (Part 3), Tool Name/Variable
+pass-through (Parts 4-5), the Shopify exclusion (Part 10), and
+human-handoff's escalations-row-write (Part 7, partial — see PROJECT_STATE.md
+for the explicitly-not-built staged-fallback trigger condition). No live
+Convocore agent exists yet, so this has not been end-to-end tested against
+real Convocore traffic — built and internally verified against the frozen
+contract only, per this Build Card's explicit scope.
 
 ---
 

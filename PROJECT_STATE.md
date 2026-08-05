@@ -15,14 +15,17 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 9 (BC-008 — Phase 3 COMPLETE)
+2026-08-05 — by Claude Code, Session 10 (BC-009 — Phase 4 NOT COMPLETE, 1 item genuinely open by design)
 
 ## Current Phase
-Phase 3 — Remaining Shared Utilities — **COMPLETE.** UTIL-001 through
-UTIL-005 all built in n8n and confirmed live. UTIL-004's Slack-send is
-intentionally non-functional (credential gate, not a defect — see
-Blockers). Phases 1 and 2 remain COMPLETE, unchanged. Phase 4 (Convocore
-Adapter, ADP-002) is next, not yet started.
+Phase 4 — Convocore Adapter (ADP-002) — built and internally verified,
+but human-handoff's staged-fallback trigger condition was correctly left
+unbuilt (genuine open decision, per the card's own instruction — see
+Blockers). ADP-002 registered in n8n_Workflow_Specification_v1.md Part
+17 (newly created — also closed the gap that ADP-001/Voiceflow was never
+registered either). All 3 stale "Prospective" lines updated to real
+status. Phase 3 remains COMPLETE, unchanged. Phase 5 (4 New Dashboard
+Systems) is next once the human-handoff sub-decision is resolved.
 
 ---
 
@@ -33,7 +36,7 @@ Phase 0  — Environment Setup .................... IN PROGRESS
 Phase 1  — Close Credential Platform Gaps ........ COMPLETE
 Phase 2  — Convocore Database Changes ............ COMPLETE
 Phase 3  — Remaining Shared Utilities ............ COMPLETE
-Phase 4  — Convocore Adapter (ADP-002) ........... NOT STARTED
+Phase 4  — Convocore Adapter (ADP-002) ........... BUILT, 1 sub-decision open
 Phase 5  — 4 New Dashboard Systems (Directus) .... NOT STARTED
 Phase 6  — Core Agent ............................ NOT STARTED
 Phase 7  — Growth Agent .......................... NOT STARTED
@@ -334,6 +337,84 @@ UTIL-005 Stop Checker:            BUILT (BC-008), n8n workflow ID
                                   Confirmed live, both HTTP nodes'
                                   credentials fixed to real
                                   zenny-vault-suparbase.
+ADP-002 Convocore Adapter:        BUILT (BC-009), n8n workflow ID
+                                  BOxeuH6ehv46FZL0, 16 nodes, confirmed
+                                  live via get_workflow_details. Real
+                                  webhook: POST https://n8n-cbzu.
+                                  srv1881104.hstgr.cloud/webhook/
+                                  convocore-adapter. Implements: Step 1
+                                  client resolution (agentId ->
+                                  convocore_agent_map -> client_id) with a
+                                  REAL Bearer-vs-agent-secret comparison
+                                  (not a stub) via the same
+                                  read_credential_secret RPC UTIL-006
+                                  itself uses internally -- literal
+                                  "call UTIL-006 as a sub-workflow" per
+                                  the card's wording wasn't actually
+                                  possible: UTIL-006's real contract
+                                  (verified BC-003/BC-008) queries
+                                  control.client_connections by
+                                  client_id+category, which has no path
+                                  to convocore_agent_map's secret at all
+                                  -- used the same underlying secure
+                                  mechanism directly instead, flagged
+                                  here as a disclosed implementation
+                                  deviation, not a silent one. Step 2
+                                  Standard Request Contract mapping built
+                                  per Part 3.2's exact field table,
+                                  including the idempotency_key pattern
+                                  ({kebab_tool}_{client_id}_
+                                  {conversation_id}) taken directly from
+                                  the Adapter Spec's own Part 3.2 (which
+                                  itself already names this exact
+                                  pattern, citing Integration Contract
+                                  Part 20). conversation_id is passed
+                                  through AS-IS -- **explicit limitation,
+                                  not silently assumed safe:** this build
+                                  has NO reliable way to detect whether a
+                                  given conversation_id originated via
+                                  WebSocket vs POST /convos (Part 12.2's
+                                  structurally-broken-conversation rule);
+                                  downstream consumers must not assume
+                                  WebSocket-only traffic. runtime_module
+                                  is explicitly left null by the Adapter,
+                                  confirmed NOT inferred (Part 8 — lives
+                                  in embedded Convocore prompt logic
+                                  instead, genuinely external to this
+                                  workflow). Step 3: Tool Name pure
+                                  pass-through, Variables become payload
+                                  as-is (ENV variables never appear in
+                                  Convocore's own outbound payload in the
+                                  first place, per Part 5.3 — nothing to
+                                  filter, confirmed by design not by
+                                  active filtering logic), System Tools
+                                  (forward-call/end-call) routed to a
+                                  dedicated exclusion branch with zero
+                                  contract mapping. Step 4: Shopify
+                                  explicitly routed to its own exclusion
+                                  branch BEFORE the standard-tool
+                                  fallback catches it — confirmed not an
+                                  accidental catch-all omission. Step 5:
+                                  human-handoff writes a REAL escalations
+                                  row (customer_id, escalation_type,
+                                  escalation_reason<-issue_summary,
+                                  escalation_team<-team_key using BC-007's
+                                  column, origin_module, trigger_condition,
+                                  ownership_state, status) via UTIL-001
+                                  Schema Resolver + a direct Supabase
+                                  insert — staged-fallback "insufficient"
+                                  trigger condition explicitly NOT built,
+                                  per the card's own instruction (Findings
+                                  doc Part 2.1 still DECISION NEEDED).
+                                  NOT end-to-end live-tested against a
+                                  real Convocore agent (none exists —
+                                  explicitly out of scope) or a real
+                                  client_id in convocore_agent_map (0 rows
+                                  still, per BC-005) — internal structural
+                                  verification only (get_workflow_details
+                                  confirms every node/wire matches
+                                  design), consistent with this card's own
+                                  scoping.
 UTIL-006 Credential Resolver:     BUILT — tested w/ placeholder creds
 SCH-006 Token Refresh Sweep:      BUILT, interval CONFIRMED LIVE = exactly
                                   6 hours (n8n get_workflow_details:
@@ -478,6 +559,35 @@ directly.
 ## Blockers Right Now
 
 ```
+BLOCKING Phase 4 closure (1 item, genuine, by design — matches BC-005
+Step 4's precedent exactly):
+- human-handoff's staged-fallback "insufficient" trigger condition —
+  Convocore_Findings_Required_Updates_FINAL.md Part 2.1 explicitly still
+  reads DECISION NEEDED ("what 'insufficient' means operationally").
+  BC-009's card explicitly instructed building ONLY the confirmed part
+  (real escalations-row-write, done) and stopping on this specific
+  sub-decision rather than inventing a threshold. Needs a Commander
+  decision on what "insufficient" means before this can be built.
+
+Open, non-blocking follow-up (BC-009):
+- ADP-002 has never been tested against real Convocore traffic — no live
+  agent exists yet (separate, paused lane per human's own instruction),
+  and control.convocore_agent_map still has 0 rows (BC-005). Structural
+  verification only. Real end-to-end testing is a future item once a
+  real agent + convocore_agent_map row exist.
+- Known, disclosed implementation deviation: the card asked for "UTIL-006
+  Credential Resolver... per its existing contract" to fetch the agent's
+  secret. UTIL-006's REAL contract (client_connections-scoped) has no
+  path to convocore_agent_map's secret — used the same underlying
+  read_credential_secret RPC directly instead of literally invoking
+  UTIL-006 as a sub-workflow. Functionally equivalent (same Vault
+  mechanism, same security guarantee), architecturally not identical to
+  the literal instruction — flagged for Commander awareness, not hidden.
+- SCH-{NNN} Shopify/WooCommerce -> Convocore KB sync workflow (Findings
+  doc Part 3.3) — confirmed real, not yet designed or built. Explicitly
+  out of BC-009's scope; logging its existence per the card's own
+  instruction so it isn't lost before Phase 11 (Scheduled Workflows).
+
 NONE blocking Phase 3 closure. Phase 3 is COMPLETE as of BC-008.
 
 Open, non-blocking follow-up (BC-008):
@@ -592,6 +702,53 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 10 — 2026-08-05 — BC-009: Phase 4 (ADP-002 Convocore Adapter)
+- What was done: Step 0 — verified live that NO ADP-{NNN} registry table
+  existed anywhere in n8n_Workflow_Specification_v1.md (not even for the
+  already-production Voiceflow Adapter) before assuming "002" was safe.
+  Created Part 17 (new) registering both ADP-001 Voiceflow and ADP-002
+  Convocore in one table, closing both gaps together rather than leaving
+  Voiceflow's retroactive registration for later. Updated all 3 stale
+  "Prospective" lines (n8n_Workflow_Specification_v1.md's Part 3 prose,
+  INTEGRATION_CONTRACT_v1.md Part 17.4, n8n_Execution_Architecture_v1.md
+  Part 16.4) directly to real final status in one pass, since the card's
+  two-pass instruction ("Specified" then real status) collapsed naturally
+  once the whole build was already complete by the time these edits were
+  written. Built ADP-002 as a single n8n workflow (webhook trigger, 16
+  nodes): client resolution against convocore_agent_map with a real
+  Bearer-vs-secret comparison, full Standard Request Contract field
+  mapping per Part 3.2's table, Tool Name/Variable pass-through, explicit
+  System Tool and Shopify exclusion branches (checked BEFORE the standard
+  fallback, not caught by omission), and a human-handoff branch that
+  writes a real escalations row via UTIL-001 + a direct Supabase insert.
+  Did NOT build the staged-fallback trigger condition — flagged per the
+  card's explicit instruction, mirroring BC-005 Step 4's precedent.
+- What was verified live vs. assumed: Confirmed via grep that zero
+  ADP-{NNN} entries existed anywhere before creating Part 17 — not
+  assumed from the card's "002" framing alone. Confirmed the workflow's
+  full real saved structure via get_workflow_details after the
+  credential-fix pass (16 nodes, wiring matches design exactly). Could
+  NOT verify end-to-end runtime behavior — no live Convocore agent and 0
+  rows in convocore_agent_map, both explicitly out of this card's scope.
+  Disclosed rather than glossed over: UTIL-006's real contract doesn't
+  actually support the literal "call UTIL-006" instruction (verified by
+  re-reading its own trigger inputs — client_id/category/tool_name, no
+  agent-secret path) — used the same underlying RPC directly, flagged as
+  a deviation, not silently substituted.
+- What broke / changed from plan: Nothing broke against the card's own
+  scope. The human-handoff sub-decision is the one intentional
+  incompleteness, matching the card's own Definition of Done wording.
+- Files touched: n8n_Workflow_Specification_v1.md (new Part 17 + Part 3
+  prose fix), INTEGRATION_CONTRACT_v1.md (Part 17.4 table),
+  n8n_Execution_Architecture_v1.md (Part 16.4), PROJECT_STATE.md. n8n: 1
+  new workflow (BOxeuH6ehv46FZL0, 16 nodes) + 1 credential-fix update.
+- **Phase 4 verdict: NOT COMPLETE.** ADP-002 is built and internally
+  verified in full per its documented scope. The single remaining gap —
+  human-handoff's staged-fallback trigger condition — is a genuine,
+  deliberate stop per the card's own instruction, not an oversight; it
+  needs an explicit Commander decision on what "insufficient" means
+  before it can be built.
 
 ### Session 9 — 2026-08-05 — BC-008: Phase 3 (UTIL-001 through UTIL-005)
 - What was done: Step 0 — searched n8n for anything resembling UTIL-001

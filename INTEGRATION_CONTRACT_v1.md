@@ -739,8 +739,8 @@ intentionally thin (Execution Architecture 16.6).
 
 | Platform | Status |
 |---|---|
-| Voiceflow | ✅ Production |
-| Convocore | 🔶 Prospective — not yet built or confirmed |
+| Voiceflow | ✅ Production (ADP-001) |
+| Convocore | 🟢 Built (ADP-002, BC-009) — see `Convocore_Adapter_Spec_FINAL.md` and `n8n_Workflow_Specification_v1.md` Part 17. Not yet live-tested against a real Convocore agent; human-handoff's staged-fallback trigger condition remains a genuine open decision. |
 | LangGraph | Future — long-term migration target |
 
 ---
