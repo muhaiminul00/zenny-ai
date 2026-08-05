@@ -34,7 +34,7 @@ This document is the entry point, not the only Convocore document. Route deeper 
 | "How does Zenny's system talk to Convocore?" | **This document** |
 | "What needs to change in our frozen docs because of Convocore?" | `Convocore_Findings_Required_Updates_FINAL.md` |
 | "How does a specific Canvas node/Tool/Variable field actually work?" | `Convocore_Canvas_Ground_Truth_FINAL.md` |
-| "How do I actually build a well-configured Convocore agent, step by step?" | `Convocore_Agent_Build_Order_Guide_v1.md` |
+| "How do I actually build a well-configured Convocore agent, step by step?" | `Convocore_Agent_Build_Order_Guide_v2.md` |
 | "What does a specific REST endpoint's request/response look like?" | `Convocore_API_Reference_v1.md` |
 | "Has endpoint X been live-tested, and what happened?" | `Convocore_REST_Live_Test_v1.md` |
 | "What can Convocore's MCP server actually do, and what are its bugs?" | `Convocore_MCP_Reference_v1.md` |
