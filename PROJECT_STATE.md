@@ -15,10 +15,10 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 1
+2026-08-05 — by Claude Code, Session 2 (BC-002)
 
 ## Current Phase
-Phase 0 — Environment Setup — IN PROGRESS (blocked, see Blockers below)
+Phase 0 — Environment Setup — MCP CONFIG COMPLETE. Phase 1 (BC-003) not yet started.
 
 ---
 
@@ -79,28 +79,71 @@ Slack:      bot token (xoxb-...) captured
 Calendly:   client ID, secret, webhook signing key captured
 Cal.com:    NOT STARTED — waiting on business email from human
 WooCommerce: no registration needed — onboarding guide NOT written
-control.oauth_apps seeded:        NO (table doesn't exist yet)
+control.oauth_apps seeded:        UNKNOWN ROW SHAPE — table EXISTS with 6
+                                   rows (see correction below), contents
+                                   not inspected this session (out of
+                                   BC-002 scope)
 Vault storage round-trip:         WALKED THROUGH, NOT CONFIRMED
 Redirect URI:                     kmhzosyljpzheqvfuyzm.supabase.co/
                                    functions/v1/oauth-callback — CONFIRMED
 ```
 
+## MCP Configuration — Real Current State (BC-002)
+
+```
+Supabase MCP:  CONFIGURED, LIVE-VERIFIED. list_projects returned 2 real
+               projects — "zenny-vault" (id kmhzosyljpzheqvfuyzm,
+               ap-northeast-2, ACTIVE_HEALTHY, the documented/correct
+               project) and "zenny-dashboard" (id bzckrqgasqiglsgqyzft,
+               ap-south-1, ACTIVE_HEALTHY — undocumented second project,
+               likely the teammate's earlier standalone reference build;
+               not investigated further, flagged below). Followed up
+               with list_tables(project_id=kmhzosyljpzheqvfuyzm,
+               schemas=[control]) — returned all 9 documented control
+               tables correctly, PLUS 4 tables PROJECT_STATE.md had
+               marked "NOT YET BUILT": control.oauth_apps (6 rows),
+               control.client_connections (0), control.oauth_state (0),
+               control.connection_audit_log (0). See correction below.
+n8n MCP:       CONFIGURED, LIVE-VERIFIED. search_workflows (no filter)
+               returned 38 real workflows, including several already
+               matching this project's naming scheme (WF-001 LEAD
+               CREATION ENGINE, WF-002 CONVERSION ENGINE, WF-003
+               ESCALATION ENGINE, WF-501 Error Logger, WF-503 Data
+               Validator, the 6 WF-2xx Email Manager v1 drafts, and 4
+               "Zenny Credential Platform" workflows including UTIL-006
+               Credential Resolver and SCH-006 Token Refresh Sweep —
+               consistent with this file's existing "BUILT" entries
+               below). n8n instance/workflow inventory is real and
+               substantially ahead of what a from-scratch Phase 0 would
+               assume.
+```
+
+**CORRECTION to this file's prior "Database — Real Current State" section
+(above), discovered only as a byproduct of BC-002's live-verification
+call, not investigated further — that's BC-003 scope:** `control.
+oauth_apps`, `control.client_connections`, `control.oauth_state`, and
+`control.connection_audit_log` already exist in zenny-vault (previously
+marked "NOT YET BUILT" above, now corrected to "EXISTS" pending BC-003's
+proper inspection of row contents/schema-shape correctness). Do not trust
+the un-struck lines above as current until BC-003 re-verifies each one
+directly.
+
 ## Blockers Right Now
 
 ```
-- BLOCKING: Neither Supabase MCP nor n8n MCP is configured anywhere in
-  this environment. Only the Convocore MCP server is present (.mcp.json,
-  npx-based). Confirmed via ToolSearch (no supabase/n8n tools exist) and
-  via ~/.claude.json (no supabase/n8n server entries; this project's own
-  mcpServers registry is empty). Phase 0 cannot fully close, and no
-  further phase can proceed with the mandatory MCP-verification
-  discipline (Protocol v2 Section 6.1), until the human provides:
-    - Supabase: project ref + service_role key (or an access token) for
-      the "zenny-vault" project, to configure the Supabase MCP server
-    - n8n: instance URL + API key, to configure the n8n MCP server
-  Claude Code cannot invent or source these credentials itself.
-- control.oauth_apps table doesn't exist — blocks Vault entries from
-  linking to a provider row (Phase 1 work, not blocking Phase 0 itself)
+- Supabase MCP and n8n MCP are now CONFIGURED and LIVE-VERIFIED (BC-002,
+  this session) — no longer a blocker. See "MCP Configuration" above.
+- Two Supabase projects exist under this org (zenny-vault AND an
+  undocumented zenny-dashboard) — every future MCP call in this project
+  MUST explicitly target project_id kmhzosyljpzheqvfuyzm (zenny-vault).
+  Flagging as a standing risk: an unqualified/wrong-project call could
+  silently hit the wrong database. Not itself a blocker, a discipline
+  note for every future session.
+- control.oauth_apps and 3 related tables already exist but their real
+  row-level state (schema correctness, whether the 6 oauth_apps rows are
+  seeded correctly) is UNVERIFIED — BC-003's first action should be
+  inspecting these directly rather than assuming they need to be built
+  from scratch.
 ```
 
 ## Deviations From Build Card / Open Questions for Commander
@@ -142,6 +185,31 @@ Redirect URI:                     kmhzosyljpzheqvfuyzm.supabase.co/
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 2 — 2026-08-05 — BC-002: MCP Configuration
+- What was done: Confirmed Supabase MCP (claude_ai_Supabase) and n8n MCP
+  (claude_ai_n8n) are now present and callable (human configured them
+  outside this session, per the credential gate — no config file edited
+  by Claude Code, .mcp.json's Convocore entry untouched). Live-tested
+  each with a real read-only call: `list_projects` + `list_tables`
+  (control schema, zenny-vault) on Supabase; `search_workflows` on n8n.
+  Real output pasted into the Implementation Report. Updated this file's
+  Blockers, added an "MCP Configuration" status section, and corrected
+  the Database status section based on what list_tables actually showed.
+- What was verified live vs. assumed: Both connections verified with
+  real tool calls, not just "the tool now appears in ToolSearch."
+  Discovered live (not assumed): a second, undocumented Supabase project
+  "zenny-dashboard" exists in the same org — every future call must
+  target zenny-vault (kmhzosyljpzheqvfuyzm) explicitly. Also discovered
+  live: control.oauth_apps/client_connections/oauth_state/
+  connection_audit_log already exist in zenny-vault, contradicting this
+  file's prior "NOT YET BUILT" entries — not investigated further, out
+  of BC-002's explicit scope (BC-003).
+- What broke / changed from plan: Nothing broke. BC-002 scope only —
+  no schema/workflow work performed, per the card's explicit exclusion.
+- Files touched: PROJECT_STATE.md only (this session).
+
+---
 
 ### Session 1 — 2026-08-05 — Phase 0: Environment Setup
 - What was done: Read all 6 required documents in full (Protocol v2,
