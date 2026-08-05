@@ -15,25 +15,22 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 15 (BC-014 — Phase 5 infrastructure, HTTPS cert pending external DNS propagation)
+2026-08-05 — by Claude Code, Session 16 (BC-015 — Order Lookup dashboard (5B) built + deployed, 1 self-resolved item)
 
 ## Current Phase
-Phase 5 (Dashboard Infrastructure) — BC-014's prior gate (BC-013's
-self-resolved item) was implicitly acknowledged by the Commander issuing
-BC-014 directly. No document-level conflict occurred this session (pure
-infrastructure work) — the Document Resolution Authority gate does not
-apply here. New `dashboard.zeromanuals.com` DNS record + placeholder
-container deployed behind Traefik on srv1881104, routing confirmed
-working. **One real, honestly-reported incomplete item:** the trusted
-Let's Encrypt certificate has NOT yet issued — Traefik's automatic ACME
-attempt failed at deploy time with NXDOMAIN because DNS hadn't
-propagated to the domain's own authoritative nameservers (NS1) yet; as
-of this session's end, 5+ minutes later, the record was still not
-visible at NS1 directly, confirmed via direct queries — genuine external
-propagation delay, not a config error. See Infrastructure section and
-Blockers below for the exact follow-up needed (retrigger ACME once
-propagation completes). No dashboard UI/app code built — infrastructure
-only, per this card's explicit scope. Convocore Adapter
+Phase 5 (Dashboard Systems) — 5B Order Lookup dashboard BUILT AND
+DEPLOYED at dashboard.zeromanuals.com/orders (BC-015). Real React+Vite
+app, Supabase Auth (password) login, SECURITY DEFINER RPC layer for
+schema-per-client order data, approve/reject UI, live-tested end-to-end
+against a real test client (client_test_002_acme_commerce_test,
+commerce_ecom archetype) — not simulated. **1 self-resolved document-
+level item this session** (the dashboard's actual client-schema query
+mechanism — see Blockers below): standing rule gate applies, next Build
+Card work should wait for Commander acknowledgment. HTTPS cert for
+dashboard.zeromanuals.com is STILL not trusted (DNS still had not
+propagated as of this session — re-checked live, unchanged from BC-014);
+this did not regress from this session's redeploy (same NXDOMAIN ACME
+error, confirmed via Traefik logs). Convocore Adapter
 (ADP-002) — **COMPLETE.** BC-010 closed the one item BC-009 left open:
 human-handoff's staged-fallback Stage 2 trigger, built per the
 Commander's exact operational definition. ADP-002 registered in
@@ -52,7 +49,7 @@ Phase 1  — Close Credential Platform Gaps ........ COMPLETE
 Phase 2  — Convocore Database Changes ............ COMPLETE
 Phase 3  — Remaining Shared Utilities ............ COMPLETE
 Phase 4  — Convocore Adapter (ADP-002) ........... COMPLETE
-Phase 5  — 4 New Dashboard Systems (Directus) .... NOT STARTED
+Phase 5  — 4 New Dashboard Systems (React+Vite) .. IN PROGRESS (5B done)
 Phase 6  — Core Agent ............................ NOT STARTED
 Phase 7  — Growth Agent .......................... NOT STARTED
 Phase 8  — Conversion Engine (11 Tools) .......... NOT STARTED
@@ -178,6 +175,144 @@ Resource headroom (VPS_getMetricsV1, real samples):
   headroom remains for the real dashboard app (a React/Directus-class
   app will cost more than nginx:alpine, but nowhere near exhausting
   ~3140MB RAM / ~46785MB disk still free).
+```
+
+## Phase 5 — 5B Order Lookup Dashboard (BC-015 — BUILT + DEPLOYED)
+
+```
+App: 05_Platform_Builds/Dashboard — React 19 + Vite 8 + TypeScript,
+react-router-dom, @supabase/supabase-js. Single app, path-routed
+(/orders is the first real route; /appointments, /inventory,
+/onboarding are siblings to add later in the same app/auth/deploy, per
+the card's explicit structure requirement). Deployed live at
+https://dashboard.zeromanuals.com/orders.
+
+**Auth:** Supabase Auth, email+password (chosen over magic-link —
+lower setup friction, no SMTP config needed, which is out of this
+card's scope). Login screen at /login, session via onAuthStateChange,
+protected routes redirect unauthenticated users to /login.
+
+**Client-schema mapping — REAL GAP CONFIRMED, FLAGGED PER THE CARD'S
+OWN INSTRUCTION (not invented as a permanent mechanism):** No table or
+mechanism mapping a Supabase Auth user to a control.clients row/
+client_schema_name existed before this session — confirmed empirically
+(queried auth/control schemas directly, found none). The card's own
+text anticipated this ("if it's genuinely missing, that's a real gap to
+flag, not invent a mapping mechanism silently"). For this card's
+verification purposes only, the one test dashboard user's
+client_schema_name is stored in Supabase Auth's own built-in
+app_metadata field (a real platform feature, not a new invented table)
+and read via auth.jwt() inside the RPC layer. **This is explicitly NOT
+a production design decision** — three real options exist for the
+Commander to decide between when the real 4-dashboard system is built:
+(1) a control.dashboard_users mapping table, (2) a custom access token
+hook injecting client_schema_name as a JWT claim at login, (3)
+continuing to use app_metadata per-user (simplest, but means every
+client user account must be created via the Admin API with the right
+metadata set, not self-serve signup). Not decided anywhere in the
+source docs — flagged here, not invented.
+
+**Data access mechanism — SELF-RESOLVED, logged below in Blockers per
+the standing rule.** Client schemas are NOT exposed to PostgREST
+directly (Client_Onboarding_Sequence_Spec.md Step 3 already documents
+this as unavailable via SQL/MCP in this environment) — so the dashboard
+cannot query {client_schema}.orders directly via the Supabase JS client.
+Built 4 SECURITY DEFINER RPC functions in `public` instead (migrations
+037-039): dashboard_get_my_client_schema() (validates the JWT's
+client_schema_name against control.clients, rejects offboarded/unknown
+schemas), dashboard_list_orders(), dashboard_get_order(p_order_id),
+dashboard_review_order(p_order_id, p_decision, p_reviewer) — each does
+a schema-qualified dynamic query (format() with %I for the schema name,
+%L for all literals — no raw string concatenation) scoped to the
+calling user's own client_schema_name only. anon role's EXECUTE grant
+explicitly revoked (Supabase's own default-privilege behavior grants
+anon EXECUTE on new public functions independent of `REVOKE ... FROM
+PUBLIC` — caught via get_advisors flagging it as WARN after the first
+migration, fixed via an explicit `REVOKE ... FROM anon` in migration
+039, re-verified via information_schema.routine_privileges that only
+authenticated/postgres/service_role now hold EXECUTE). One real bug
+caught and fixed: the first version of dashboard_review_order failed
+live with "type order_status_enum does not exist" — SET search_path=''
+on the function means the enum name inside the dynamic SQL string also
+needed explicit public. qualification; found via a real end-to-end
+curl test against the live REST API, not assumed from successful
+migration application alone.
+
+**End-to-end verification — real, not simulated:** created a genuine
+new test client (client_id baa673b5-c51a-4a7b-91f5-a37027f8dca4,
+"TEST CLIENT -- BC-015 ORDER DASHBOARD TEST -- DO NOT USE", archetype
+commerce_ecom, schema client_test_002_acme_commerce_test — the existing
+BC-013 test client is 'emergency' archetype and has no orders table, so
+a new one was needed) via the real
+create_client_schema_from_template('commerce', ARRAY['conversions_ecom',
+'orders'], ...) function, seeded 1 customer/3 leads/3 conversions/3
+conversions_ecom/3 orders spanning pending_review/pushed/rejected
+states. Created one real Supabase Auth user (test-dashboard-
+bc015@zenny.internal, password auth, app_metadata.client_schema_name
+set) via direct SQL against auth.users/auth.identities (pgcrypto
+crypt() for the password hash — no Admin API service-role key exposed
+via MCP, this was the only available path) — hit and fixed a real
+GoTrue "Database error querying schema" 500 on first login attempt
+(NULL vs '' on several auth.users token columns; GoTrue scans some of
+these as non-nullable, a known platform quirk, not a mistake in the
+insert's intent). After the fix: signed in via the real Auth REST API,
+got a real JWT, called all 3 read/write RPCs with it over HTTP — listed
+3 real orders, approved one for real (then reset it back to
+pending_review so the deployed demo shows a clean 3-state view),
+confirmed anon (no bearer token) is rejected with "Not authenticated".
+
+**Approve action / provider push — confirmed missing, flagged in the UI
+itself, not silently no-op'd:** searched n8n live (search_workflows,
+query "order") — zero results, confirming Phase5_Dashboard_Data_Flow.md
+5B's existing note ("the approve→push workflow is new, not yet built")
+is still accurate. Approve sets orders.status='approved' (a real,
+distinct enum value from 'pushed') and reviewed_by/reviewed_at — it
+does NOT attempt any provider push, since no such workflow exists to
+call. The order detail page explicitly displays this to the reviewer:
+"approving marks the order as approved but does not yet push it...
+provider-push n8n workflow is not built yet... A human must currently
+complete the provider-side order manually after approval."
+
+**Deployment — real constraint discovered, adapted around:** the
+original plan (multi-stage Dockerfile, git-context `build:` in the
+compose file) FAILED live — confirmed via VPS_getProjectLogsV1 that
+Hostinger's Compose orchestration only runs `docker compose pull` +
+`up`, never `build`, even when a `build:` key is present ("No such
+image: zenny-dashboard-dashboard:latest", "Project deployment failed").
+This is a genuine, previously-unknown platform limitation of the
+Hostinger MCP's Compose API — not a mistake in the Dockerfile itself
+(kept in the repo for future use, e.g. if a registry-based deploy path
+is set up later). Real fix: switched to a stock node:22-alpine image
+that clones the (public) zenny-sync repo, runs npm ci/npm run build,
+and serves the built dist/ via `npx serve` — entirely inline in the
+compose file's `command:`, needing no custom image or registry, only
+images `docker compose pull` can already fetch. This briefly took the
+site down between the failed attempt and the working redeploy (~2
+minutes) — the OLD placeholder was stopped before the failure was
+caught; not represented as zero-downtime. Confirmed working via
+VPS_getProjectLogsV1 (real npm ci + tsc + vite build + "Accepting
+connections at http://localhost:80" in the container's own logs) and a
+direct-IP curl with a Host header override returning the real dashboard
+HTML (not the old placeholder's). Local Docker Desktop was not running
+in this environment and was not started — the remote build-and-verify
+path already used successfully for BC-014's placeholder was reused
+instead of debugging local Docker.
+
+**HTTPS cert:** still not trusted — re-checked live (nslookup + Traefik
+logs), still the exact same NXDOMAIN ACME failure as BC-014, confirming
+DNS still has not propagated (not a regression caused by this
+session's redeploy). Same follow-up as BC-014 applies: retrigger once
+`nslookup dashboard.zeromanuals.com 8.8.8.8` resolves.
+
+**Env/secrets:** the Supabase anon/publishable key is embedded directly
+in the compose file's `environment:` and the Vite build (this is a
+public, client-side-safe key by Supabase's own design — the same key
+is visible in the deployed JS bundle regardless). Root .gitignore's
+blanket `.env.*` pattern excludes `05_Platform_Builds/Dashboard/
+.env.production` from git even though it holds only that same public
+key — confirmed harmless (nothing secret excluded), left as-is rather
+than carving a gitignore exception, since the deploy path doesn't
+depend on that file being committed (build args instead).
 ```
 
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
@@ -833,13 +968,15 @@ directly.
 ## Blockers Right Now
 
 ```
-NONE blocking further work. BC-014 (this session) performed pure
-infrastructure work — no system-document conflict/gap occurred, so the
-Document Resolution Authority gate does not apply this session. BC-013's
-prior gate (below) was implicitly acknowledged by the Commander issuing
-BC-014 directly.
+Per the standing rule: this session (BC-015) has 1 self-resolved
+document-level item (below). Do not begin the next Build Card's work
+until the Commander has explicitly acknowledged this specific
+resolution in a follow-up message. The schema/RPC/app work itself is
+NOT blocked on that acknowledgment — it is already built, deployed, and
+committed.
 
-Real, non-blocking operational follow-up (BC-014):
+Real, non-blocking operational follow-up (still open from BC-014,
+unchanged this session):
 - dashboard.zeromanuals.com's Let's Encrypt cert has not yet issued —
   Traefik's automatic ACME attempt failed at deploy time (DNS hadn't
   propagated). Once `nslookup dashboard.zeromanuals.com 8.8.8.8`
@@ -852,6 +989,55 @@ Real, non-blocking operational follow-up (BC-014):
   different IPs for it. Flagged for Commander awareness, not
   investigated (out of BC-014 scope, doesn't affect the new `dashboard`
   subdomain).
+
+### Self-resolved document-level item (BC-015 — dashboard data-access mechanism) — AWAITING ACKNOWLEDGMENT
+- **What:** No document specifies HOW a dashboard is meant to actually
+  query a client's dynamically-named schema (e.g.
+  client_test_002_acme_commerce_test.orders) given Client_Onboarding_
+  Sequence_Spec.md Step 3 already documents, as a confirmed empirical
+  finding from an earlier session, that registering a schema with
+  PostgREST's Exposed Schemas list has no SQL/MCP-level mechanism at all
+  in this environment — meaning direct Supabase-JS queries against a
+  client schema were never actually going to work for any of the 4
+  planned dashboards, not just this one.
+- **Documents/evidence checked:** Phase5_Dashboard_Data_Flow.md (5B's
+  row describes WHAT is read/written, not the query mechanism);
+  Client_Onboarding_Sequence_Spec.md Step 3 (confirms the exposure gap,
+  already logged in a prior session); re-confirmed live this session
+  that the gap still exists (no pgrst.db_schemas GUC, no MCP tool
+  manages Supabase's Exposed Schemas setting) — not re-assumed from the
+  prior session's finding alone.
+- **Resolved to:** SECURITY DEFINER RPC functions living in `public`
+  (already an exposed schema), each validating the caller's
+  client_schema_name against control.clients before doing a
+  schema-qualified dynamic query. Full detail in the new "Phase 5 — 5B
+  Order Lookup Dashboard" section above.
+- **Why self-resolvable under the standing rule's item 3:** the
+  SECURITY DEFINER + dynamic-SQL pattern is not a new architectural
+  choice — it's the exact same mechanism already used by
+  create_client_schema_from_template and the entire existing
+  credential-platform RPC layer (store_credential_secret,
+  get_client_connection, etc. — all SECURITY DEFINER functions in
+  `public`). Given schema-per-client is already fully committed
+  architecture and direct PostgREST schema exposure is already confirmed
+  unavailable, using the one mechanism this codebase already
+  demonstrates works is a mechanical extension of established pattern,
+  not a novel product/design decision — there was no plausible
+  alternative that doesn't require a platform capability already proven
+  absent.
+- **Not the same as, and does not resolve,** the separate flagged gap
+  (client_schema_name-to-auth-user mapping) — that one genuinely has
+  multiple viable production designs and was correctly left for the
+  Commander per the card's own explicit instruction, not treated as
+  self-resolved.
+- Migrations 037-039 applied and committed already, app deployed and
+  live — none of that is blocked on acknowledgment, only PROCEEDING TO
+  THE NEXT BUILD CARD is.
+
+Per the new rule: this session stops here. Do not begin the next Phase
+5 dashboard (5A/5C/5D) or any other build work until the Commander has
+explicitly acknowledged this specific resolution in a follow-up
+message.
 
 ### Self-resolved document-level item (BC-013 Step 2/3) — RESOLVED,
 ACKNOWLEDGED (Commander issued BC-014 directly, Phase 5 infrastructure
@@ -1097,6 +1283,73 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 16 — 2026-08-05 — BC-015: Order Lookup dashboard (5B) built + deployed, 1 self-resolved item
+- What was done: Step 0 — re-checked DNS propagation (still NXDOMAIN)
+  and Traefik's cert state live before starting, re-read Phase5_
+  Dashboard_Data_Flow.md and pulled the real `orders`/`conversions_ecom`
+  schemas live rather than trusting memory of the card that created
+  them (BC-013). Confirmed no client-schema-to-auth-user mapping exists
+  anywhere (real gap, flagged per the card's own instruction, not
+  invented as permanent design). Confirmed direct PostgREST access to
+  client schemas is unavailable (Client_Onboarding_Sequence_Spec.md
+  Step 3's known gap) — resolved the resulting "how does the dashboard
+  actually read data" question via SECURITY DEFINER RPC functions
+  (self-resolved, logged in Blockers, gate applies). Created a genuine
+  new commerce_ecom test client + schema (the existing BC-013 test
+  client is 'emergency' archetype, has no orders table) with seeded
+  order data across 3 statuses. Built and live-tested (real HTTP calls
+  against the real Auth + REST API, not simulated) 4 RPC functions;
+  caught and fixed 2 real bugs this way (an enum-qualification bug
+  under SET search_path='', and Supabase's default anon EXECUTE grant
+  surviving an explicit REVOKE FROM PUBLIC). Created one real Supabase
+  Auth test user via direct SQL (no Admin API service-role key exposed
+  via MCP) — hit and fixed a real GoTrue 500 error from NULL token
+  columns. Scaffolded a React+Vite+TypeScript dashboard app (path-
+  routed, /orders first, siblings easy to add), built Login/OrdersList/
+  OrderDetail pages consuming the RPC layer, approve/reject wired to
+  the real review RPC, an explicit UI note where the provider-push
+  workflow is confirmed missing (live n8n search, zero results) rather
+  than silently no-op'd. Step 3 — deployed to
+  dashboard.zeromanuals.com/orders: the originally planned git-context
+  Docker build FAILED live against Hostinger's Compose API (confirmed:
+  it only pulls pre-built images, never builds — a genuine, previously
+  unknown platform limitation, not a mistake in the Dockerfile), fixed
+  by switching to a stock node:22-alpine image that clones+builds+
+  serves inline via `command:`, needing no custom registry. Confirmed
+  the real dashboard HTML is now served (not the old placeholder) via a
+  direct-IP curl test, and confirmed the HTTPS cert state is unchanged
+  from BC-014 (same NXDOMAIN ACME failure, re-confirmed via Traefik
+  logs) — this session's redeploy did not regress it.
+- What was verified live vs. assumed: every RPC function was tested via
+  a real sign-in + real bearer JWT + real HTTP call against the live
+  Supabase REST API, not just "migration applied successfully." The
+  Hostinger Compose API's build behavior was verified by reading the
+  actual deployment logs after a real failure, not assumed from
+  Hostinger's own tool description text (which doesn't mention this
+  limitation). Anon-role RPC access was verified rejected via a real
+  unauthenticated HTTP call, not just via `get_advisors` — then
+  `get_advisors` was used as a second, independent confirmation, and it
+  caught something the manual test alone hadn't (anon still had EXECUTE
+  despite an explicit REVOKE ... FROM PUBLIC).
+- What broke / changed from plan: the git-context Docker build plan
+  didn't work (see above) — real platform constraint, adapted around,
+  not silently downgraded. Site was briefly down (~2 min) between the
+  failed attempt stopping the old placeholder and the working redeploy
+  landing — disclosed, not hidden.
+- Files touched: 05_Platform_Builds/Dashboard/ (new — full app source,
+  committed a849ffa, pushed after explicit human confirmation since the
+  harness gates pushes as an external-facing action); Supabase
+  migrations 037-039 (RPC layer); 1 new test client + schema
+  (client_test_002_acme_commerce_test) + seed data + 1 test Auth user,
+  all in zenny-vault, clearly marked as test data; 1 new Docker Compose
+  deploy on srv1881104 (zenny-dashboard project replaced); PROJECT_
+  STATE.md.
+- **This session: 1 self-resolved document-level item — the Document
+  Resolution Authority gate DOES apply. See Blockers section above for
+  full detail. Do not proceed to the next Phase 5 dashboard (5A/5C/5D)
+  or any other build work until the Commander acknowledges this
+  resolution.**
 
 ### Session 15 — 2026-08-05 — BC-014: Phase 5 infrastructure (HTTPS cert pending propagation)
 - What was done: Step 0 — confirmed live via Hostinger MCP (no SSH
