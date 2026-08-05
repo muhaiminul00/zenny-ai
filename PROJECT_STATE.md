@@ -15,22 +15,28 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 16 (BC-015 — Order Lookup dashboard (5B) built + deployed, 1 self-resolved item)
+2026-08-05 — by Claude Code, Session 17 (BC-016 — HTTPS cert fixed + trusted, brand applied, Integrations dashboard built)
 
 ## Current Phase
-Phase 5 (Dashboard Systems) — 5B Order Lookup dashboard BUILT AND
-DEPLOYED at dashboard.zeromanuals.com/orders (BC-015). Real React+Vite
-app, Supabase Auth (password) login, SECURITY DEFINER RPC layer for
-schema-per-client order data, approve/reject UI, live-tested end-to-end
-against a real test client (client_test_002_acme_commerce_test,
-commerce_ecom archetype) — not simulated. **1 self-resolved document-
-level item this session** (the dashboard's actual client-schema query
-mechanism — see Blockers below): standing rule gate applies, next Build
-Card work should wait for Commander acknowledgment. HTTPS cert for
-dashboard.zeromanuals.com is STILL not trusted (DNS still had not
-propagated as of this session — re-checked live, unchanged from BC-014);
-this did not regress from this session's redeploy (same NXDOMAIN ACME
-error, confirmed via Traefik logs). Convocore Adapter
+Phase 5 (Dashboard Systems) — 5B Order Lookup dashboard is LIVE with a
+**trusted HTTPS certificate** (BC-016 — root cause was Hostinger never
+being authoritative DNS for zeromanuals.com; Netlify is, human added the
+real record there, confirmed via live `Issuer: CN=YR2, O=Let's Encrypt`
+chain check, not just "no curl error"). Zenny brand (sage/honey/oat,
+Fraunces + Hanken Grotesk, ensō mark) applied across the dashboard. New
+**Integrations dashboard** (`/integrations`) built and deployed —
+connect/disconnect against `control.client_connections`, real end-to-end
+test of the connect chain against Google (genuine redirect to Google's
+own consent screen with correct client_id/redirect_uri/scopes/state;
+completing Google's actual interactive login wasn't possible without a
+real human-owned test account, disclosed not hidden), simulated
+post-consent state via the exact same `upsert_client_connection` RPC
+`oauth-callback` itself uses, disconnect verified live via Playwright.
+2 real bugs caught and fixed via live Playwright testing (login never
+redirected after success; a stale provider subtitle after disconnect).
+`oauth-callback`'s dead `ZENNY_DASHBOARD_URL` fallback fixed. 0
+self-resolved document-level items this session — BC-015's gate is
+closed (Commander acknowledged via issuing BC-016). Convocore Adapter
 (ADP-002) — **COMPLETE.** BC-010 closed the one item BC-009 left open:
 human-handoff's staged-fallback Stage 2 trigger, built per the
 Commander's exact operational definition. ADP-002 registered in
@@ -177,6 +183,55 @@ Resource headroom (VPS_getMetricsV1, real samples):
   ~3140MB RAM / ~46785MB disk still free).
 ```
 
+## Infrastructure Correction (BC-016) — DNS ownership + HTTPS cert now trusted
+
+```
+**CORRECTION to the "Domain" note above (BC-014) and the "HTTPS cert"
+note in BC-015's own report: Hostinger is NOT the authoritative DNS
+provider for zeromanuals.com. It never was.** Confirmed live this
+session: `nslookup -type=NS zeromanuals.com 8.8.8.8` returns
+dns1-4.p09.nsone.net — an NS1-backed zone that Hostinger's own DNS API
+(used for BC-014's A-record write) does not actually control. This is
+the real explanation for BC-014/BC-015's propagation symptom: it was
+never "still propagating" — Hostinger's write never reached the zone
+NS1/Netlify actually serves. It also resolves BC-014's own flagged
+"unrelated DNS discrepancy" (root `@` record differing between
+Hostinger's API and NS1) — same root cause, now explained rather than
+merely observed.
+
+The human added `dashboard.zeromanuals.com -> 187.127.217.123` (A
+record) directly in Netlify's own DNS management for this zone.
+Re-verified live this session (not assumed from a screenshot) via
+`nslookup dashboard.zeromanuals.com 8.8.8.8` — resolves correctly.
+Traefik's ACME retry was triggered (zenny-dashboard container/router
+restart, per BC-014's own documented mechanism) and a **real trusted
+Let's Encrypt certificate is now being served** — confirmed via an
+actual certificate-chain read (not just "curl succeeded without -k"):
+`Issuer: CN=YR2, O=Let's Encrypt, C=US`, `NotAfter: 2026-11-04`.
+
+**Going forward: Netlify is zeromanuals.com's real DNS control plane.**
+Any future DNS change for this domain must be made in Netlify, not
+Hostinger's DNS API — Hostinger's own DNS tools will accept writes
+without error but they will not take effect on the live zone. This
+correction is the standing reference for all future sessions; do not
+repeat BC-014/BC-015's misdiagnosis.
+
+**Real bug caught during the retry, unrelated to DNS:** the
+"restart the container" mechanism (`VPS_restartProjectV1`) does NOT
+recreate the container — it restarts the same container in place,
+reusing its writable filesystem layer. Since the deployed image's
+entrypoint does a fresh `git clone` into `/src` on every start, a mere
+restart crash-looped ("fatal: destination path '/src' already exists")
+— the site was actually down for ~15 minutes before this was caught via
+live log inspection (not assumed working from the restart action's
+"success" state). Fixed two ways: (1) redeployed via a full recreate
+(`VPS_createNewProjectV1`, same project name) instead of restart, (2)
+made the container's own command self-healing (`rm -rf /src/* ...`
+before cloning) so a future in-place restart — a host reboot, a
+Traefik-triggered restart, anything using `restart:` semantics rather
+than a full recreate — won't crash-loop again.
+```
+
 ## Phase 5 — 5B Order Lookup Dashboard (BC-015 — BUILT + DEPLOYED)
 
 ```
@@ -313,6 +368,104 @@ blanket `.env.*` pattern excludes `05_Platform_Builds/Dashboard/
 key — confirmed harmless (nothing secret excluded), left as-is rather
 than carving a gitignore exception, since the deploy path doesn't
 depend on that file being committed (build args instead).
+```
+
+## Phase 5 — Brand Pass + Integrations Dashboard (BC-016 — BUILT + DEPLOYED)
+
+```
+**Brand pass:** Read `.claude/skills/zenny-brand-new-guideline.skill`
+(a zipped skill bundle sitting in the repo's `.claude/skills/`
+directory, not a top-level installed/loaded skill in this session's
+tool list — extracted locally to read `SKILL.md`). Applied the real
+tokens to `05_Platform_Builds/Dashboard`: sage/pine/honey/oat/mist/
+cloud/taupe palette as CSS custom properties, Fraunces (display) +
+Hanken Grotesk (body) + Space Mono (utility labels) via Google Fonts,
+a real ensō mark component (`src/components/EnsoMark.tsx`, the exact
+SVG from the guideline) used in the header and login screen, "Zenny."
+wordmark with a honey full-stop, warm-but-plain copy ("Sign in to
+manage your orders and connections," not robotic/hyped). Visually
+confirmed live via Playwright screenshots against the deployed site,
+not just "the CSS compiled" — see Session Log.
+
+**Integrations dashboard (`/integrations`), same app/auth as `/orders`
+per the card's requirement:** Drives the existing oauth-initiate/
+oauth-callback Edge Functions (built Phase 1, never called by anything
+client-facing until now). New RPC layer (migrations 040-041):
+`dashboard_get_my_client()` (same JWT app_metadata -> client_schema_name
+pattern BC-015 already flagged as a temporary, non-production mechanism
+— explicitly NOT re-decided or replaced here, per the card's own
+instruction not to invent a second mechanism), `dashboard_list_
+connections()`, `dashboard_disconnect_connection(connection_id)` (with
+an explicit ownership check — a client can only disconnect its own
+connection_id, never trusts the UUID alone). Disconnect calls the
+existing `update_connection_status(..., 'revoked', ...)` RPC and logs a
+real `connection_audit_log` row via `insert_audit_log_event` — one real
+bug caught here too: the first version used invalid `event_type`/
+`auth_method` literals against the table's actual CHECK constraints
+(`'disconnected'`/`'dashboard'` aren't real values; fixed to
+`'revoked_by_client'` + derived `'oauth'`/`'api_key'` from whether the
+connection had a refresh token, matching oauth-callback's own logic).
+
+**Which categories/providers are shown per archetype is a UI-only
+judgment call (`ARCHETYPE_CATEGORIES`/`CATEGORY_PROVIDERS` in
+Integrations.tsx), not a documented decision** — no source doc specifies
+this mapping. Flagged, easy to revise; doesn't touch schema or backend
+behavior.
+
+**`oauth-callback`'s dead redirect fixed:** `ZENNY_DASHBOARD_URL` was
+confirmed still unset (same as BC-003/BC-004's original finding — no
+MCP tool here can set Supabase Edge Function secrets, confirmed by
+searching for one). Fixed at the code level instead: the function's own
+fallback default (which is what actually governs behavior when the env
+var is unset) changed from the dead `https://dashboard.zenny.pending/`
+to the real `https://dashboard.zeromanuals.com/integrations`, redeployed
+(oauth-callback v3). If a human later sets the real env var via the
+Supabase CLI/Management API, it still takes precedence — this fix works
+either way.
+
+**End-to-end test — real, disclosed scope:** Clicked "Connect Google
+Calendar" via a real, live Playwright browser session against the
+deployed dashboard. It genuinely navigated to accounts.google.com with
+the real seeded client_id, the correct redirect_uri back to this
+project's own oauth-callback, the real requested scopes (calendar +
+gmail.modify), and a real state UUID — confirmed that exact state row
+landed in `control.oauth_state` with the correct client_id/category/
+provider. **Could not complete Google's actual interactive consent
+screen** — that requires a real human-owned Google account logging in,
+which isn't available to an autonomous agent session; not faked or
+worked around. To still test the dashboard's post-connect behavior for
+real, simulated the "connected" state using the exact same
+`upsert_client_connection`/`store_credential_secret` RPCs `oauth-
+callback` itself calls (not a raw INSERT bypassing real code) — verified
+live via Playwright that the Integrations page correctly showed
+"Connected · google · bc016-test@example.com," then clicked Disconnect
+and confirmed it flipped back to "Not connected" in the real UI, backed
+by a real `control.client_connections.status = 'revoked'` row and a real
+audit log entry. The simulated test connection/secret are left in place
+(revoked, clearly test-named) per this project's "mark clearly, don't
+delete" convention.
+
+**2 real bugs caught via live Playwright testing (not assumed working
+from a successful build):**
+1. Login never redirected to /orders after a successful sign-in — the
+   Auth API call succeeded (real 200) but nothing in the app reacted to
+   the new session on the /login route itself. Fixed with a `LoginRoute`
+   wrapper that redirects to /orders once a session exists.
+2. The Integrations page's provider/account subtitle ("google ·
+   bc016-test@example.com") kept showing after Disconnect — it checked
+   `existing` but not `existing.status !== 'revoked'` the way the
+   status-pill/button branch already did. Fixed to match.
+Both caught by actually using the deployed app (via
+`mcp__plugin_playwright_playwright__*`, confirmed enabled this session —
+see Session Log Step 0), not by reading the code and assuming it worked.
+
+**Disconnect does not call the provider's own revoke endpoint** (e.g.
+Google's token revocation API) — Claude Code's call per the card's
+"flag if unsure": implemented as local-only (clears Zenny's own record)
+and disclosed explicitly in the Integrations page's own copy, rather
+than silently claiming full revocation or building per-provider revoke
+calls without being asked. A real design question for whoever owns this
+next: should Disconnect also revoke at the provider?
 ```
 
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
@@ -968,29 +1121,35 @@ directly.
 ## Blockers Right Now
 
 ```
-Per the standing rule: this session (BC-015) has 1 self-resolved
-document-level item (below). Do not begin the next Build Card's work
-until the Commander has explicitly acknowledged this specific
-resolution in a follow-up message. The schema/RPC/app work itself is
-NOT blocked on that acknowledgment — it is already built, deployed, and
-committed.
+NONE blocking further work. BC-016 (this session) resolved BC-015's
+prior gate — the Commander issued BC-016 directly, addressing the exact
+self-resolved item (dashboard data-access mechanism) BC-015 flagged,
+which counts as acknowledgment per this project's established pattern
+(same as BC-012->013, BC-013->014). 0 NEW self-resolved document-level
+items occurred this session — the client-schema-to-auth-user mapping
+question (app_metadata, still open) was explicitly NOT re-decided here,
+per BC-016's own instruction; the archetype/category display mapping
+used in the Integrations page is a disclosed UI judgment call, not a
+document-level resolution.
 
-Real, non-blocking operational follow-up (still open from BC-014,
-unchanged this session):
-- dashboard.zeromanuals.com's Let's Encrypt cert has not yet issued —
-  Traefik's automatic ACME attempt failed at deploy time (DNS hadn't
-  propagated). Once `nslookup dashboard.zeromanuals.com 8.8.8.8`
-  actually resolves to 187.127.217.123, trigger a Traefik retry
-  (restart the zenny-dashboard container/router, or wait for Traefik's
-  own backoff). Not urgent — routing/container both already confirmed
-  working via direct-IP testing; only the trusted-cert step is pending.
-- Unrelated DNS discrepancy on zeromanuals.com's root (`@`) record —
-  Hostinger's API and the domain's own authoritative NS1 servers report
-  different IPs for it. Flagged for Commander awareness, not
-  investigated (out of BC-014 scope, doesn't affect the new `dashboard`
-  subdomain).
+Both real follow-ups from BC-014/BC-015 are now CLOSED:
+- HTTPS cert: FIXED. Real root cause found (Hostinger was never
+  authoritative DNS for zeromanuals.com — Netlify is), human added the
+  real record in Netlify, Traefik's ACME retry confirmed issuing a real
+  trusted Let's Encrypt certificate (chain-verified, not just "no curl
+  error"). See Infrastructure Correction (BC-016) section above.
+- The "unrelated DNS discrepancy" flagged in BC-014 is now EXPLAINED,
+  not just observed — same root cause (Hostinger's DNS API was never
+  the real authoritative zone).
 
-### Self-resolved document-level item (BC-015 — dashboard data-access mechanism) — AWAITING ACKNOWLEDGMENT
+Still open, unresolved by design (not this card's scope):
+- Client-schema-to-auth-user mapping mechanism (app_metadata is a
+  test-only stopgap, per BC-015) — genuinely a Commander product
+  decision among 3 flagged options, not re-touched this session.
+- Whether Integrations' Disconnect should also revoke access at the
+  provider (currently local-only) — flagged, not decided.
+
+### Self-resolved document-level item (BC-015 — dashboard data-access mechanism) — RESOLVED, ACKNOWLEDGED (Commander issued BC-016 directly, addressing this exact item)
 - **What:** No document specifies HOW a dashboard is meant to actually
   query a client's dynamically-named schema (e.g.
   client_test_002_acme_commerce_test.orders) given Client_Onboarding_
@@ -1032,12 +1191,10 @@ unchanged this session):
   self-resolved.
 - Migrations 037-039 applied and committed already, app deployed and
   live — none of that is blocked on acknowledgment, only PROCEEDING TO
-  THE NEXT BUILD CARD is.
-
-Per the new rule: this session stops here. Do not begin the next Phase
-5 dashboard (5A/5C/5D) or any other build work until the Commander has
-explicitly acknowledged this specific resolution in a follow-up
-message.
+  THE NEXT BUILD CARD was — now RESOLVED: the Commander issued BC-016
+  directly, which both used and built on this exact RPC mechanism
+  (migrations 040-041 follow the identical pattern), constituting
+  acknowledgment per this project's established convention.
 
 ### Self-resolved document-level item (BC-013 Step 2/3) — RESOLVED,
 ACKNOWLEDGED (Commander issued BC-014 directly, Phase 5 infrastructure
@@ -1283,6 +1440,89 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 17 — 2026-08-05 — BC-016: HTTPS cert fixed (real root cause), Zenny brand applied, Integrations dashboard built
+- Step 0 — tooling check: confirmed live, not assumed from a prior
+  session. No dedicated GitHub-plugin MCP tools were present this
+  session (searched explicitly, none found — only the always-available
+  `gh` CLI via Bash, which isn't plugin-gated). Playwright MCP tools
+  (`mcp__plugin_playwright_playwright__*`) WERE available and used for
+  real browser-based verification throughout this session (login flow,
+  brand screenshots, the full Integrations connect/disconnect flow) —
+  this caught 2 real bugs that a curl-only check would have missed
+  entirely (see below). superpowers skills were listed/available but
+  not invoked — this card's work didn't match their trigger conditions.
+- Step 1 — found the real root cause of BC-014/BC-015's HTTPS cert
+  failure: `nslookup -type=NS zeromanuals.com 8.8.8.8` showed the zone
+  is served by NS1 (dns1-4.p09.nsone.net), which Hostinger's own DNS API
+  was never authoritative for — every prior DNS write via Hostinger's
+  API silently never took effect on the real zone. The human added the
+  real A record directly in Netlify; re-verified live via nslookup
+  (resolves correctly), triggered Traefik's ACME retry via a project
+  recreate, and did a REAL certificate-chain read (PowerShell
+  X509Certificate2, not just "curl succeeded") confirming `Issuer: CN=
+  YR2, O=Let's Encrypt, C=US`. Corrected PROJECT_STATE.md's Infrastructure
+  section so future sessions don't repeat the misdiagnosis. Also caught
+  a second real bug here: `VPS_restartProjectV1` restarts the container
+  in place (same writable layer) rather than recreating it, and the
+  container's own entrypoint does a fresh `git clone` on every start —
+  a plain restart crash-looped for ~15 minutes (`fatal: destination
+  path '/src' already exists`) before being caught via live log
+  inspection. Fixed by using a full recreate instead, and made the
+  container command self-healing (`rm -rf` before clone) for any future
+  in-place restart.
+- Step 2 — extracted `.claude/skills/zenny-brand-new-guideline.skill`
+  (a zipped bundle, not a top-level loaded skill this session — read
+  directly) and applied the real tokens (sage/honey/oat palette,
+  Fraunces + Hanken Grotesk, a real ensō SVG mark, warm-but-plain copy)
+  across the whole Dashboard app. Verified visually via live Playwright
+  screenshots against the deployed site, not just "the CSS compiled."
+- Step 3 — read both oauth-initiate and oauth-callback's real deployed
+  source before changing anything. Confirmed no MCP tool here can set
+  Supabase Edge Function secrets (searched explicitly) — fixed
+  `ZENNY_DASHBOARD_URL`'s dead fallback at the code level instead
+  (still respects the env var if a human sets it later via CLI/
+  Management API). Built the Integrations page + 3 new RPC functions
+  (migrations 040-041, reusing BC-015's exact JWT app_metadata pattern
+  — did not invent a second mechanism, per the card's explicit
+  instruction). Tested end-to-end for real: Playwright-clicked "Connect
+  Google Calendar" on the live deployed dashboard, confirmed it
+  genuinely reached accounts.google.com with the correct client_id/
+  redirect_uri/scopes/state, confirmed the matching row landed in
+  control.oauth_state. Could not complete Google's actual interactive
+  consent (no real human-owned test account available to an autonomous
+  session) — disclosed, not worked around. Simulated the post-consent
+  state using the exact same upsert_client_connection/
+  store_credential_secret RPCs oauth-callback itself calls, then used
+  Playwright to verify the Connected state displays correctly and that
+  Disconnect real-flips it back to Not Connected, backed by a real
+  revoked row + audit log entry.
+- What was verified live vs. assumed: the HTTPS cert claim is backed by
+  an actual issuer-chain read, not a "no error" inference. The OAuth
+  connect button's correctness is backed by the real destination URL
+  Google returned, not by reading the code and assuming the redirect
+  chain was right. Both of this session's real bugs (login not
+  redirecting, stale subtitle after disconnect) were caught specifically
+  BECAUSE a real browser was driven against the real deployed app —
+  neither would have surfaced from a code review or a curl-only check.
+- What broke / changed from plan: the restart-based ACME retry
+  mechanism BC-014 itself documented turned out to crash-loop the
+  container (see Step 1) — real bug, not assumed working, fixed same
+  session.
+- Files touched: 05_Platform_Builds/Dashboard/ (brand CSS, EnsoMark
+  component, Integrations page, App.tsx login-redirect fix, subtitle
+  fix — 4 commits: 7eb6bbf, 443b749, 49bc9fe, plus this session's
+  PROJECT_STATE.md commit); Supabase migrations 040-041 (Integrations
+  RPC layer); oauth-callback Edge Function redeployed (v3, fixed
+  fallback URL); 1 simulated test connection + secret in zenny-vault,
+  clearly marked test data, left in place per project convention;
+  zenny-dashboard Docker Compose project on srv1881104 redeployed 4x
+  (ACME retry, brand+integrations, login fix, subtitle fix).
+- **This session: 0 NEW self-resolved document-level items — the
+  Document Resolution Authority gate does not apply to new work this
+  session. BC-015's prior gate is now RESOLVED/ACKNOWLEDGED (Commander
+  issued BC-016 directly, addressing that exact item). Proceeding to
+  the next Build Card is fine.**
 
 ### Session 16 — 2026-08-05 — BC-015: Order Lookup dashboard (5B) built + deployed, 1 self-resolved item
 - What was done: Step 0 — re-checked DNS propagation (still NXDOMAIN)
