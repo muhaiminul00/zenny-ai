@@ -350,6 +350,13 @@ card's own instruction — flagged, not applied):
 
 ## Session Log (append-only — newest at top, never delete old entries)
 
+### Session 6 — 2026-08-05 — BC-006: doc sync (owed from BC-004)
+- Applied both flagged doc diffs to Client_Integration_and_Credential_
+  Platform_v1.md Part 4.2's oauth_apps schema block: added
+  webhook_signing_key_id (uuid NULL) to the column list, and added
+  'pending' to app_status's documented value list — both now match the
+  live schema (migrations 023/024). No other content changed.
+
 ### Session 5 — 2026-08-05 — BC-004: Phase 1 closure
 - What was done: Step A — re-verified auth.users live, confirmed 0 rows
   (human had run the delete outside this session by the time this card

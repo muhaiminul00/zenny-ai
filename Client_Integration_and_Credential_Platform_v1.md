@@ -188,11 +188,25 @@ client_id          text NOT NULL      -- OAuth Client ID (or Cal.com/etc
                                       -- name this differently per provider
 client_secret_id    uuid NOT NULL     -- references a Vault secret, NOT the
                                       -- plaintext secret itself (Part 4.4)
+webhook_signing_key_id   uuid NULL  -- references a Vault secret, same
+                                      -- non-FK pattern as client_secret_id.
+                                      -- Added via migration
+                                      -- 024_add_webhook_signing_key_id_
+                                      -- to_oauth_apps, 2026-08-05. NULL
+                                      -- for providers with no webhook
+                                      -- signature verification (most).
+                                      -- Currently populated for: calendly.
 redirect_uri          text NOT NULL
 scopes                  text NOT NULL  -- space-separated, provider-specific
 app_status                text NOT NULL -- 'testing' | 'published' |
                                       -- 'not_applicable' (Shopify Custom
                                       -- App has no such concept, Part 8.2)
+                                      -- | 'pending' (added via migration
+                                      -- 023_add_pending_to_oauth_apps_status,
+                                      -- 2026-08-05 — signals a provider
+                                      -- branch is built but deliberately
+                                      -- not routed to real traffic yet,
+                                      -- e.g. Cal.com pre-launch)
 updated_at                timestamptz NOT NULL DEFAULT now()
 ```
 
