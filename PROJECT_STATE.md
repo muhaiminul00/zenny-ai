@@ -15,22 +15,25 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 14 (BC-013 — Phase 5 data layer built, 1 new self-resolved item)
+2026-08-05 — by Claude Code, Session 15 (BC-014 — Phase 5 infrastructure, HTTPS cert pending external DNS propagation)
 
 ## Current Phase
-Phase 5 (Dashboard Data Layer) — schema built: `orders` (public +
-tpl_commerce) and `appointments` (public, tpl_appointment, tpl_commerce,
-tpl_emergency, tpl_consultation — see this session's self-resolved item
-below for why 3 of those 5 weren't in the original card). Parallel-write
-Change Request applied to all 5 affected Tool entries in
-n8n_Workflow_Specification_v1.md Part 13. Data-flow doc written
-(`06_Infrastructure/Database/Phase5_Dashboard_Data_Flow.md`). BC-012's
-prior gate was implicitly acknowledged by the Commander issuing BC-013
-directly (Phase 5 schema work) — noted, not assumed silently. Per the
-new rule's gate, this session stops again: 1 new self-resolved item
-occurred (see Blockers), awaiting Commander acknowledgment before Phase
-5 UI work (the next card) begins. No dashboard UI built — schema +
-data-flow doc only, per this card's explicit scope. Convocore Adapter
+Phase 5 (Dashboard Infrastructure) — BC-014's prior gate (BC-013's
+self-resolved item) was implicitly acknowledged by the Commander issuing
+BC-014 directly. No document-level conflict occurred this session (pure
+infrastructure work) — the Document Resolution Authority gate does not
+apply here. New `dashboard.zeromanuals.com` DNS record + placeholder
+container deployed behind Traefik on srv1881104, routing confirmed
+working. **One real, honestly-reported incomplete item:** the trusted
+Let's Encrypt certificate has NOT yet issued — Traefik's automatic ACME
+attempt failed at deploy time with NXDOMAIN because DNS hadn't
+propagated to the domain's own authoritative nameservers (NS1) yet; as
+of this session's end, 5+ minutes later, the record was still not
+visible at NS1 directly, confirmed via direct queries — genuine external
+propagation delay, not a config error. See Infrastructure section and
+Blockers below for the exact follow-up needed (retrigger ACME once
+propagation completes). No dashboard UI/app code built — infrastructure
+only, per this card's explicit scope. Convocore Adapter
 (ADP-002) — **COMPLETE.** BC-010 closed the one item BC-009 left open:
 human-handoff's staged-fallback Stage 2 trigger, built per the
 Commander's exact operational definition. ADP-002 registered in
@@ -61,6 +64,121 @@ Phase 13 — Template Dashboard .................... DEFERRED (per Part 2.6)
 ```
 
 ---
+
+## Infrastructure — VPS / Dashboard Deployment (BC-014)
+
+```
+VPS in use for ALL Zenny infrastructure: srv1881104 (id 1881104),
+KVM 1, 1 CPU / 4096MB RAM / 51200MB disk, Ubuntu 24.04 + Docker +
+Traefik template, IPv4 187.127.217.123. This is the SAME VPS already
+hosting n8n (n8n-cbzu.srv1881104.hstgr.cloud) — confirmed live via
+Hostinger MCP (VPS_getVirtualMachinesV1), not assumed from the domain
+name pattern alone. VPS 1729215 exists but is explicitly out of scope
+(per BC-014's own instruction) — never touched this session.
+
+Docker Compose projects running on srv1881104 (Hostinger's own
+project-management API, no SSH needed/available — confirmed no SSH
+key/config exists in this environment):
+  - traefik           — reverse proxy, network_mode: host
+  - n8n-cbzu           — existing n8n instance
+  - zenny-dashboard      — NEW (BC-014), placeholder container
+
+Traefik's REAL config (read live, not assumed — resolves the card's own
+explicit uncertainty):
+  - Provider: DOCKER LABELS (--providers.docker=true,
+    exposedbydefault=false) — NOT file-based/dynamic config.
+  - TLS: Let's Encrypt via ACME HTTP-01 challenge
+    (--certificatesresolvers.letsencrypt.acme.httpchallenge=true),
+    cert storage in a named volume (traefik-letsencrypt). HTTP->HTTPS
+    redirect configured at the entrypoint level.
+  - n8n's own container proves the working pattern: traefik.enable=true
+    + Host() rule + entrypoints=websecure + tls.certresolver=letsencrypt
+    + loadbalancer.server.port labels. zenny-dashboard's placeholder
+    copies this exact pattern.
+
+Domain: zeromanuals.com (ZeroManual's own registered domain, active,
+confirmed via Hostinger domains_getDomainListV1 — NOT assumed from
+context). Real DNS state found BEFORE this session's change:
+  zenny.zeromanuals.com  -> CNAME -> zeromanualai.github.io (GitHub
+                            Pages, unrelated, pre-existing -- NOT
+                            reused, would have collided)
+  www.zeromanuals.com    -> CNAME -> zeromanuals.com
+  @ (root)               -> A -> 2.57.91.91 (does NOT match this VPS's
+                            IP -- a different service, untouched)
+  NO subdomain pointed at this VPS's IP existed before this session.
+
+Subdomain decision (Step 1): dashboard.zeromanuals.com, single app,
+path-routed (per the card's own recommendation — 1 Traefik router, not
+4; 1 Supabase Auth session across all 4 dashboards; matches per-client-
+per-business access better than 4 separate subdomains). "dashboard" was
+chosen over the more obvious "zenny" specifically because "zenny" was
+already taken by the pre-existing GitHub Pages CNAME — confirmed via
+live DNS check before picking a name, not guessed. Paths for the 4
+dashboards (/orders, /appointments, /inventory, /onboarding) will be
+real routes once the actual dashboard app exists — not yet built.
+
+New DNS A record added (confirmed live before writing, human explicitly
+approved the write since the harness gated it as a real external
+action): dashboard.zeromanuals.com -> 187.127.217.123, TTL 300.
+Confirmed via Hostinger's own API immediately after: zenny/www/@ records
+untouched (different `name`, additive write, not a zone wipe).
+
+New Docker Compose project (zenny-dashboard) deployed: nginx:alpine
+serving a static placeholder page, Traefik-labeled identically to
+n8n's working pattern, restart: unless-stopped (survives VPS
+reboot/container crash — same guarantee as n8n's own container, which
+has been running unrestarted for 7+ hours prior to this session).
+Container confirmed RUNNING live (VPS_getProjectContainersV1): ~7MB
+RAM, negligible CPU.
+
+Routing confirmed working RIGHT NOW via a direct IP connection with a
+Host header override (curl --resolve, bypasses DNS): HTTP 200, exact
+placeholder content returned, proves Traefik host-based routing +
+container both work correctly.
+
+**HTTPS cert: NOT YET a trusted Let's Encrypt certificate — genuinely
+incomplete, not silently claimed done.** Traefik's automatic ACME
+attempt fired immediately at container deploy time and failed with a
+real, logged error (confirmed via VPS_getProjectLogsV1):
+`DNS problem: NXDOMAIN looking up A for dashboard.zeromanuals.com`
+— because the new DNS record hadn't propagated to the domain's own
+authoritative nameservers (dns1-4.p09.nsone.net) yet at that moment.
+Confirmed via direct queries against 8.8.8.8, 1.1.1.1, AND the
+authoritative NS1 servers directly: after 5+ minutes and 14 polling
+attempts, still not propagated as of this session's end. This is a
+genuine external delay (Hostinger backend -> NS1 sync timing), not a
+config error — Traefik currently serves its own default self-signed
+fallback cert (confirmed: curl reports SEC_E_UNTRUSTED_ROOT without
+-k). **Follow-up needed, not yet done:** once dashboard.zeromanuals.com
+resolves publicly (check via `nslookup dashboard.zeromanuals.com
+8.8.8.8`), trigger a Traefik ACME retry — the simplest mechanism is
+restarting the zenny-dashboard container/router (Traefik re-evaluates
+ACME on router changes) or waiting for Traefik's own internal retry
+backoff. No further Claude Code action needed beyond that one retry
+once propagation is confirmed complete.
+
+**Unrelated observation, flagged not investigated (out of BC-014
+scope):** zeromanuals.com's root (`@`) record resolves to different
+IPs depending on which server answers — Hostinger's own API reports
+2.57.91.91, but the domain's actual authoritative NS1 servers report
+52.74.6.109 / 13.215.239.219 (AWS-range IPs) when queried directly.
+Not touched, not explained — flagged for the Commander's awareness
+since it's a discrepancy in the SAME zone this session wrote to, even
+though the `dashboard` subdomain itself is unaffected.
+
+Resource headroom (VPS_getMetricsV1, real samples):
+  Before (baseline, same day):  RAM ~1009MB used / 4096MB total (~75%
+                                 free), Disk ~4021MB used / 51200MB
+                                 total (~92% free), CPU ~0.6% idle load
+  After (placeholder deployed): RAM ~956MB used (flat/noise, nginx:
+                                 alpine container itself uses ~7MB),
+                                 Disk ~4415MB used (+~394MB, the
+                                 nginx:alpine image pull), CPU ~0.66%
+  Conclusion: negligible resource cost for a placeholder. Massive
+  headroom remains for the real dashboard app (a React/Directus-class
+  app will cost more than nginx:alpine, but nowhere near exhausting
+  ~3140MB RAM / ~46785MB disk still free).
+```
 
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
 
@@ -715,10 +833,30 @@ directly.
 ## Blockers Right Now
 
 ```
-BLOCKING all further work — REAL instance of the new Document
-Resolution Authority gate (BC-011), second occurrence:
+NONE blocking further work. BC-014 (this session) performed pure
+infrastructure work — no system-document conflict/gap occurred, so the
+Document Resolution Authority gate does not apply this session. BC-013's
+prior gate (below) was implicitly acknowledged by the Commander issuing
+BC-014 directly.
 
-### Self-resolved document-level item (BC-013 Step 2/3)
+Real, non-blocking operational follow-up (BC-014):
+- dashboard.zeromanuals.com's Let's Encrypt cert has not yet issued —
+  Traefik's automatic ACME attempt failed at deploy time (DNS hadn't
+  propagated). Once `nslookup dashboard.zeromanuals.com 8.8.8.8`
+  actually resolves to 187.127.217.123, trigger a Traefik retry
+  (restart the zenny-dashboard container/router, or wait for Traefik's
+  own backoff). Not urgent — routing/container both already confirmed
+  working via direct-IP testing; only the trusted-cert step is pending.
+- Unrelated DNS discrepancy on zeromanuals.com's root (`@`) record —
+  Hostinger's API and the domain's own authoritative NS1 servers report
+  different IPs for it. Flagged for Commander awareness, not
+  investigated (out of BC-014 scope, doesn't affect the new `dashboard`
+  subdomain).
+
+### Self-resolved document-level item (BC-013 Step 2/3) — RESOLVED,
+ACKNOWLEDGED (Commander issued BC-014 directly, Phase 5 infrastructure
+work, implicitly confirming this resolution — noted, not silently
+assumed)
 - **What:** BC-013's card Step 2 instructed mirroring the new
   `public.appointments` table only into `tpl_appointment`. BC-013's own
   Step 3, in the same card, listed the "5 Tools" needing the parallel-
@@ -959,6 +1097,60 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 15 — 2026-08-05 — BC-014: Phase 5 infrastructure (HTTPS cert pending propagation)
+- What was done: Step 0 — confirmed live via Hostinger MCP (no SSH
+  available/configured, used Hostinger's own Docker Compose project-
+  management API instead) that srv1881104 runs exactly 2 projects
+  (traefik, n8n-cbzu) before this session, read both real docker-
+  compose.yml contents, resolving the card's own explicit Traefik-
+  config-shape uncertainty (Docker labels provider, Let's Encrypt HTTP-
+  01 ACME, confirmed not assumed). Confirmed real DNS state via
+  Hostinger's domains/DNS APIs before deciding anything — found
+  zeromanuals.com as the real managed domain, and a real constraint
+  (zenny.zeromanuals.com already CNAME'd to an unrelated GitHub Pages
+  site). Captured real baseline resource metrics. Step 1 — decided
+  dashboard.zeromanuals.com, single app, path-routed, per the card's own
+  recommendation, with the "zenny" naming conflict explicitly flagged
+  as the reason "dashboard" was chosen instead. Step 2 — added the DNS
+  A record (paused for explicit human confirmation first, since the
+  harness gated this as a real external-facing write; the user
+  confirmed via AskUserQuestion before I proceeded), deployed a
+  Traefik-labeled nginx:alpine placeholder as a new Docker Compose
+  project, confirmed routing works via a direct-IP curl test with a
+  Host header override (bypasses DNS entirely). Discovered the HTTPS
+  cert had NOT actually issued — read Traefik's real logs (not assumed
+  success from "container is running"), found the exact ACME failure
+  reason (NXDOMAIN, DNS not yet propagated at deploy time), polled
+  public resolvers AND the domain's own authoritative NS1 servers
+  directly for ~5+ minutes/14 attempts, genuinely still not propagated
+  by session end — reported as an honest incomplete item rather than
+  silently claimed working. Step 3 — captured real after-metrics,
+  computed the actual delta.
+- What was verified live vs. assumed: Everything in this session was a
+  real API call or a real network test — which VPS hosts what, Traefik's
+  actual config (not assumed from the template name alone), the actual
+  pre-existing DNS zone contents (not assumed empty), the actual HTTP
+  response from the deployed container (not assumed from "container
+  status: running" alone), the actual TLS certificate trust chain (not
+  assumed valid from "HTTPS entrypoint configured" alone) — this last
+  one is the clearest example: a less careful pass would have declared
+  Step 2 "done" the moment the container came up and curl -k returned
+  200, without ever checking whether the cert was real.
+- What broke / changed from plan: The HTTPS cert did not issue within
+  this session's timeframe — a real external dependency (DNS
+  propagation to third-party authoritative servers), not a mistake to
+  fix. Correctly left as an honest, flagged incomplete item per the
+  card's own "Flag if a real constraint makes this wrong" spirit,
+  applied to the verification step rather than the design step this
+  time.
+- Files touched: PROJECT_STATE.md only, locally. Infrastructure changes:
+  1 new DNS A record (zeromanuals.com zone), 1 new Docker Compose
+  project (zenny-dashboard) on srv1881104. No repo files changed beyond
+  this state file — no dashboard application code exists yet.
+- **This session: 0 self-resolved document-level items — the Document
+  Resolution Authority gate does not apply. Proceeding is fine; the one
+  real follow-up (ACME retry) is operational, not a document conflict.**
 
 ### Session 14 — 2026-08-05 — BC-013: Phase 5 data layer (1 new self-resolved item)
 - What was done: Step 0 — live audit confirmed no drift in conversions_
