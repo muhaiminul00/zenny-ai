@@ -15,31 +15,40 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 20 (BC-019 — Gmail + WooCommerce connections wired up, inventory sync logged, Supabase tier confirmed)
+2026-08-05 — by Claude Code, Session 21 (BC-020 — OAuth popup flow, 2 real platform constraints found+fixed, proxy-domain findings reported)
 
 ## Current Phase
-Phase 5 (Dashboard Systems) — Integrations page now supports Gmail
-(BC-019, reuses the existing `google` oauth_apps row via a new 'email'
-category — no separate row needed, per Client_Integration_and_
-Credential_Platform_v1.md Part 8.1's "one shared app" design) and
-WooCommerce (a real API-key form wired to the existing but
-never-before-used `woocommerce-connect` Edge Function). **2 real bugs
-caught and fixed via live Playwright testing of the WooCommerce form**:
-missing CORS headers (the function had only ever been exercised
-server-to-server, never from an actual browser) and a client-side error-
-message extraction bug (supabase-js doesn't auto-parse Edge Function
-error bodies). Confirmed via Client_Integration_and_Credential_
-Platform_v1.md Part 8.2 that Shopify does NOT need a separate API-key
-path — already resolved in that doc, no redundant path built. Logged
-`SCH-007 Inventory/Catalogue Sync` as a formal future-phase requirement
-(3 sources: Shopify, WooCommerce, AND Google Sheets — the last one new
-per explicit human instruction). Confirmed live: Supabase org is on the
+Phase 5 (Dashboard Systems) — OAuth connects now use a popup instead of
+a full-page redirect (BC-020). **This required discovering and working
+around 2 genuine, previously-unknown platform constraints, found only
+via real live Playwright testing** — full detail in the new "Phase 5 —
+OAuth Popup Flow + Proxy-Domain Feasibility (BC-020)" section below:
+(1) Supabase Edge Functions cannot serve script-executing HTML at all
+(the gateway forces `Content-Type: text/plain` + a sandboxed CSP on real
+GET responses — a `curl -I` HEAD request misleadingly showed
+`text/html`, masking this until tested in a real browser); (2) Google's
+own OAuth pages send a `Cross-Origin-Opener-Policy` header, a
+documented, industry-wide cause of `window.opener` going null partway
+through a real Google redirect chain. Final working mechanism:
+`localStorage` + the `storage` event as the primary completion signal
+(doesn't need `window.opener` at all), `postMessage` kept as a secondary
+best-effort one. Verified end-to-end via real Playwright popups for
+Google Calendar, Gmail, and Shopify (the actual mechanism, not just the
+URL-building); WooCommerce was never OAuth-based so needed no popup
+treatment. Manual popup-close handled gracefully. Investigated the
+Traefik reverse-proxy workaround (Step 2) — confirmed live that
+Cloudflare/Supabase reject mismatched Host headers (403), and confirmed
+via the source doc that Google's "unverified app" warning is gated by
+Google Cloud Console's Publishing Status toggle, NOT by which domain
+serves the redirect — meaning a proxy domain would not fix the actual
+friction it was proposed to fix. Recommended NOT building it; explicitly
+stopped for Commander decision, nothing deployed. Confirmed live: Supabase org is on the
 **free tier** — no custom domain possible for oauth-initiate/oauth-
 callback without upgrading to Pro, documented as an open human decision,
-not actioned. 0 self-resolved document-level items this session — no
-gate applies. Two doc diffs flagged, unapplied (see Blockers): BC-018's
-still-open `appointments` section gap in Database_Structure_v4_FINAL.md,
-and this session's new SCH-007 registry entry for
+not actioned (BC-019). 0 self-resolved document-level items this session
+— no gate applies. Both doc diffs from BC-018/BC-019 remain flagged,
+unapplied (see Blockers): the still-open `appointments` section gap in
+Database_Structure_v4_FINAL.md, and the SCH-007 registry entry for
 n8n_Workflow_Specification_v1.md Part 8. Convocore Adapter
 (ADP-002) — **COMPLETE.** BC-010 closed the one item BC-009 left open:
 human-handoff's staged-fallback Stage 2 trigger, built per the
@@ -729,6 +738,157 @@ api.zeromanuals.com), which requires upgrading to Supabase Pro tier —
 a plan/cost decision for the human, not decided or actioned here.
 ```
 
+## Phase 5 — OAuth Popup Flow + Proxy-Domain Feasibility (BC-020)
+
+```
+**CORRECTION to the BC-019 note directly above:** "likely a factor in
+Google brand verification friction" is NOT confirmed accurate — BC-020
+investigated this directly (Step 2) and found Google's "unverified app"
+warning is gated entirely by the OAuth app's Publishing Status
+(Testing/Production) in Google Cloud Console, per Client_Integration_
+and_Credential_Platform_v1.md's own already-researched finding ("the
+only documented fix is completing Google's verification and switching
+the project's Publishing Status from Testing to Production") — this is
+independent of which domain serves the redirect_uri. A custom proxy
+domain would not reduce verification friction; BC-019's phrasing
+overstated the connection. Left uncorrected until now since BC-019
+itself never tested the claim, just noted it as a plausible factor.
+
+**Step 1 — Popup OAuth flow, 2 real platform constraints found and
+fixed via live testing (not assumed working from code review):**
+
+1. *Supabase Edge Functions cannot serve script-executing HTML.*
+   First attempt: oauth-callback returned an HTML page with an inline
+   `<script>` that detected `window.opener` and called `postMessage()`/
+   `window.close()` directly from the function. Looked correct — `curl
+   -I` (a HEAD request) showed `Content-Type: text/html`. **Failed in a
+   real Playwright browser**: a real GET request showed the true
+   response was `Content-Type: text/plain` plus `Content-Security-
+   Policy: default-src 'none'; sandbox` — the platform gateway forces
+   this on real GET responses from Edge Functions, and the CSP's
+   `sandbox` directive blocks inline script execution entirely,
+   regardless of what Content-Type a function tries to set itself. HEAD
+   responses aren't wrapped the same way, which is exactly what made
+   the first version look correct until tested with a real browser
+   session. **Real fix:** oauth-callback (v5) went back to a plain
+   redirect (its pre-BC-020 shape). The popup-detection/postMessage/
+   close logic moved into the DASHBOARD app itself
+   (`Integrations.tsx`) — served from dashboard.zeromanuals.com with
+   normal headers, no sandboxing — which runs it after the redirect
+   lands there (the popup's own landing page IS this same
+   `/integrations` route).
+
+2. *Google's OAuth pages send a Cross-Origin-Opener-Policy header.*
+   Confirmed live via curl: `accounts.google.com` sends
+   `Cross-Origin-Opener-Policy-Report-Only: same-origin`. This is a
+   well-documented, industry-wide cause of `window.opener` going null
+   partway through a real multi-hop OAuth redirect chain — independent
+   of anything in this app's code (it's part of why Google's own newer
+   identity libraries moved away from relying on `window.opener` for
+   popup flows). Confirmed empirically in this session: a popup
+   redirected back to `/integrations` sometimes had `window.opener`
+   correctly set and sometimes didn't, depending on the exact
+   navigation path taken to reach it — not reliable enough to build on
+   alone. **Real fix:** `localStorage` + the `storage` event is now the
+   PRIMARY completion signal — it doesn't need an opener reference at
+   all, since `storage` events fire in every other same-origin window
+   purely because the origin matches, regardless of how that window was
+   opened or whether COOP severed the opener link. `postMessage` is
+   kept as a secondary, best-effort signal for when the opener does
+   survive.
+
+   Also fixed along the way (not a platform constraint, an implementation
+   bug caught via the same live testing): the popup used a single fixed
+   window name (`'zenny-oauth'`) for every connect attempt. Reusing one
+   fixed name across repeated opens in the same browser session showed
+   inconsistent same-tab-navigation behavior (the "popup" replaced the
+   parent tab instead of opening separately) instead of a reliable new
+   window. Fixed to a unique name per attempt
+   (`` `zenny-oauth-${Date.now()}` ``) — more robust regardless of the
+   exact root cause, and standard practice for repeatable popup flows.
+
+   **Verified end-to-end via real Playwright popups** (not just URL
+   construction, the actual mechanism): opened a real popup for Gmail,
+   confirmed it's a genuine separate window (not a same-tab navigation),
+   manually drove it to oauth-callback with a deliberately invalid code
+   (same disclosed-limitation pattern as every prior card — completing
+   Google's real consent isn't possible without a real account),
+   confirmed the popup redirected to `/integrations?connect_result=
+   error&...`, correctly detected it should self-terminate, wrote to
+   localStorage, attempted postMessage, and **genuinely closed itself**
+   (confirmed: the tab disappeared from the browser's tab list) — and
+   the PARENT tab (untouched, still on plain `/integrations`) correctly
+   received the `storage` event and updated its UI (`"Couldn't connect
+   (token_exchange_failed)."`, busy state cleared, connection list
+   unchanged since no connection was actually created). Repeated the
+   same real-popup confirmation for Shopify (correct
+   `my-test-store-bc020.myshopify.com/admin/oauth/authorize?...` URL,
+   same popup mechanics). WooCommerce was never OAuth-based (a direct
+   in-page form + Edge Function POST, no redirect at all) so needed no
+   popup treatment — noted explicitly rather than silently skipped.
+
+   **Manual popup-close (Step 1.4) verified live:** opened a popup,
+   closed it manually before it reached the callback, confirmed the
+   parent's `popup.closed` poll (500ms interval) detected this within
+   about a second, cleared the busy/disabled button state, and showed
+   "Window closed before finishing — nothing was connected." — not left
+   hanging.
+
+   **Interesting real-world side-evidence found mid-session:** two
+   genuine "Connected" rows appeared in `control.client_connections`
+   for the test client (Calendar and Email, both provider=google) at
+   timestamps between the two failed popup-fix attempts — confirmed via
+   `control.connection_audit_log` (`event_type='connected',
+   auth_method='oauth', actor='client'`, immediately preceded by a real
+   Google `invalid_grant` error from an earlier attempt). This is
+   strong evidence a real human completed real Google OAuth logins
+   during this session using the test credentials — independently
+   proving the core mechanism (oauth-initiate's authorize URL,
+   oauth-callback's token exchange, the DB writes) works correctly for
+   real, even during the window when the popup's own closing UI was
+   still broken by constraint #1 above. Both connections were
+   disconnected again during testing to get back to a clean state for
+   controlled re-tests — not left in place, since they weren't this
+   session's own deliberately-seeded test data.
+
+**Step 2 — Proxy-domain feasibility: investigated, reported, NOT
+built, per the card's explicit instruction to stop for a Commander
+decision:**
+
+- **Live-tested the card's exact question:** does Supabase's edge
+  gateway accept requests proxied through a different Host header? NO —
+  confirmed via a real request (`curl ... -H "Host:
+  api.zeromanuals.com"` against the real Supabase Edge Function URL):
+  Cloudflare (fronting Supabase) returns a hard `403 Forbidden` for a
+  mismatched Host header. A naive pass-through proxy (preserving the
+  client-facing domain as the Host header sent upstream) will NOT work.
+- A CORRECTLY configured reverse proxy (Traefik rewriting the Host
+  header to match Supabase's real domain on its own outbound leg —
+  standard `passHostHeader: false` behavior, not exotic) would likely
+  avoid this specific rejection, since Supabase would then see an
+  ordinary, correctly-Host-matched request. This was NOT verified with
+  an actual live proxy deployment (would require a new DNS record for
+  api.zeromanuals.com — an external action, plus updating both oauth-
+  initiate's redirect_uri construction AND Google Cloud Console's
+  registered redirect URI to match exactly) — reasoned from Traefik's
+  documented behavior, not empirically confirmed end-to-end.
+- **The more important finding: even if built, it would not solve the
+  problem it was proposed to solve.** Per the correction at the top of
+  this section, Google's "unverified app" warning is controlled by the
+  OAuth app's Publishing Status in Google Cloud Console, not by which
+  domain the redirect_uri points to. A proxy domain's only real benefit
+  would be cosmetic (a branded domain flashing by during the redirect,
+  if even visible in a popup context) plus avoiding a future dependency
+  on the raw Supabase project-ref domain if it ever needed to change.
+- **Recommendation (not a decision — Commander's call):** given the
+  real added complexity (new DNS record, new Traefik route, redirect_uri
+  updates in two places kept in sync, ongoing maintenance) against a
+  benefit that's real but minor and NOT the fix for the actual
+  friction (Google verification) it was originally proposed to address,
+  this doesn't look worth building right now. Nothing was deployed —
+  stopping here per the card's explicit instruction.
+```
+
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
 
 Per Planning_to_Build_Transition_v1.md Part 4 Phase 5, 4 Directus-based
@@ -1382,11 +1542,25 @@ directly.
 ## Blockers Right Now
 
 ```
-NONE blocking further work. BC-019 (this session) has 0 self-resolved
+NONE blocking further work. BC-020 (this session) has 0 self-resolved
 document-level items — the Document Resolution Authority gate does not
-apply. Wiring up Gmail/WooCommerce, logging SCH-007, and confirming the
-Supabase tier are ordinary build/documentation work, not document-level
-conflicts.
+apply. Fixing the 2 real platform constraints found via live testing
+(Edge Function CSP sandboxing, Google's COOP header) is ordinary
+engineering bug-fixing, not a document-level conflict. Correcting
+BC-019's own PROJECT_STATE.md claim about verification friction isn't a
+system-document correction either — PROJECT_STATE.md is Claude Code's
+own session-state log, freely overwritten each session by its own house
+rules, not a document the standing rule's gate applies to.
+
+**Step 2 decision pending — genuinely for the Commander, not decided
+here:** should the api.zeromanuals.com Traefik proxy workaround be
+built? Findings in the "Phase 5 — OAuth Popup Flow + Proxy-Domain
+Feasibility (BC-020)" section above: technically plausible with a
+correctly-configured Host-header rewrite (not empirically verified
+end-to-end), but would NOT fix Google's verification warning (the
+problem it was proposed to solve) — recommendation leans against
+building it, but explicitly left open per the card's instruction not to
+decide unilaterally.
 
 2 doc diffs flagged for Commander to apply (not applied by Claude Code —
 Section 13 standing rule, same pattern as BC-006/009/010):
@@ -1396,19 +1570,24 @@ Section 13 standing rule, same pattern as BC-006/009/010):
   the "Phase 5 — 3 Defect Fixes From Manual Testing (BC-018)" section
   above.
 - n8n_Workflow_Specification_v1.md Part 8's Scheduled Workflows table
-  needs the new SCH-007 row (BC-019, new) — exact row text in the
-  "Phase 5 — Gmail/WooCommerce Connections..." section above.
+  needs the new SCH-007 row (BC-019, still open) — exact row text in
+  the "Phase 5 — Gmail/WooCommerce Connections..." section above.
 
 Still open, unresolved by design (not this card's scope):
 - Client-schema-to-auth-user mapping mechanism (app_metadata stopgap,
   per BC-015) — still a Commander product decision, not touched.
 - Whether Integrations' Disconnect should also revoke access at the
   provider (BC-016, still open).
-- Supabase custom domain for oauth-initiate/oauth-callback (BC-019,
-  new) — requires a Pro-tier upgrade, a plan/cost decision for the
-  human, not actioned.
-- SCH-007 Inventory/Catalogue Sync itself (BC-019, new) — logged as a
-  real future-phase requirement, not built; schema/workflow design not
+- Supabase custom domain for oauth-initiate/oauth-callback (BC-019) —
+  requires a Pro-tier upgrade, a plan/cost decision for the human, not
+  actioned. BC-020 adds: even with Pro tier, this fixes cosmetics only,
+  not the verification warning — see correction above.
+- The api.zeromanuals.com Traefik proxy workaround (BC-020, new) —
+  feasibility investigated and reported, explicit Commander decision
+  needed before any build.
+- SCH-007 Inventory/Catalogue Sync itself (BC-019, still open) — logged
+  as a real future-phase requirement, not built; schema/workflow design
+  not
   started.
 
 Prior gates, for reference (all previously resolved/acknowledged):
@@ -1721,6 +1900,89 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 21 — 2026-08-05 — BC-020: OAuth popup flow (2 real platform constraints found+fixed), proxy-domain feasibility reported
+- Step 1 — first attempt: rewrote oauth-callback to return an HTML page
+  with an inline script that detected window.opener and postMessage'd/
+  closed directly. `curl -I` (HEAD) showed Content-Type: text/html,
+  looked correct. **Failed live in Playwright**: a real GET showed the
+  true response was text/plain with a `sandbox` CSP — Supabase's Edge
+  Functions gateway forces this on real GET responses, blocking inline
+  script execution regardless of what the function sets itself. This
+  was caught ONLY because a real browser was used, not because the code
+  was re-read — a system reminder mid-session correctly flagged this as
+  "resume from where you were stuck" after a tool-use pause, and
+  resuming with `curl -D -` (full headers on a real GET, not HEAD)
+  found the actual mismatch. Real fix: oauth-callback (v5) reverted to
+  a plain redirect; popup-detection/postMessage/close logic moved into
+  the dashboard app itself, which has no such sandboxing.
+- Second real constraint, found immediately after fixing the first:
+  Google's own sign-in pages send a Cross-Origin-Opener-Policy header
+  (confirmed via curl) — window.opener was observed going null
+  inconsistently depending on the exact navigation path taken back to
+  the callback, a known industry-wide issue independent of this app's
+  code. Real fix: switched the primary completion signal to localStorage
+  + the `storage` event, which doesn't need window.opener at all;
+  postMessage kept as a secondary best-effort signal. Also fixed a
+  real window-naming bug found via the same live testing: a single
+  fixed popup target name showed inconsistent same-tab-navigation
+  behavior on repeated opens — switched to a unique name per attempt.
+- Verified the FULL mechanism end-to-end via real Playwright popups
+  (opened, genuinely separate windows confirmed via the tab list, driven
+  to oauth-callback with a deliberately invalid code — same disclosed-
+  limitation pattern as every prior card, real Google consent isn't
+  completable without a real account) for Gmail and Shopify: popup
+  correctly redirected, detected completion, wrote localStorage,
+  genuinely closed itself (confirmed via tab list), and the parent tab
+  correctly received the signal and updated its UI without any
+  navigation. Manual popup-close (Step 1.4) also verified live: closed
+  a popup mid-flow, confirmed the parent's poll detected it within
+  ~1s and cleared the busy state with the right message. WooCommerce
+  needed no popup treatment (never OAuth-based) — stated explicitly,
+  not silently skipped.
+- Noticed mid-session: 2 genuine "Connected" rows appeared in
+  control.client_connections for the test client at timestamps between
+  the two fix attempts, with a real Google `invalid_grant` audit log
+  entry immediately before — strong evidence a real human completed
+  real Google logins with the test credentials during this session,
+  independently proving the core mechanism works for real even while
+  the popup's own closing UI was still broken. Disconnected both to
+  restore a clean test state rather than leaving undocumented state.
+- Step 2 — live-tested the card's exact question (does Supabase's edge
+  accept a mismatched Host header): NO, confirmed via a real curl
+  request — Cloudflare returns a hard 403. A correctly-configured
+  reverse proxy (Host header rewritten to match Supabase's real domain)
+  would likely avoid this specific rejection but wasn't verified
+  end-to-end (would require a new DNS record + Google Cloud Console
+  changes). More importantly: re-read the source doc and found Google's
+  verification warning is gated by the OAuth app's Publishing Status in
+  Google Cloud Console, NOT by which domain serves the redirect — a
+  proxy domain would not fix the problem it was proposed to fix.
+  Corrected BC-019's own PROJECT_STATE.md claim ("likely a factor in
+  verification friction") accordingly. Recommended against building it,
+  explicitly stopped for a Commander decision, nothing deployed.
+- What was verified live vs. assumed: literally everything in this
+  session was verified by actually triggering the real behavior — the
+  CSP constraint via a real GET request's real headers (not the
+  misleading HEAD request), the COOP issue via a real popup's real
+  window.opener state across multiple real attempts, the Host-header
+  rejection via an actual request against the real Supabase endpoint,
+  and the verification-warning claim via the actual source document
+  rather than repeating BC-019's own unverified phrasing.
+- What broke / changed from plan: the first 2 implementation attempts
+  for Step 1 both failed for reasons that couldn't have been predicted
+  from code review alone — both are genuine platform/third-party
+  behaviors, not logic bugs, and both are now disclosed and fixed via a
+  4th deploy of oauth-callback + the dashboard.
+- Files touched: 05_Platform_Builds/Dashboard/src/pages/Integrations.tsx
+  (commits 43662bd, 21f46eb, c78887d, 89f9930); oauth-callback Edge
+  Function redeployed 3x this session (v4 broken popup attempt, v5 real
+  fix — plain redirect); zenny-dashboard Docker Compose project on
+  srv1881104 redeployed 4x; PROJECT_STATE.md.
+- **This session: 0 self-resolved document-level items — the Document
+  Resolution Authority gate does not apply. Proceeding to the next
+  Build Card is fine. Step 2's proxy-domain question remains genuinely
+  open for the Commander, separate from the gate.**
 
 ### Session 20 — 2026-08-05 — BC-019: Gmail + WooCommerce connections wired up, SCH-007 logged, Supabase tier confirmed
 - Step 1 — confirmed live `control.oauth_apps` has no 'gmail' row (7
