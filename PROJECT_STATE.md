@@ -15,23 +15,27 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 18 (BC-017 — test credentials reset, Appointment Booking dashboard (5C) built)
+2026-08-05 — by Claude Code, Session 19 (BC-018 — fixed 3 real defects found in manual testing)
 
 ## Current Phase
-Phase 5 (Dashboard Systems) — **5A/5B/5C-monitoring/Integrations** are
-now live at dashboard.zeromanuals.com: Orders (5B), Appointments (5C,
-read-only monitoring — the booking Tools that would write real rows
-aren't built until Phase 8), and Integrations (OAuth connect/disconnect,
-BC-016). Test dashboard login credentials reset and handed to the human
-this session (BC-017) — see Session Log for the real password, verified
-live via the Auth API before being reported. `client_test_002_acme_
-commerce_test`'s schema retrofitted with a real `appointments` table
-(its archetype's template, tpl_commerce, already had one; the client's
-own schema just hadn't been given it yet) — same `LIKE ... INCLUDING
-ALL` pattern the onboarding function itself uses, seeded with 2 real
-test rows exercising both the clean-success and alert-fired/fallback
-cases from BC-013's parallel-write design. 0 self-resolved document-
-level items this session — no gate applies. Convocore Adapter
+Phase 5 (Dashboard Systems) — 3 real defects found via the human's own
+manual click-through fixed this session (BC-018): (1) Shopify's Connect
+button now prompts for the merchant's shop subdomain before calling
+oauth-initiate (was silently building a request the Edge Function
+correctly rejected) — verified live, produces a real, correctly-formed
+`https://{shop}.myshopify.com/admin/oauth/authorize?...` URL; (2) the
+Integrations page now shows all 5 real, non-`not_applicable` oauth_apps
+providers relevant to the client's archetype (Cal.com was missing
+entirely) — Cal.com and Slack both shown as "Not yet available" rather
+than hidden, reasoning below; (3) `appointments.scheduled_at` added
+(the table only had `created_at` — when the row was created, not when
+the appointment occurs, a genuine missed requirement) across `public` +
+all 5 relevant `tpl_*` schemas + `client_test_002`'s live schema,
+surfaced prominently in the dashboard UI, seeded rows backfilled with
+real values matching their conversation content. 0 self-resolved
+document-level items this session — no gate applies. One doc diff
+flagged (Database_Structure_v4_FINAL.md has no `appointments` section
+at all — see Blockers). Convocore Adapter
 (ADP-002) — **COMPLETE.** BC-010 closed the one item BC-009 left open:
 human-handoff's staged-fallback Stage 2 trigger, built per the
 Commander's exact operational definition. ADP-002 registered in
@@ -534,6 +538,100 @@ Playwright browser session (login persisted from a prior session,
 confirming the auth flow itself still works end-to-end) to confirm both
 rows render correctly and the alert-fired detail page shows the right
 warning content.
+```
+
+## Phase 5 — 3 Defect Fixes From Manual Testing (BC-018)
+
+```
+**Step 1 — Shopify shop subdomain (real bug, not a design gap):**
+Re-read oauth-initiate's live deployed source before touching anything
+(per the card's explicit instruction not to guess). Confirmed the exact
+param: `shop` (bare subdomain, e.g. "mystore" — the function itself
+appends `.myshopify.com`, passing the full domain would double it).
+Integrations' handleConnect now special-cases provider==='shopify':
+window.prompt() for the subdomain (minimal UI, per the card — a plain
+input+confirm, no styled form), normalizes common paste variations
+(strips https://, trailing slash, an already-appended .myshopify.com
+suffix), then passes it as `shop`. **Verified live end-to-end as far as
+possible without a real store:** clicked the button via a real
+Playwright browser session, handled the real prompt dialog, and it
+correctly reached `https://my-test-store.myshopify.com/admin/oauth/
+authorize?client_id=...&scope=...&redirect_uri=...&state=...` — a
+genuinely well-formed Shopify authorize URL (the 404 "Store unavailable"
+is expected and correct, since no real store exists at that subdomain —
+same disclosed-limitation pattern as Google's consent screen in BC-016).
+The matching `control.oauth_state` row was confirmed inserted with the
+correct client_id/category='ecommerce'/provider='shopify'.
+
+**Step 2 — Show all real archetype-relevant providers:** Re-confirmed
+live via `control.oauth_apps` that 5 providers have a real,
+non-`not_applicable` app_status (google, shopify, calendly testing;
+cal_com pending) — cal_com was entirely missing from BC-016's
+CATEGORY_PROVIDERS map (the actual bug), not just under-surfaced. Added
+it to the 'calendar' category. Also added 'notification' to every
+archetype in ARCHETYPE_CATEGORIES (a UI judgment call, not a documented
+decision — ops notifications aren't really archetype-specific, unlike
+'ecommerce'), which is what made Slack's absence visible at all.
+
+**Slack decision, stated not left silent:** chose to SHOW Slack as "Not
+yet available" (same treatment as Cal.com), not hide it. Reasoning:
+confirmed live that `oauth_apps.client_id` for slack is literally the
+placeholder string `'SLACK_BOT_TOKEN_MODE_NO_OAUTH_APP'` (per BC-004
+Step C — a real, working multi-tenant Slack OAuth app was never built,
+only a bot-token mode that doesn't fit this dashboard's per-client
+OAuth flow) — its `app_status` says 'testing' in the DB, which is
+actually misleading given the client_id is a non-functional placeholder,
+so this UI decision deliberately does NOT trust that raw status field.
+Consistent, honest treatment (show + explain, never hide) beats a
+per-provider special case that would silently vary. Both Cal.com and
+Slack render a "Not yet available" pill with the real reason available
+on hover (`title` attribute) rather than a clickable button that would
+build a broken authorize URL.
+
+**Step 3 — `appointments.scheduled_at` (migrations 043-044):**
+Live-checked first whether any doc already named a scheduled-time field
+for THIS table before adding a new one, per the card's explicit
+instruction. Found `conversions_appointment.appointment_time` and
+`conversions_restaurant.reservation_time` in Database_Structure_v4_
+FINAL.md — but both live in DIFFERENT, archetype-specific tables, not
+`appointments` (a deliberately generic table reused across 5 archetypes
+per BC-013's own design note — a single archetype-specific name would
+be wrong here, e.g. "reservation_time" wouldn't fit an emergency
+dispatch). n8n_Workflow_Specification_v1.md Part 13.3's CreateAppointment
+response shape doesn't name a time field for `appointments` either.
+Confirmed: no existing name applies to this specific table — `scheduled_
+at` proceeds as a genuinely new column, not a rename. Added as nullable
+first, backfilled the 2 real seeded test rows with values matching their
+own conversation content (order matters: "Thursday 3pm" -> 2026-08-06
+15:00 UTC, "Friday 11am" -> 2026-08-07 11:00 UTC, both computed and
+verified live via `to_char()`), then set NOT NULL on all 6 schemas
+(public + tpl_appointment/tpl_commerce/tpl_emergency/tpl_consultation +
+client_test_002 — the same 5 tpl_* schemas BC-013 deployed `appointments`
+to). Dashboard RPCs (migration 044) and UI updated: list now sorts by
+`scheduled_at` ascending (soonest first — more useful for a monitoring
+view than insertion order) and shows it as the prominent bolded column
+in place of `created_at`; detail page shows it large up top, with
+`created_at` demoted to a small "booked {when}" note beside it.
+Re-verified live via curl with a real JWT before touching any UI code.
+
+**Doc diff needed, not applied by Claude Code (Section 13 standing
+rule):** `Database_Structure_v4_FINAL.md` has NO section for
+`appointments` at all — the table was added in BC-013, after that
+doc's authorship, and was never backfilled into it (unlike
+conversions_appointment/conversions_restaurant, which are documented).
+Needed: a new `### appointments (in public, tpl_appointment, tpl_commerce,
+tpl_emergency, tpl_consultation)` section, matching the format of the
+existing conversions_* sections, listing:
+  appointment_id              uuid PRIMARY KEY
+  conversion_id                 uuid UNIQUE REFERENCES conversions(conversion_id)
+  client_calendar_event_id        text, nullable
+  client_calendar_provider           text, nullable
+  client_calendar_write_status          calendar_write_status_enum NOT NULL
+  our_db_write_status                      calendar_write_status_enum NOT NULL
+  authoritative_source                        authoritative_source_enum NOT NULL
+  alert_fired                                    boolean NOT NULL
+  scheduled_at                                      timestamptz NOT NULL  -- new, BC-018
+  created_at                                           timestamptz NOT NULL
 ```
 
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
@@ -1189,16 +1287,29 @@ directly.
 ## Blockers Right Now
 
 ```
-NONE blocking further work. BC-016 (this session) resolved BC-015's
-prior gate — the Commander issued BC-016 directly, addressing the exact
-self-resolved item (dashboard data-access mechanism) BC-015 flagged,
-which counts as acknowledgment per this project's established pattern
-(same as BC-012->013, BC-013->014). 0 NEW self-resolved document-level
-items occurred this session — the client-schema-to-auth-user mapping
-question (app_metadata, still open) was explicitly NOT re-decided here,
-per BC-016's own instruction; the archetype/category display mapping
-used in the Integrations page is a disclosed UI judgment call, not a
-document-level resolution.
+NONE blocking further work. BC-018 (this session) has 0 self-resolved
+document-level items — the Document Resolution Authority gate does not
+apply. Fixing 3 confirmed real defects from manual testing isn't a
+document-level conflict/gap, it's ordinary bug-fixing (explicitly
+unaffected by the standing rule, per its own "ordinary bug-catching"
+carve-out).
+
+Doc diff flagged for Commander to apply (BC-018, not applied by Claude
+Code — Section 13 standing rule, same pattern as BC-006/009/010):
+- Database_Structure_v4_FINAL.md has no `appointments` section at all
+  (table added in BC-013, after that doc's authorship, never
+  backfilled in). Full column list + exact wording given in the new
+  "Phase 5 — 3 Defect Fixes From Manual Testing (BC-018)" section
+  above — ready to paste in as a new subsection alongside the existing
+  conversions_* entries.
+
+Still open, unresolved by design (not this card's scope):
+- Client-schema-to-auth-user mapping mechanism (app_metadata stopgap,
+  per BC-015) — still a Commander product decision, not touched.
+- Whether Integrations' Disconnect should also revoke access at the
+  provider (BC-016, still open).
+
+Prior gates, for reference (all previously resolved/acknowledged):
 
 Both real follow-ups from BC-014/BC-015 are now CLOSED:
 - HTTPS cert: FIXED. Real root cause found (Hostinger was never
@@ -1508,6 +1619,66 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 19 — 2026-08-05 — BC-018: fixed 3 real defects found in the human's manual testing
+- Step 1 — re-read oauth-initiate's real deployed source before
+  touching anything (confirmed exact param: bare `shop` subdomain, not
+  a full domain). Added a window.prompt() to Integrations' Shopify
+  connect flow (minimal UI, per the card), with input normalization for
+  common paste variations. Verified live end-to-end as far as possible:
+  real Playwright browser session, handled the real dialog, confirmed
+  the resulting URL was a genuinely well-formed Shopify authorize URL
+  (404 "Store unavailable" is expected — no real store exists at the
+  test subdomain, same disclosed-limitation pattern as BC-016's Google
+  test), and confirmed the matching control.oauth_state row landed
+  correctly.
+- Step 2 — re-confirmed live via control.oauth_apps which providers are
+  real (non-not_applicable): 5, not the 3 that were actually surfacing.
+  cal_com was missing entirely from the category/provider map (the real
+  bug) — added it. Added 'notification' to every archetype in
+  ARCHETYPE_CATEGORIES (disclosed UI judgment call), which is what
+  exposed Slack's absence. Decided AND STATED (not left silent, per the
+  card's explicit instruction) to show both Cal.com and Slack as "Not
+  yet available" rather than hiding either — confirmed live that
+  Slack's oauth_apps.client_id is a literal placeholder string despite
+  its app_status field saying 'testing' (a known, already-documented
+  BC-004 mismatch), so this UI deliberately doesn't trust that raw
+  status column for Slack specifically.
+- Step 3 — live-checked for an existing scheduled-time field name
+  before adding one, per the card's explicit instruction: found
+  appointment_time/reservation_time in Database_Structure_v4_FINAL.md,
+  but both live in different, archetype-specific conversions_* tables,
+  not the generic `appointments` table — confirmed no existing name
+  applies here, `scheduled_at` proceeds as instructed. Added nullable,
+  backfilled the 2 real seeded rows with values matching their own
+  conversation content (verified via to_char() that "Thursday 3pm" and
+  "Friday 11am" actually landed correctly), then set NOT NULL across
+  all 6 relevant schemas (public + 4 tpl_* + client_test_002). Updated
+  the RPC layer and both dashboard pages to surface scheduled_at
+  prominently (list now sorts by it, ascending) in place of created_at.
+  Flagged the exact doc diff needed for Database_Structure_v4_FINAL.md,
+  which turned out to have no `appointments` section at all — not
+  applied directly, per the Section 13 standing rule.
+- What was verified live vs. assumed: every fix in this session was
+  confirmed against real behavior — the Shopify URL was actually
+  produced by a real browser click, not inferred from reading the
+  normalization code; which providers are real was re-queried from
+  oauth_apps directly rather than trusted from BC-016's own (incomplete)
+  map; the scheduled_at backfill values were checked with to_char() to
+  confirm they actually landed on the right day/time, not assumed
+  correct from the interval arithmetic alone.
+- What broke / changed from plan: nothing broke this session — all 3
+  fixes worked on the first deploy, confirmed via live Playwright/curl
+  checks.
+- Files touched: 05_Platform_Builds/Dashboard/ (Integrations.tsx,
+  Appointments.tsx, types.ts — commit 435ef3c); Supabase migrations
+  043-044 (scheduled_at column + RPC updates); client_test_002's 2
+  seeded appointment rows backfilled; zenny-dashboard Docker Compose
+  project on srv1881104 redeployed once; PROJECT_STATE.md.
+- **This session: 0 self-resolved document-level items — ordinary
+  bug-fixing, explicitly outside the standing rule's scope. The
+  Document Resolution Authority gate does not apply. Proceeding to the
+  next Build Card is fine.**
 
 ### Session 18 — 2026-08-05 — BC-017: test credentials reset, Appointment Booking dashboard (5C, read-only) built
 - Step 0 — reset test-dashboard-bc015@zenny.internal's password via
