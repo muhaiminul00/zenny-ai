@@ -15,28 +15,23 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 17 (BC-016 — HTTPS cert fixed + trusted, brand applied, Integrations dashboard built)
+2026-08-05 — by Claude Code, Session 18 (BC-017 — test credentials reset, Appointment Booking dashboard (5C) built)
 
 ## Current Phase
-Phase 5 (Dashboard Systems) — 5B Order Lookup dashboard is LIVE with a
-**trusted HTTPS certificate** (BC-016 — root cause was Hostinger never
-being authoritative DNS for zeromanuals.com; Netlify is, human added the
-real record there, confirmed via live `Issuer: CN=YR2, O=Let's Encrypt`
-chain check, not just "no curl error"). Zenny brand (sage/honey/oat,
-Fraunces + Hanken Grotesk, ensō mark) applied across the dashboard. New
-**Integrations dashboard** (`/integrations`) built and deployed —
-connect/disconnect against `control.client_connections`, real end-to-end
-test of the connect chain against Google (genuine redirect to Google's
-own consent screen with correct client_id/redirect_uri/scopes/state;
-completing Google's actual interactive login wasn't possible without a
-real human-owned test account, disclosed not hidden), simulated
-post-consent state via the exact same `upsert_client_connection` RPC
-`oauth-callback` itself uses, disconnect verified live via Playwright.
-2 real bugs caught and fixed via live Playwright testing (login never
-redirected after success; a stale provider subtitle after disconnect).
-`oauth-callback`'s dead `ZENNY_DASHBOARD_URL` fallback fixed. 0
-self-resolved document-level items this session — BC-015's gate is
-closed (Commander acknowledged via issuing BC-016). Convocore Adapter
+Phase 5 (Dashboard Systems) — **5A/5B/5C-monitoring/Integrations** are
+now live at dashboard.zeromanuals.com: Orders (5B), Appointments (5C,
+read-only monitoring — the booking Tools that would write real rows
+aren't built until Phase 8), and Integrations (OAuth connect/disconnect,
+BC-016). Test dashboard login credentials reset and handed to the human
+this session (BC-017) — see Session Log for the real password, verified
+live via the Auth API before being reported. `client_test_002_acme_
+commerce_test`'s schema retrofitted with a real `appointments` table
+(its archetype's template, tpl_commerce, already had one; the client's
+own schema just hadn't been given it yet) — same `LIKE ... INCLUDING
+ALL` pattern the onboarding function itself uses, seeded with 2 real
+test rows exercising both the clean-success and alert-fired/fallback
+cases from BC-013's parallel-write design. 0 self-resolved document-
+level items this session — no gate applies. Convocore Adapter
 (ADP-002) — **COMPLETE.** BC-010 closed the one item BC-009 left open:
 human-handoff's staged-fallback Stage 2 trigger, built per the
 Commander's exact operational definition. ADP-002 registered in
@@ -55,7 +50,7 @@ Phase 1  — Close Credential Platform Gaps ........ COMPLETE
 Phase 2  — Convocore Database Changes ............ COMPLETE
 Phase 3  — Remaining Shared Utilities ............ COMPLETE
 Phase 4  — Convocore Adapter (ADP-002) ........... COMPLETE
-Phase 5  — 4 New Dashboard Systems (React+Vite) .. IN PROGRESS (5B done)
+Phase 5  — 4 New Dashboard Systems (React+Vite) .. IN PROGRESS (5B, 5C-monitor, Integrations done)
 Phase 6  — Core Agent ............................ NOT STARTED
 Phase 7  — Growth Agent .......................... NOT STARTED
 Phase 8  — Conversion Engine (11 Tools) .......... NOT STARTED
@@ -466,6 +461,79 @@ and disclosed explicitly in the Integrations page's own copy, rather
 than silently claiming full revocation or building per-provider revoke
 calls without being asked. A real design question for whoever owns this
 next: should Disconnect also revoke at the provider?
+```
+
+## Phase 5 — 5C Appointment Booking Dashboard (BC-017 — BUILT + DEPLOYED, read-only)
+
+```
+**Test credentials reset (Step 0):** test-dashboard-bc015@zenny.internal's
+password reset via direct SQL (same pgcrypto path used to originally
+create the account — no Admin API service-role key exposed via MCP).
+Verified live via a real POST to the Auth REST API (200, real JWT
+returned, app_metadata intact) BEFORE reporting the new password — see
+Session Log for the actual value. Old password no longer works (this
+UPDATE overwrote encrypted_password directly, not a parallel row).
+
+**`appointments` table added to client_test_002_acme_commerce_test's
+schema:** confirmed live which test client actually has one — NEITHER
+existing test client did (only the 5 tpl_* template schemas + public
+had it; the table was never included in either client's original
+`create_client_schema_from_template` call). Per the card's literal test
+("if its archetype has an appointments table") — commerce_ecom's
+template (tpl_commerce) does have one — retrofitted it into that
+client's existing schema using the exact same `CREATE TABLE ... LIKE
+... INCLUDING ALL` + explicit FK re-add + RLS-enable + grant-revoke
+pattern `create_client_schema_from_template` itself uses (mechanical,
+not a new mechanism). Re-verified live afterward: RLS enabled, zero
+anon/authenticated grants, matching every other table in this project.
+No third test client created — the card's own instruction not to was
+followed.
+
+**2 real test appointment rows seeded** (2 new leads + conversions +
+appointments, clearly test data): one clean success
+(client_calendar_write_status='success', our_db_write_status='success',
+authoritative_source='client_calendar', alert_fired=false) and one
+exercising BC-013's parallel-write fallback design
+(client_calendar_write_status='failed', our_db_write_status='success',
+authoritative_source='our_db_fallback', alert_fired=true) — the second
+is what a real client-calendar outage would actually produce.
+
+**RPC layer (migration 042):** `dashboard_list_appointments()`,
+`dashboard_get_appointment(appointment_id)` — same SECURITY DEFINER +
+`dashboard_get_my_client_schema()` pattern as every dashboard RPC since
+BC-015, no new mechanism introduced. Read-only by design: no write RPC
+exists, since the booking Tools that would actually produce these rows
+(CreateAppointment, CreateReservation, CreateInspectionSlotBooking,
+CreateScoredBooking — Phase 8) aren't built yet. Learned from BC-015's
+mistake this time: the anon-EXECUTE revoke was included in the SAME
+migration as the GRANT, not fixed in a follow-up — verified live via
+`information_schema.routine_privileges` that anon never had EXECUTE at
+any point.
+
+**UI (`/appointments`, `/appointments/:id`):** list shows intent,
+source-of-truth pill (client_calendar vs. our_db_fallback), an explicit
+alert indicator, created date. Detail page surfaces a prominent
+alert-fired banner explaining what it means and that a human needs to
+reconcile it, plus both write-status badges and the calendar
+provider/event ID. The page's own copy explicitly discloses this is a
+monitoring view of not-yet-built Tools' future output, not live traffic
+— per the card's explicit instruction to flag this clearly rather than
+imply real production data.
+
+**Brand:** no separate pass needed — reused the same CSS classes/tokens
+BC-016 already established (`.status-pill`, `.orders-table`, `.note`,
+`.error-text`, danger-red alert section) with 2 new pill-color mappings
+for the source-of-truth badges. Verified visually via live Playwright
+screenshots against the deployed site (both list and alert-fired detail
+view), not assumed from "the CSS classes exist."
+
+**Testing:** all of this was verified against REAL data (the 2 seeded
+rows), not mocked — the RPC was curl-tested with a real JWT before any
+UI code was written, then the deployed UI was driven with a real
+Playwright browser session (login persisted from a prior session,
+confirming the auth flow itself still works end-to-end) to confirm both
+rows render correctly and the alert-fired detail page shows the right
+warning content.
 ```
 
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
@@ -1440,6 +1508,67 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 18 — 2026-08-05 — BC-017: test credentials reset, Appointment Booking dashboard (5C, read-only) built
+- Step 0 — reset test-dashboard-bc015@zenny.internal's password via
+  direct SQL (pgcrypto `crypt()`, same path used to create the account
+  originally — no Admin API service-role key exposed via MCP). **New
+  password: `ZennyTest-BC017-Sage!42`** — verified live via a real POST
+  to `/auth/v1/token?grant_type=password` (HTTP 200, real JWT with
+  app_metadata.client_schema_name intact) BEFORE reporting it here, per
+  the card's explicit instruction. This is a disposable test account on
+  a test client — not a real credential.
+- Step 1 — confirmed live which test client actually has an
+  `appointments` table before building anything: neither
+  client_test_001 (emergency) nor client_test_002 (commerce_ecom) did —
+  only the template schemas (public + 5 tpl_*) had it, since it was
+  never included in either client's original `create_client_schema_
+  from_template` call. Per the card's own test (archetype's template has
+  it), client_test_002_acme_commerce_test was the right client — its
+  archetype's template (tpl_commerce) does have `appointments`. Added it
+  to that client's live schema using the exact CREATE TABLE LIKE ...
+  INCLUDING ALL + FK re-add + RLS-enable + grant-revoke sequence
+  `create_client_schema_from_template` itself uses — re-verified RLS/
+  grants live afterward, matching every other table. Seeded 2 real test
+  appointments (2 leads + conversions + appointments rows): one clean
+  success, one deliberately exercising BC-013's parallel-write fallback
+  (client calendar write failed, our DB is authoritative, alert_fired=
+  true) — chosen specifically so the UI would have something real to
+  show for both states the schema was designed to represent. Built 2 new
+  RPC functions (migration 042, read-only — no write RPC, since the
+  booking Tools that would produce real rows aren't built until Phase
+  8), reusing BC-015's exact SECURITY DEFINER pattern with no new
+  mechanism. Learned from BC-015's own mistake: put the anon-EXECUTE
+  revoke in the same migration as the grant this time, verified live
+  that anon never had EXECUTE at any point (no follow-up fix needed).
+  cURL-tested both RPCs with a real JWT before writing any UI. Built
+  `/appointments` list + detail pages reusing BC-016's brand
+  tokens/components as-is (no separate brand pass needed) — status
+  pills for source-of-truth, an explicit alert-fired banner on the
+  detail page explaining what it means. Deployed, then verified live via
+  a real Playwright browser session against the deployed site: both
+  seeded rows render correctly, the alert-fired detail page shows the
+  correct warning content, matching the real RPC data (not mocked).
+- What was verified live vs. assumed: the new password was proven
+  working via a real Auth API call, not just "the UPDATE succeeded."
+  Which test client has an appointments table was checked directly
+  (information_schema.tables) rather than assumed from BC-013's
+  deployment list alone (a client's own schema and its source template
+  can drift — this session confirmed they had). Both dashboard pages
+  were confirmed rendering real seeded data via an actual browser
+  session, not inferred from a successful build.
+- What broke / changed from plan: nothing broke this session — no bugs
+  found via the live Playwright pass this time (unlike BC-016's 2).
+- Files touched: 05_Platform_Builds/Dashboard/ (Appointments.tsx, App.tsx
+  routing, types.ts — commit 5787970); Supabase migration 042
+  (appointments RPC layer); client_test_002_acme_commerce_test schema
+  (new appointments table + 2 seeded leads/conversions/appointments
+  rows, clearly test data); test user's auth.users.encrypted_password
+  updated directly; zenny-dashboard Docker Compose project on
+  srv1881104 redeployed once; PROJECT_STATE.md.
+- **This session: 0 self-resolved document-level items — the Document
+  Resolution Authority gate does not apply. Proceeding to the next
+  Build Card is fine.**
 
 ### Session 17 — 2026-08-05 — BC-016: HTTPS cert fixed (real root cause), Zenny brand applied, Integrations dashboard built
 - Step 0 — tooling check: confirmed live, not assumed from a prior
