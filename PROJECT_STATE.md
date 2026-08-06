@@ -15,10 +15,20 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-06 — by Claude Code, Session 23 (BC-022 — COMPLETE: proxy-domain decision settled, codebase-memory-mcp onboarded+verified, Gmail account-label root cause found+fixed (missing OAuth scope), SCH-006 Slack node state verified/matches prior report, UI polish backlog logged)
+2026-08-06 — by Claude Code, Session 24 (BC-023 — COMPLETE: token-expiry root-caused to SCH-006 never being activated (now active), Calendar scope narrowed to calendar.events (Console+DB in sync, verified via real reconnect+refresh), Calendly's real disconnection from the reconnect explained, Privacy Policy/ToS revised for the real B2B model)
 
 ## Current Phase
-Phase 5 (Dashboard Systems) — **BC-021 and BC-022 both COMPLETE.**
+Phase 5 (Dashboard Systems) — **BC-021, BC-022, and BC-023 all COMPLETE.**
+BC-023: the "token expired" symptom was never a scope/migration bug — SCH-006
+(the scheduled token-refresh workflow) had simply never been toggled
+active, so nothing auto-refreshed tokens between manual test sessions.
+Now active (Slack alert nodes disabled to unblock publish — no real
+Slack credential exists, per the long-standing BC-004/BC-008 gap).
+Also completed the Calendar scope narrowing (full `calendar` →
+`calendar.events`) that BC-023 was originally issued for, verified via
+a real reconnect + real SCH-006 refresh against the new token. Full
+detail in "Phase 5 — Token-Expiry Diagnosis + Calendar Scope Narrowing
++ Legal Page Revision (BC-023)" below.
 BC-022 found and fixed one more real bug while diagnosing the Gmail
 account-label gap: the google OAuth app's requested scopes never
 included anything granting access to Google's userinfo endpoint, so
@@ -1233,6 +1243,120 @@ standing instruction:**
   styling).
 ```
 
+## Phase 5 — Token-Expiry Diagnosis + Calendar Scope Narrowing + Legal Page Revision (BC-023)
+
+```
+**Step 0 — tooling:** confirmed `@playwright/cli` (microsoft/playwright-cli)
+is installed and functional locally (`playwright-cli --help` works). Not
+actually needed this session's real work — the human did the live
+Google/Console/reconnect actions themselves, and the rest was direct
+Supabase/n8n MCP queries plus raw HTML fetched via `curl` (more direct
+than a full browser session for reading two static pages). Confirmed
+available and evaluated honestly rather than forced into use.
+
+**Step 1 — token-expiry root cause, REAL diagnosis, not guessed:**
+Queried `control.client_connections` directly: both the google/email
+and calendly/calendar connections were genuinely `status='connected'`
+in the DB (not `'expired'`) — the dashboard's "token expired" label is
+a client-side comparison of `token_expires_at` against the current
+time, and both had simply passed their natural ~1-2 hour access-token
+lifetime with nothing refreshing them since. Confirmed via
+`get_workflow_details`: **SCH-006 was `active: false`** — it had only
+ever run when manually triggered in prior sessions; nothing was running
+in the background. Ran it manually and captured the real result: BOTH
+the Google and Calendly refreshes succeeded (real new Google access
+token, real new Calendly access+refresh token pair), verified against
+`control.client_connections` afterward (both `token_expires_at` moved
+into the future). This proves conclusively the refresh mechanism itself
+was never broken — the only real problem was that the schedule was
+never turned on. **Fixed with the human's explicit go-ahead: activated
+SCH-006.** Publishing initially failed — n8n's stricter production
+validation requires a real `slackApi` credential on the 4 alert nodes,
+which doesn't exist (same BC-004/BC-008 gap). Per the human's own
+standing instruction, disabled (not deleted, not invented a credential)
+those 4 nodes so the real refresh logic could activate; the Slack gap
+itself is completely unchanged, just no longer blocking production
+scheduling.
+
+**Step 2 — Calendar scope narrowing, actually completed this session:**
+The human's Console screenshot showed the OAuth consent screen still
+requesting the FULL `calendar` scope ("edit, share, and permanently
+delete all the calendars") — not narrowed to `calendar.events` as the
+original card assumed. Console and the DB were already in sync with
+each other (both at full `calendar`) — the narrowing itself had never
+actually been done on either side, a real, useful correction to the
+card's own premise. The human then narrowed Console's requested scope
+to `calendar.events` live; migration 047 updated `control.oauth_apps`'
+google row to match exactly: `calendar.events` + `gmail.modify` +
+`userinfo.email`. Confirmed via direct query, not assumed.
+
+**Step 3 — reconnect + verification, real, not "shows connected in UI":**
+The human reconnected Google (both Gmail and Calendar) after the scope
+narrowing. Verified directly against `control.client_connections`:
+`scopes_granted` on both rows now genuinely includes `calendar.events`
+(not the old full scope) — the narrowing took effect for real, not just
+in configuration. Ran SCH-006 again manually: both Google connections
+refreshed successfully against the new narrower-scoped tokens, verified
+against the DB afterward (`token_expires_at` correctly advanced on
+both). **Calendly — real, expected side effect, not a bug:** reconnecting
+Google Calendar wrote to the SAME `category='calendar'` connection row
+Calendly previously held (the `UNIQUE(client_id, category)` design
+flagged as an open question back in BC-021) — confirmed via the audit
+log timeline that connection_id `609559ce-...` flipped from
+`provider='calendly'` to `provider='google'` at the exact moment of the
+human's reconnect. **Calendly is now genuinely disconnected**, replaced
+by Google Calendar in that same category slot — not broken, not a
+migration side effect, a direct and expected consequence of today's
+reconnect given the still-open category-sharing design. Reconnecting
+Calendly again would simply replace Google Calendar back, per the same
+design; this remains an open product question for the Commander, not
+resolved this session either.
+
+**Step 4 — Privacy Policy + Terms of Service, revised (not rewritten):**
+Neither page exists anywhere in this repo — traced them live: DNS
+resolves `zenny.zeromanuals.com` to Netlify (`Server: Netlify` header
+confirmed via a direct curl), not the `zeromanualai/zenny` GitHub repo
+(checked via `gh api` — that repo holds only a stale `index.html`, no
+legal pages; a real, useful correction to an assumption, not something
+to guess past). Fetched the real live HTML via `curl` (not WebFetch,
+which paraphrases/summarizes rather than returning raw source — the
+exact CSS/visual design needed to be preserved byte-for-byte per the
+card's explicit instruction). Revised both documents' substantive
+language to reflect Zenny's real model — a Client business connects its
+own Google account, and Zenny's AI agent then acts on that Client's
+behalf when communicating with the Client's OWN customers — replacing
+the "you authorize your personal Google account for your own use"
+consumer-tool framing throughout (Privacy Policy Sections 1-2, ToS
+Sections 2-3 primarily). Added an explicit new subsection addressing a
+real gap the card asked to check: end-customer personal data (names,
+emails, appointment details) genuinely does flow through the Client's
+Gmail/Calendar access even though the end customer never authorizes
+anything directly — disclosed clearly, same Limited Use restrictions
+applied regardless of whose data it is, end-customer requests routed
+through the Client business. Made the "Zenny, a product of ZeroManual,
+Inc." relationship explicit and consistent everywhere the two names
+appear (nav eyebrow, footer, body copy) — addresses the brand-name-
+consistency flag from the card's note. Every already-correct section
+(Limited Use disclosure at Section 4/Google API Services User Data
+Policy, retention, revocation mechanism, contact info) preserved
+verbatim in substance, only reworded where the "you" needed to shift
+from personal user to connecting business. Visual design (colors,
+fonts, layout, all CSS) preserved exactly — the new brand guideline was
+explicitly NOT applied here, per the human's direct instruction.
+**Publishing — human's own action, per their explicit choice:** both
+finished HTML files are committed in this repo at
+`00_Project_Control/Legal_Pages_Revised_BC023/` (`privacy-policy.html`,
+`terms-of-service.html`) for the human to upload via Netlify directly;
+Claude Code does not have Netlify access this session.
+
+0 self-resolved document-level items this session — the Document
+Resolution Authority gate does not apply. Everything above was either
+live diagnosis against real data (Step 1), a database change matching
+a human-controlled Console change 1:1 (Step 2), verification (Step 3),
+or a content revision explicitly commissioned by this card (Step 4) —
+none of it a document-level conflict.
+```
+
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
 
 Per Planning_to_Build_Transition_v1.md Part 4 Phase 5, 4 Directus-based
@@ -1886,25 +2010,37 @@ directly.
 ## Blockers Right Now
 
 ```
-**BC-021 AND BC-022 ARE BOTH COMPLETE.** BC-021: root cause diagnosed
-and fixed (store_credential_secret migration 045, oauth-callback v6,
-woocommerce-connect v3), the human's real re-test (Gmail/Calendly/
-WooCommerce) verified directly against real DB rows per Step 0.5,
-SCH-006 tested against real stored tokens (3 more real pre-existing
-bugs found+fixed along the way), full regression pass clean. See
-"Phase 5 — Real OAuth Connection Persistence Bug (BC-021)" above for
-full detail. BC-022: proxy-domain decision settled as a documented
+**BC-021, BC-022, AND BC-023 ARE ALL COMPLETE.** BC-021: root cause
+diagnosed and fixed (store_credential_secret migration 045, oauth-
+callback v6, woocommerce-connect v3), the human's real re-test (Gmail/
+Calendly/WooCommerce) verified directly against real DB rows per Step
+0.5, SCH-006 tested against real stored tokens (3 more real pre-
+existing bugs found+fixed along the way), full regression pass clean.
+See "Phase 5 — Real OAuth Connection Persistence Bug (BC-021)" above
+for full detail. BC-022: proxy-domain decision settled as a documented
 alternative (not open), codebase-memory-mcp onboarded and verified
 useful, Gmail's missing account-label root-caused to a missing OAuth
 scope and fixed (migration 046), SCH-006's Slack node state confirmed
 matching BC-021's report exactly, UI polish backlog logged separately.
 See "Phase 5 — Small Fix Pass + SCH-006 Slack State Verification +
-codebase-memory-mcp Onboarding (BC-022)" above for full detail. One
-real open product question surfaced (BC-021), not resolved unilaterally:
-Google Calendar and Calendly currently share the same `category=
-'calendar'` slot (UNIQUE(client_id, category)), so a client can only
-hold one calendar provider connected at a time — flagged for the
-Commander in that section above.
+codebase-memory-mcp Onboarding (BC-022)" above for full detail. BC-023:
+"token expired" root-caused to SCH-006 never having been activated (now
+active — the 4 Slack alert nodes disabled, not deleted, to unblock
+publish, since no real Slack credential exists), Calendar scope
+narrowed to calendar.events end-to-end (Console + DB in sync, verified
+via a real reconnect + real SCH-006 refresh against the narrower token),
+Calendly's real disconnection from that same reconnect explained (not a
+bug — the existing category-sharing design), Privacy Policy/Terms of
+Service revised for the real B2B-agent-on-behalf-of-business model
+(files ready for the human to publish at 00_Project_Control/
+Legal_Pages_Revised_BC023/). See "Phase 5 — Token-Expiry Diagnosis +
+Calendar Scope Narrowing + Legal Page Revision (BC-023)" above for full
+detail. One real open product question remains, not resolved
+unilaterally across all 3 cards: Google Calendar and Calendly (or now,
+concretely, Google Calendar itself after today) still share the same
+`category='calendar'` slot (UNIQUE(client_id, category)), so a client
+can only hold one calendar provider connected at a time — flagged for
+the Commander repeatedly, still open.
 
 0 self-resolved document-level items this session — the Document
 Resolution Authority gate does not apply. Diagnosing and fixing a real
@@ -2264,6 +2400,63 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 24 — 2026-08-06 — BC-023 COMPLETE: token-expiry root-caused (SCH-006 never activated, now active), Calendar scope narrowed to calendar.events (verified via real reconnect+refresh), Calendly's real disconnection explained, Privacy Policy/ToS revised for the real B2B model
+- Step 0 — confirmed @playwright/cli is installed and usable; this
+  session's real work (DB/n8n queries, fetching 2 static legal pages)
+  didn't call for live browser automation, so it wasn't forced into use
+  — the human handled the live Google/Console/reconnect steps directly.
+- Step 1 — diagnosed "token expired" with real evidence: both Google and
+  Calendly connections were genuinely `status='connected'` in the DB,
+  just past their natural access-token lifetime with nothing refreshing
+  them — confirmed SCH-006 was `active: false` (only ever ran when
+  manually triggered). Ran it manually and captured the real result:
+  both refreshes succeeded, proving the mechanism itself was never
+  broken. Also found the calendar-scope narrowing (original BC-023
+  premise) had never actually been applied to the DB.
+- Activated SCH-006 with the human's explicit go-ahead. Publish failed
+  initially on a real slackApi credential requirement (stricter than
+  manual-execution validation) — disabled the 4 Slack alert nodes (not
+  deleted, not invented a credential) per the human's own standing
+  instruction, then activation succeeded.
+- Step 2 — the human's Console screenshot showed the scope had NOT
+  actually been narrowed yet (still full `calendar`) — Console and DB
+  were already in sync with each other, just both at the old scope; a
+  real correction to the card's own premise. Human narrowed Console
+  live; migration 047 matched control.oauth_apps to
+  calendar.events+gmail.modify+userinfo.email.
+- Step 3 — human reconnected Google (Gmail + Calendar). Verified
+  scopes_granted on both rows genuinely includes calendar.events, not
+  the old scope. Ran SCH-006 again — both refreshed successfully,
+  verified against real DB rows. Traced Calendly's fate via the audit
+  log: reconnecting Google Calendar wrote into the SAME category=
+  'calendar' connection row Calendly held (the known UNIQUE(client_id,
+  category) design) — confirmed the exact connection_id flipped
+  provider from calendly to google at the reconnect's timestamp.
+  Calendly is now genuinely disconnected — a real, expected side effect
+  of the existing category-sharing design, not a new bug; still an open
+  product question for the Commander.
+- Step 4 — traced the live Privacy Policy/ToS to Netlify (not the
+  zeromanualai/zenny GitHub repo, which only holds a stale index.html —
+  confirmed via a Netlify response header and gh api, not guessed).
+  Fetched real raw HTML via curl (not WebFetch, which paraphrases).
+  Revised both documents' substantive language for Zenny's real model —
+  a business connects its own Google account, Zenny's AI agent acts on
+  that business's behalf toward the business's OWN customers — while
+  preserving the exact existing visual design and every already-correct
+  section (Limited Use, retention, revocation, contact). Added an
+  explicit end-customer-data disclosure (real gap: customer names/
+  emails/appointment details do flow through a Client's Gmail/Calendar
+  access even though the end customer never authorizes anything
+  directly). Made "Zenny, a product of ZeroManual, Inc." explicit and
+  consistent throughout. Finished files committed to this repo at
+  00_Project_Control/Legal_Pages_Revised_BC023/ for the human to publish
+  via Netlify themselves, per their explicit choice.
+- 0 self-resolved document-level items — the Document Resolution
+  Authority gate does not apply (live diagnosis, a DB change matching a
+  human-driven Console change, verification, and a commissioned content
+  revision — none of it a document-level conflict). This session is
+  complete.
 
 ### Session 23 — 2026-08-06 — BC-022 COMPLETE: proxy-domain decision settled, codebase-memory-mcp onboarded+verified, Gmail account-label root cause found+fixed (missing OAuth scope), SCH-006 Slack state verified, UI polish backlog logged
 - Step 0 — updated both Blockers mentions of the proxy-domain workaround
