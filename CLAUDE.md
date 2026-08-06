@@ -183,7 +183,14 @@ v2 Section 8.
 
 At the START of every session: read PROJECT_STATE.md in full before
 touching any code. This is the real, current state of the build — not
-the plan (that's Planning_to_Build_Transition_v1.md).
+the plan (that's Planning_to_Build_Transition_v1.md). **(BC-030)**
+PROJECT_STATE.md's Session Log retains only the most recent ~8-10
+sessions — older entries are moved verbatim (never summarized) to
+`00_Project_Control/Session_Log_Archive.md` as the file grows. Check
+the archive only if a session needs context older than what
+PROJECT_STATE.md's own trimmed Session Log covers — its current-state
+STATUS sections remain the primary, sufficient source for "what's true
+right now" regardless of archive status.
 
 At the END of every session, before ending:
 1. Update every status section in PROJECT_STATE.md to reflect real,

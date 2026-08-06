@@ -539,6 +539,17 @@ is worse than one delayed by 30 seconds of reading — Section 6.1's
 MCP-verification discipline applies to schema/workflow build capability;
 this section applies the same principle to the Commander's own picture
 of what's already built.
+
+**Archive note (added BC-030):** PROJECT_STATE.md's Session Log retains
+only the most recent ~8-10 sessions going forward — older entries are
+moved verbatim (never summarized or condensed) to
+`00_Project_Control/Session_Log_Archive.md` as the file grows, to keep
+it usable ahead of the largest remaining build phases. This does not
+change what either party reads before acting: PROJECT_STATE.md's
+current-state STATUS sections remain the primary, sufficient source for
+"what's true right now" regardless of Session Log trimming. The archive
+is consulted only when a session genuinely needs context older than
+what the trimmed Session Log covers.
 ------------------------------------------------------------------------
 
 # 11. Workflow/Build Status Model — Unchanged
@@ -635,3 +646,9 @@ here.
   found the registry didn't exist at all and several already-"complete"
   workflows had real, previously-unnoticed defects that a per-workflow,
   live-verified reference would have caught sooner.
+- **v2.3 (BC-030)** — added the archive note to Section 10.E
+  (PROJECT_STATE.md Sync): the Session Log now retains only the most
+  recent ~8-10 sessions, with older entries moved verbatim to the new
+  `00_Project_Control/Session_Log_Archive.md` as the file grows.
+  Pure housekeeping — no change to what either party reads before
+  acting; PROJECT_STATE.md's current-state sections remain primary.
