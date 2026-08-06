@@ -15,13 +15,42 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 21 (BC-020 — OAuth popup flow, 2 real platform constraints found+fixed, proxy-domain findings reported)
+2026-08-05 — by Claude Code, Session 22 (BC-021 — real root cause of "connects then reverts" found + fixed across ALL providers; awaiting human re-test)
 
 ## Current Phase
-Phase 5 (Dashboard Systems) — OAuth connects now use a popup instead of
-a full-page redirect (BC-020). **This required discovering and working
+Phase 5 (Dashboard Systems) — **BC-021 IN PROGRESS, awaiting the
+human's re-test per this session's own hand-off request** (see Session
+Log / Blockers). Root cause found and fixed for the "real OAuth/API-key
+connections silently fail to persist" defect the human reported: `store_
+credential_secret` used a STATIC Vault secret name per client+category
+— any reconnect/retry hit Vault's real `secrets_name_idx` UNIQUE
+constraint, which NEITHER `oauth-callback` nor `woocommerce-connect`
+ever checked, so both silently proceeded to log "connected" and (for
+WooCommerce) return HTTP 200 while the real database row was left
+untouched. Confirmed via real Postgres error logs at the exact
+timestamps of the human's real test attempts today — not inferred, the
+literal error text `duplicate key value violates unique constraint
+"secrets_name_idx"` followed by `null value in column
+"access_token_secret_id"... violates not-null constraint` was found
+directly. Fixed at the root (`store_credential_secret` now upserts by
+name) plus defense-in-depth (every RPC call in both Edge Functions is
+now actually checked; every failure branch logs a real, diagnosable
+audit event — previously several early-exit paths logged nothing at
+all, which is also why Calendly's one real attempt left no trace to
+diagnose from). Also found and fixed, while tracing Shopify's real
+callback logs: a genuine double-`.myshopify.com`-suffix bug that would
+500 any Shopify connection that got PAST the distribution-method screen
+(confirmed via a real callback hit with real Shopify HMAC/shop params
+that 500'd). Full detail in the new "Phase 5 — Real OAuth Connection
+Persistence Bug (BC-021)" section below. **Not yet re-verified against
+a real human-driven reconnect** — that's the explicit next step,
+following this card's own Step 0.5 hand-off process, not assumed
+working from the fix alone.
+
+Earlier this session (BC-020): OAuth connects use a popup instead of
+a full-page redirect. **This required discovering and working
 around 2 genuine, previously-unknown platform constraints, found only
-via real live Playwright testing** — full detail in the new "Phase 5 —
+via real live Playwright testing** — full detail in the "Phase 5 —
 OAuth Popup Flow + Proxy-Domain Feasibility (BC-020)" section below:
 (1) Supabase Edge Functions cannot serve script-executing HTML at all
 (the gateway forces `Content-Type: text/plain` + a sandboxed CSP on real
@@ -889,6 +918,118 @@ decision:**
   stopping here per the card's explicit instruction.
 ```
 
+## Phase 5 — Real OAuth Connection Persistence Bug (BC-021)
+
+```
+**Reported symptom:** the human completed REAL consent for Google
+Calendar, Gmail, WooCommerce, and Calendly. None showed "Connected" in
+the dashboard afterward; WooCommerce briefly showed connected then
+reverted.
+
+**Root cause, confirmed via real data, not inferred:**
+
+1. Queried `control.client_connections` for the test client directly:
+   3 real rows existed (google/calendar, google/email, woocommerce/
+   ecommerce), each with real provider_account_id/token_expires_at
+   values proving a real successful token exchange happened at least
+   once for each — but ALL THREE now show `status = 'revoked'`.
+2. Queried `control.connection_audit_log`: found the expected
+   `connected` events, but ALSO found repeated `connected` events with
+   `connection_id: null` — a red flag, since a genuinely successful
+   `upsert_client_connection` call always returns a real UUID (confirmed
+   by re-reading its own SQL definition).
+3. Pulled real Postgres error logs for the exact timestamps of those
+   null-connection_id events and found the literal, unambiguous error
+   chain, repeated identically on every retry:
+   `duplicate key value violates unique constraint "secrets_name_idx"`
+   immediately followed by
+   `null value in column "access_token_secret_id" of relation
+   "client_connections" violates not-null constraint`.
+
+**What was actually happening:** `store_credential_secret` called
+`vault.create_secret` with a STATIC name per client+category (e.g.
+`client_{id}_calendar_access`). The FIRST connect for any category
+works fine (fresh name). Any RECONNECT for the SAME category — a
+disconnect-then-reconnect, or simply retrying after not seeing the UI
+update — tries to create a SECOND secret with the identical name, which
+Vault's own real `secrets_name_idx` UNIQUE constraint rejects. Neither
+`oauth-callback` nor `woocommerce-connect` checked this RPC's error
+before proceeding — both blindly continued to `upsert_client_
+connection` with a null secret id, which ALSO failed (a real column is
+`NOT NULL`), ALSO uncaught — and both functions still logged a
+"connected" audit event (and `woocommerce-connect` returned a real HTTP
+200 to the browser) while the actual `client_connections` row was left
+completely untouched. This is not a UI bug and not a BC-020 popup-
+signal regression — the data was never correctly written in the first
+place on any retry; the popup/UI layer was reporting exactly what the
+backend told it, which was a lie.
+
+**Fix (2 layers):**
+1. **Root cause** — `store_credential_secret` (migration 045) now
+   upserts by name: looks up any existing secret with that name first
+   and calls `vault.update_secret` in place instead of always calling
+   `vault.create_secret`. Verified live: called it twice with the same
+   name, got the same secret UUID back both times, second call's value
+   correctly overwrote the first — no error.
+2. **Defense in depth** — both `oauth-callback` (v6) and `woocommerce-
+   connect` (v3) now actually check every RPC's `error`/`data` before
+   proceeding, and log a real, specific audit event on every failure
+   branch (previously several early-exit paths — missing_state,
+   invalid_state, app_lookup_failed — logged NOTHING at all, which is
+   also the direct reason Calendly's one real attempt left no
+   diagnosable trace — see below). A silent false-success can no longer
+   happen from any of these functions.
+
+**Shopify — a SEPARATE real bug, found while tracing this:** the real
+Edge Function logs contained one genuine Shopify callback hit with real
+HMAC/shop/timestamp params (proving that specific install attempt
+actually got PAST Shopify's own authorization screen) that returned
+HTTP 500. Root cause: Shopify's REAL callback sends `shop` as the FULL
+`{name}.myshopify.com` domain, but `exchangeCode`'s shopify case always
+appended `.myshopify.com` regardless (matching oauth-initiate's own UI,
+which only ever collects the bare subdomain) — producing a corrupted
+double-suffixed URL (`{name}.myshopify.com.myshopify.com`) for the
+actual token exchange request, which fails. Fixed in oauth-callback v6:
+strips any existing `.myshopify.com` suffix before re-appending it,
+correctly handling both shapes.
+
+**Shopify — the distribution-method issue (Step 2), confirmed
+NON-code, human action needed:** per the human's own screenshot,
+Shopify's install screen shows "This app can't be installed yet — The
+app developer needs to select a distribution method first." Confirmed
+this is not caused by anything in this codebase: multiple real
+`oauth-initiate` calls for Shopify are logged with correct client_id/
+scope/redirect_uri, all producing real 302 redirects to Shopify's own
+authorize endpoint — the request Zenny sends is well-formed. This is a
+Shopify Partner Dashboard setting on the app itself (Public/Custom/
+Private distribution), unrelated to the double-suffix bug above (that
+bug only affects an install that already got approved). **Action needed
+from the human, not Claude Code:** log into the Shopify Partner
+Dashboard for this app and select a distribution method.
+
+**Calendly — real attempt found, root cause is the missing-audit-log
+gap above:** found the exact real callback hit (`state=e71d8448-...`,
+a real `code` param, no `iss` param — matching Calendly's real callback
+shape). The matching `oauth_state` row was confirmed consumed (deleted)
+by this request, but NO audit log entry (connected OR error) exists for
+it — meaning it hit one of the early-exit branches that had no logging
+at all before this session's fix. `get_oauth_app('calendly')` was
+independently confirmed to work correctly (real row, real client_id/
+redirect_uri/scopes), ruling out a broken app-config as the cause.
+**Genuinely not fully diagnosed this session** — the exact failure
+point could not be pinned down further without the missing log entry
+that now (post-fix) would exist on retry. Flagged honestly as
+unresolved rather than guessed at; the next real Calendly attempt will
+have a full audit trail to diagnose from if it fails again.
+
+**NOT YET DONE this session, explicitly pending human re-test per this
+card's own Step 0.5 process:** Steps 3-5 (re-test Google Calendar/
+Gmail/Calendly/WooCommerce against the real fix, verify against real DB
+rows not just UI, test SCH-006 against a real stored token, full
+regression pass). See Blockers/Session Log for the exact hand-off
+request made to the human.
+```
+
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
 
 Per Planning_to_Build_Transition_v1.md Part 4 Phase 5, 4 Directus-based
@@ -1542,25 +1683,28 @@ directly.
 ## Blockers Right Now
 
 ```
-NONE blocking further work. BC-020 (this session) has 0 self-resolved
-document-level items — the Document Resolution Authority gate does not
-apply. Fixing the 2 real platform constraints found via live testing
-(Edge Function CSP sandboxing, Google's COOP header) is ordinary
-engineering bug-fixing, not a document-level conflict. Correcting
-BC-019's own PROJECT_STATE.md claim about verification friction isn't a
-system-document correction either — PROJECT_STATE.md is Claude Code's
-own session-state log, freely overwritten each session by its own house
-rules, not a document the standing rule's gate applies to.
+**BC-021 IS MID-FLIGHT, blocked on the human's re-test — not a code
+blocker, a real hand-off.** Step 1's diagnosis is complete and the real
+root cause is fixed (store_credential_secret migration 045,
+oauth-callback v6, woocommerce-connect v3 — see "Phase 5 — Real OAuth
+Connection Persistence Bug (BC-021)" above), but per this card's own
+Step 0.5 process, Claude Code does NOT proceed to Steps 3-5 (re-test
+Google/Gmail/Calendly/WooCommerce, SCH-006, regression pass) without
+first asking the human to redo the real connect flows and waiting for
+their confirmation. **Explicit ask made this session, response
+pending** — see Session Log for the exact request.
 
-**Step 2 decision pending — genuinely for the Commander, not decided
-here:** should the api.zeromanuals.com Traefik proxy workaround be
-built? Findings in the "Phase 5 — OAuth Popup Flow + Proxy-Domain
-Feasibility (BC-020)" section above: technically plausible with a
-correctly-configured Host-header rewrite (not empirically verified
-end-to-end), but would NOT fix Google's verification warning (the
-problem it was proposed to solve) — recommendation leans against
-building it, but explicitly left open per the card's instruction not to
-decide unilaterally.
+0 self-resolved document-level items this session — the Document
+Resolution Authority gate does not apply. Diagnosing and fixing a real
+reported defect via live data (Postgres logs, audit tables) is ordinary
+engineering bug-fixing, not a document-level conflict.
+
+Proxy-domain workaround (BC-020 feasibility investigation): confirmed
+technically plausible but does NOT fix Google verification (the actual
+friction) — Commander decision: SKIP for now, revisit only if a future
+concrete need arises (e.g. cosmetic requirement from a client, or the
+raw Supabase domain needs to change). Not blocking anything currently.
+CLOSED (BC-021 Step 0) — no longer an open question.
 
 2 doc diffs flagged for Commander to apply (not applied by Claude Code —
 Section 13 standing rule, same pattern as BC-006/009/010):
@@ -1582,9 +1726,13 @@ Still open, unresolved by design (not this card's scope):
   requires a Pro-tier upgrade, a plan/cost decision for the human, not
   actioned. BC-020 adds: even with Pro tier, this fixes cosmetics only,
   not the verification warning — see correction above.
-- The api.zeromanuals.com Traefik proxy workaround (BC-020, new) —
-  feasibility investigated and reported, explicit Commander decision
-  needed before any build.
+- Proxy-domain workaround (BC-020 feasibility investigation): confirmed
+  technically plausible but does NOT fix Google verification (the
+  actual friction) — Commander decision: SKIP for now, revisit only if
+  a future concrete need arises (e.g. cosmetic requirement from a
+  client, or the raw Supabase domain needs to change). Not blocking
+  anything currently. CLOSED (BC-021 Step 0) — no longer an open
+  question.
 - SCH-007 Inventory/Catalogue Sync itself (BC-019, still open) — logged
   as a real future-phase requirement, not built; schema/workflow design
   not
@@ -1900,6 +2048,88 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 22 — 2026-08-05 — BC-021 (IN PROGRESS): real root cause of failed OAuth persistence found+fixed; human re-test requested, awaiting response
+- Step 0 — updated the Blockers entry for the proxy-domain question to
+  the Commander's exact given language: SKIP for now, closed, not an
+  open question anymore.
+- Step 1 — diagnosed the human's reported defect (4 real OAuth/API-key
+  connect attempts, none showed "Connected" afterward, WooCommerce
+  briefly did then reverted) using ONLY real data, never guessed:
+  queried control.client_connections directly (found 3 real rows, all
+  status='revoked', each with real provider_account_id/token_expires_at
+  proving real successful exchanges happened), queried control.
+  connection_audit_log (found "connected" events with a null
+  connection_id — impossible from a genuinely successful upsert, since
+  re-reading upsert_client_connection's own SQL confirms it always
+  returns a real UUID on success), then pulled real Postgres error logs
+  for those exact timestamps and found the literal, unambiguous chain:
+  `duplicate key value violates unique constraint "secrets_name_idx"`
+  followed by `null value in column "access_token_secret_id"... violates
+  not-null constraint`. Root cause: store_credential_secret used a
+  STATIC Vault secret name per client+category — any reconnect hit
+  Vault's real UNIQUE constraint, uncaught, cascading into an uncaught
+  NOT NULL failure, while both oauth-callback and woocommerce-connect
+  still reported success regardless. Fixed at the root (migration 045:
+  store_credential_secret now upserts by name — verified live, same
+  UUID returned twice, value correctly overwritten) plus defense in
+  depth (oauth-callback v6, woocommerce-connect v3: every RPC call is
+  now actually checked, every failure branch logs a real audit event —
+  several previously logged nothing at all).
+- Also found, while tracing Shopify's real logs specifically: a genuine
+  500 on a real Shopify callback (real HMAC/shop/timestamp params,
+  proving that attempt got past Shopify's own authorization screen) —
+  root cause: Shopify's real callback sends the FULL `.myshopify.com`
+  domain in `shop`, but exchangeCode always re-appended the suffix
+  (matching oauth-initiate's own bare-subdomain UI), corrupting the URL.
+  Fixed in the same oauth-callback v6 deploy.
+- Step 2 — confirmed Shopify's "can't be installed yet" screen is a
+  Shopify Partner Dashboard distribution-method setting, not a code
+  issue: multiple real oauth-initiate calls for Shopify are logged with
+  correct client_id/scope/redirect_uri, all producing real 302s to
+  Shopify's own authorize endpoint. Not routed around in code, per the
+  card's explicit instruction — human action needed (select a
+  distribution method in the Partner Dashboard).
+- Calendly's real attempt: found the real callback hit (real code, no
+  iss param, matching state consumed/deleted) but NO audit log entry at
+  all for it — meaning it hit one of the previously-unlogged early-exit
+  branches. get_oauth_app('calendly') independently confirmed working
+  (rules out broken app config). Genuinely NOT fully diagnosed this
+  session — flagged honestly as unresolved rather than guessed at; the
+  audit-logging fix above means a retry will leave a full trace if it
+  fails again.
+- **Steps 3-5 NOT done this session — explicitly stopped per the card's
+  own Step 0.5 process** rather than assuming the fix works or faking a
+  test: the human needs to redo the real Google Calendar, Gmail,
+  Calendly, and WooCommerce connect flows against the now-fixed code,
+  and confirm when done, before Claude Code verifies against real DB
+  state and proceeds to SCH-006 testing and the full regression pass.
+- What was verified live vs. assumed: every claim in Step 1 is backed
+  by real data — the exact Postgres error text, the exact audit log
+  rows with their null connection_ids, the real Shopify callback's real
+  500 and real params, live-tested confirmation that the
+  store_credential_secret fix genuinely resolves the collision (not
+  just reasoned about). What is explicitly NOT yet verified: whether
+  the fix actually makes a real human's real reconnect attempt persist
+  correctly end-to-end — that requires the human's action, not assumed
+  from the fix being logically correct.
+- What broke / changed from plan: this defect was more serious and more
+  unifying than the card's own framing suggested (it read as possibly
+  several separate per-provider issues) — it turned out to be one root
+  cause affecting every provider that had ever been reconnected, plus
+  one separate genuine Shopify bug found as a side effect of the same
+  investigation.
+- Files touched: Supabase migration 045 (store_credential_secret fix);
+  oauth-callback Edge Function redeployed (v6: error checking, full
+  audit logging, Shopify shop-suffix fix); woocommerce-connect Edge
+  Function redeployed (v3: error checking, full audit logging);
+  PROJECT_STATE.md. No dashboard frontend changes this session — the
+  bug and fix were entirely server-side.
+- **This session so far: 0 self-resolved document-level items — the
+  Document Resolution Authority gate does not apply. This session is
+  NOT complete — Steps 3-5 remain, blocked on the human's real re-test
+  per Step 0.5's explicit hand-off process. Do not treat this as a
+  finished Build Card.**
 
 ### Session 21 — 2026-08-05 — BC-020: OAuth popup flow (2 real platform constraints found+fixed), proxy-domain feasibility reported
 - Step 1 — first attempt: rewrote oauth-callback to return an HTML page
