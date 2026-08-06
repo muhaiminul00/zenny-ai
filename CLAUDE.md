@@ -80,6 +80,20 @@ credential. Building on the native node now means rebuilding later, not
 swapping a credential. Applies to every provider integration, every
 future phase. Full detail: `Planning_to_Build_Transition_v1.md` Part 2.8.
 
+## Standing Rule — Use Available Tools (added BC-028)
+
+Actively check and use whatever MCP tools, plugins, and skills are
+available for a given task rather than defaulting to manual/verbose
+approaches when a better-fit tool exists. This includes tools added
+mid-project (like `claude-remember`) — check what's actually available
+before reaching for a slower manual path. **But never trust a new or
+unfamiliar tool's behavior from its name or README alone** — verify it
+with a genuine test call first, per this project's existing discipline
+of confirming everything live rather than assumed (Mandatory MCP
+Verification, above). If a tool turns out not to actually work as
+advertised, say so plainly rather than quietly working around it or
+overstating what it does.
+
 ## Standing Rule — Document Resolution Authority
 
 When you hit a conflict, gap, or apparent error in a system document

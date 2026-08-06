@@ -15,22 +15,40 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-07 — by Claude Code, Session 28 (BC-027 — COMPLETE: BC-026's self-resolved item formally acknowledged by the Commander (Step 0); BC-026's pending commit pushed; every currently-built workflow (19 real ones) documented live in a new `06_Infrastructure/n8n/Workflow_Registry.md`, one entry each, read fresh via `get_workflow_details` rather than reconstructed from prose; a standing per-workflow-documentation requirement added to CLAUDE.md and Claude_Build_Command_Protocol_v2.md (now part of Definition of Done); BC-026's PROJECT_STATE.md section expanded with a plain point-by-point summary; SCH-006 confirmed live at a genuine 2-hour interval, its 7-day Google Testing-mode refresh-token constraint documented as sweep-interval-independent)
+2026-08-07 — by Claude Code, Session 29 (BC-028 — COMPLETE: fixed every real bug BC-027's audit surfaced. `control.client_connections_display`'s SECURITY DEFINER view (a real cross-tenant data-exposure gap, not just a lint nag) fixed with `security_invoker=true`. UTIL-003 and UTIL-005 fixed via the proven RPC-wrapper pattern, re-verified against real client-schema data on all branches. ADP-002's ENTIRE human-handoff path (Stage 1 + Stage 2) fixed and verified end-to-end for the first time ever — 6 separate real bugs found along the way (broken RPC pattern, a missing table-level GRANT on `convocore_agent_map`, an array-unwrap bug across 5 nodes, a response-format bug, a lost-context bug, the known UTIL-004 output-pin gotcha). Tool Execution Fallback's dead Slack node replaced with Gmail/UTIL-004, plus 3 more real bugs fixed (2 nodes with zero credential attached, 1 missing responseFormat) — first-ever confirmed live execution. UTIL-006 given a new synchronous token-expiry check (new shared UTIL-007 helper, extracted from SCH-006's real Google refresh logic) closing a genuine dead-token window between sweep runs — 3 more real "never had a credential attached" bugs found and fixed, first-ever confirmed live execution tested against a REAL production connection that was genuinely expired at test time, confirmed fixed with real fresh DB state. `claude-remember` plugin verified honestly (installed, hook fires, but has never completed a save for this project — not relied on this session). New standing "use available tools, verify before trusting" rule added to CLAUDE.md)
 
 ## Current Phase
+Phase 6 remains the current phase — **BC-028 was a bug-fix card closing
+out every real gap BC-027's documentation audit surfaced, not a new
+build phase.** Full detail in "Phase 6 — Real Infrastructure Bug Fixes
+(BC-028)" below. Headline results: ADP-002's human-handoff path — the
+actual Convocore escalation path — went from completely non-functional
+to fully verified end-to-end (Stage 1 + Stage 2); UTIL-003, UTIL-005,
+and Tool Execution Fallback all went from never-successfully-executed
+to fixed-and-verified; UTIL-006 gained a real synchronous token-expiry
+check on top of being fixed and verified for the first time; one real
+security gap (a SECURITY DEFINER view bypassing RLS on a table holding
+every client's connection data) was found and fixed. A new shared
+workflow, UTIL-007 (Refresh Connection Token), was built to support
+UTIL-006's new expiry check. 0 self-resolved document-level items this
+session — every finding was ordinary bug-catching (missing credentials,
+missing grants, array-shape assumptions, response-format quirks), not a
+document-level conflict, so the Document Resolution Authority gate does
+not apply and no stop is required.
+
 Phase 6 remains the current phase — **BC-027 was a documentation card,
 not a new build phase.** It formally closed out BC-026's standing-rule
 stop (Commander acknowledgment, Step 0), pushed BC-026's pending
 commit, and created the permanent per-workflow reference
 (`06_Infrastructure/n8n/Workflow_Registry.md`, one live-verified entry
-per real built workflow — 19 total) plus the standing requirement to
-keep it updated going forward (CLAUDE.md + Claude_Build_Command_
-Protocol_v2.md, now part of Definition of Done). No new workflows were
-built or modified in BC-027 itself, aside from a SCH-006 config check
-(no change — the human had already retuned its interval to 2 hours
-directly in n8n; this session only confirmed it live). See
-"Phase 6 — Core Agent Build (BC-026)" below for the actual build detail
-this documentation covers.
+per real built workflow — 19 total, now 20 after BC-028's new UTIL-007)
+plus the standing requirement to keep it updated going forward
+(CLAUDE.md + Claude_Build_Command_Protocol_v2.md, now part of
+Definition of Done). No new workflows were built or modified in BC-027
+itself, aside from a SCH-006 config check (no change — the human had
+already retuned its interval to 2 hours directly in n8n; this session
+only confirmed it live). See "Phase 6 — Core Agent Build (BC-026)"
+below for the actual build detail this documentation covers.
 
 Phase 6 (Core Agent) — **BC-026 COMPLETE.** Built the 10 workflows every
 other future module depends on: INT-001 Create Customer, INT-002 Load
@@ -2356,6 +2374,159 @@ proper inspection of row contents/schema-shape correctness). Do not trust
 the un-struck lines above as current until BC-003 re-verifies each one
 directly.
 
+## Phase 6 — Real Infrastructure Bug Fixes (BC-028)
+
+```
+**Step 0 — claude-remember plugin, verified honestly:** ran the
+plugin's own `doctor.sh` diagnostic (per the standing "verify a new
+tool's real behavior before relying on it" discipline). Real result:
+the plugin is installed and its PostToolUse hook is firing (a live
+10-second-old marker file confirmed), but **no save has ever completed
+for this project** — 0 memory files exist, FAIL line explicit. Honest
+conclusion: not currently functional here, not relied on this session.
+Added a new standing rule to CLAUDE.md: actively check and use
+available MCP tools/plugins/skills rather than defaulting to manual
+approaches, but always verify a new/unfamiliar tool's real behavior
+with a genuine test call first — never trust a name or README alone.
+
+**Step 1 — `control.client_connections_display` SECURITY DEFINER view,
+fixed (a real security gap, not just a lint nag):** pulled the view's
+real definition (a plain `SELECT` passthrough over
+`control.client_connections`, no cross-schema logic). Confirmed via
+`reloptions` it had never had `security_invoker` explicitly set (a
+known Supabase Dashboard/legacy-view default quirk, not a deliberate
+choice) — meaning it ran with the view owner's (`postgres`) privileges,
+bypassing `client_connections`' real RLS (enabled, zero policies,
+default-deny) entirely. Combined with `anon`/`authenticated` holding
+table-level grants on the view itself, this meant **any authenticated
+request could read every client's connection metadata across the
+entire platform** via this one view — a genuine cross-tenant exposure,
+same class of finding as BC-024's `connection_snapshots` RLS gap.
+Fixed: `ALTER VIEW ... SET (security_invoker = true)`. Security Advisor
+re-run confirmed the `security_definer_view` ERROR is gone.
+
+**Step 2 — UTIL-003 + UTIL-005 fixed via the proven RPC-wrapper
+pattern:** built `public.insert_client_tool_call_log`,
+`public.client_has_suppression`, `public.get_client_lead_status` (all
+SECURITY DEFINER, `SET search_path TO ''`, `%I`-safe dynamic schema
+interpolation, `anon` EXECUTE revoked — the established pattern from
+BC-026). Rewired both workflows' broken direct-client-schema HTTP
+nodes to call these instead. **A real, newly-confirmed quirk found
+along the way:** with `responseFormat: json` forced on a bare JSON
+scalar (e.g. a boolean), n8n lands the value as the item's WHOLE `.json`
+directly (`json: false`), not nested under `.data` the way the
+established `text`-format scalar cases work — a real bug in the first
+fix attempt, caught via a real execution showing `proceed: false` for a
+genuinely non-suppressed contact. Re-verified all 4 real branches
+(suppressed/not-suppressed, booked/closed lead) against real data.
+
+**Step 3 — ADP-002's human-handoff path, fixed end-to-end (the single
+most important fix this session — this is Convocore's actual
+escalation path; no real Convocore-triggered escalation could ever
+have succeeded before this):**
+- Root cause: `Check Existing Open Escalation` and `Insert Escalation
+  Row` both used the broken direct-client-schema pattern. Fixed via 2
+  new RPCs: `client_has_open_escalation` and a newly-overloaded
+  `insert_client_escalation` (10-arg version adding `p_escalation_team`
+  — Postgres correctly keeps this alongside the original 9-arg version
+  WF-017 already calls, resolved by exact-arity match, fully backward
+  compatible, verified via `pg_proc`).
+- **A second, separate real infrastructure gap found while building the
+  first real test data this project has ever had for this table:**
+  `control.convocore_agent_map` had ZERO table-level grants for
+  `authenticated`/`service_role` at all (`permission denied for table`)
+  — the BC-026 schema-`USAGE` fix opened the schema door but this one
+  table's own grants were never added, never caught because no real
+  agent-map row existed anywhere until this session created one to test
+  with. Fixed via `GRANT SELECT ON control.convocore_agent_map`.
+- **A third, pre-existing bug, unrelated to PostgREST exposure:**
+  `Agent Known?` and 4 downstream nodes assumed the agent-lookup
+  response was still `[0]`-indexed — same array-unwrap bug class as
+  BC-026's INT-002 finding, never caught because no real row ever hit
+  the "found" branch before. Fixed all 5 references.
+- **A fourth:** `Read Agent Secret` had no `responseFormat` set; fixed
+  to `text` + corrected the Bearer comparison to reference `$json.data`.
+- **A fifth:** `Insert Escalation Row`'s `p_schema` reference broke
+  because the intervening `Check Existing Open Escalation` node's own
+  HTTP response replaces the item's `.json` entirely — fixed to
+  reference the schema-resolver node explicitly via `$()`.
+- **A sixth:** the Stage-2 UTIL-004 call had the same single-output-pin
+  gotcha WF-017 had before its BC-026 fix — wired both pins.
+- Real end-to-end test via the actual production webhook with a real
+  (test-marked) `convocore_agent_map` row + stored Bearer secret. Stage
+  1: real Bearer auth passed, real `escalations` row created
+  (`escalation_team: 'ops_team'` confirmed via SQL). Stage 2 (repeat
+  call, same customer): correctly detected the open escalation, did NOT
+  create a duplicate (exactly one row confirmed via SQL), fired a real
+  UTIL-004 notification.
+
+**Step 4 — Tool Execution Fallback's dead Slack node, replaced:** same
+unmigrated-Slack issue BC-025 already fixed everywhere else — no real
+multi-tenant Slack OAuth app exists (BC-004/BC-008), so this
+credential-failure human-notification step had always notified no one.
+Removed the Slack node entirely (not disabled-in-place, per the BC-025
+precedent) and replaced with Execute Workflow → UTIL-004 (both output
+pins wired). **2 more real bugs found while testing (this workflow had
+also never been execution-tested before):** `Mark Connection Errored`
+and `Log Fallback Event` both had zero credential attached at all (real
+"Credentials not found" error); `Log Fallback Event` also had no
+`responseFormat` set. Fixed both. Real end-to-end test via a disposable
+`control.client_connections` row (category `telephony`, marked
+`revoked` after use): confirmed the connection was genuinely marked
+`status='error'` via direct SQL, and a real Gmail message was sent
+(`id: 19fd89f71e99ca23`).
+
+**Step 5/6 — Credential Resolver's synchronous expiry check, built and
+given its first-ever confirmed live execution:** per
+Client_Integration_and_Credential_Platform_v1.md Part 6.2's own design,
+built a new shared sub-workflow, `Zenny Shared Utility - Refresh
+Connection Token` (UTIL-007, new n8n ID `NiBCdKzb0pkvWBQn`), extracting
+SCH-006's real Google OAuth-refresh logic (Calendly/Cal.com explicitly
+flagged as not-yet-implemented — a real, disclosed scope cut, since
+Google is the only provider with real tested credentials across every
+prior session) so UTIL-006 has one canonical place to call rather than
+reimplementing the refresh HTTP calls a second time. Wired into
+UTIL-006: `Token Expiring Soon?` (`!token_expires_at || <= now+5min`) →
+if true, calls UTIL-007 synchronously before returning a token; if the
+refresh itself fails, routes to Tool Execution Fallback with a real
+reason instead of silently returning a stale/dead token. **3 more real,
+pre-existing bugs found — UTIL-006 had never been execution-tested
+before this session either:** `Get Client Connection`, `Read Token
+Secret` both had zero credential attached (2 separate real "Credentials
+not found" errors); `Read Token Secret` also had no `responseFormat`
+set, and `Resolved Credential`'s token assignment needed to reference
+`$json.data` once fixed. **Real test — not artificially forced:**
+Client A's real `google`/`email` connection happened to be genuinely
+expired at test time (a live, real instance of exactly the gap being
+fixed, confirmed via direct SQL before touching anything — snapshotted
+first per the established BC-024 safety-net pattern). Called UTIL-006
+directly: confirmed a real, freshly-minted Google access token
+returned, and confirmed via direct SQL that `token_expires_at` was
+updated to ~1 hour in the future (matching Google's real access-token
+lifetime) with a fresh `updated_at`. This was a genuine production fix,
+not disposable test data — the connection is now actually healthy.
+
+**Step 7 — Workflow Registry updated:** every workflow touched this
+session (UTIL-003, UTIL-005, UTIL-006, ADP-002, Tool Execution
+Fallback) had its entry rewritten to reflect the real, fixed, verified
+state — no more "KNOWN BROKEN" language left stale. New UTIL-007 entry
+added. SCH-006's entry cross-referenced from UTIL-006's new design-
+intent note.
+
+**Cleanup:** disposable test harness archived; disposable `telephony`
+connection marked `revoked`; disposable RPC-verification rows deleted;
+the real `convocore_agent_map`/escalation/connection test data used for
+ADP-002's and UTIL-006's genuine E2E tests left in place, clearly
+named, per this project's convention (the UTIL-006 fix was a real
+production repair, not something to roll back).
+
+**0 self-resolved document-level items this session** — every finding
+was ordinary bug-catching (missing credentials, missing grants,
+array-shape assumptions, response-format quirks, a lost-context
+reference), never a genuine document-level conflict or gap. The
+Document Resolution Authority gate does not apply; no stop required.
+```
+
 ## Phase 6 — Core Agent Build (BC-026)
 
 **Point-by-point session summary (added BC-027, for the human's own
@@ -2625,33 +2796,45 @@ roster test clients).
 ## Blockers Right Now
 
 ```
-**BC-026 COMPLETE — self-resolved item (no `conversations` table
-exists; Convocore owns the real conversation record; INT-004/INT-005
-map to `active_issues` instead) FORMALLY ACKNOWLEDGED by the Commander
-in BC-027 Step 0** — the standing-rule stop is lifted, Phase 6 work may
-be built upon. Full reasoning in "Phase 6 — Core Agent Build (BC-026)"
-below. Two real infrastructure bugs were also found and fixed during
-BC-026 (PostgREST client-schema exposure; missing `USAGE` grant on the
-`control` schema) — ordinary bug-catching, not document-level items.
-**Still flagged, not yet fixed:** 3 pre-existing workflows (UTIL-003
-Error Logger, UTIL-005 Stop Checker, ADP-002 Convocore Adapter's
-human-handoff path) use the same broken direct-client-schema-access
-pattern the PostgREST-exposure bug invalidated — a real, latent bug in
-already-"complete" prior work that needs a future card. Also flagged
-during BC-027's documentation pass: UTcdzMvOb7gCQM5J (Tool Execution
-Fallback)'s human-notification step is a dead Slack node with no valid
-credential — the credential-failure path currently fails to notify a
-human even though it correctly marks the connection errored and logs
-it; and ADP-001 (Voiceflow Adapter) is documented as "Production" in
-n8n_Workflow_Specification_v1.md Part 17 but no matching n8n workflow
-was found live in the instance — a real doc/reality mismatch, not
-investigated further (BC-027 was a documentation card). All 10 BC-026
+**BC-028 COMPLETE — every real gap BC-027's documentation audit
+surfaced is now fixed and verified.** UTIL-003, UTIL-005, ADP-002's
+human-handoff path (Convocore's actual escalation path — was fully
+non-functional, now verified Stage 1 + Stage 2 end-to-end), and Tool
+Execution Fallback all went from broken/never-tested to fixed and
+real-execution-verified. UTIL-006 gained a real synchronous
+token-expiry check (new UTIL-007 helper) and was itself fixed (3
+separate "never had a credential attached" bugs) and given its
+first-ever confirmed live execution — against a REAL production
+connection that was genuinely expired at test time, now genuinely
+healthy again. One real security gap fixed:
+`control.client_connections_display` was bypassing RLS via an implicit
+SECURITY DEFINER view, exposing every client's connection metadata
+cross-tenant — fixed with `security_invoker=true`, Security Advisor
+re-confirmed clean. 0 self-resolved document-level items — no standing-
+rule stop applies. Full detail in "Phase 6 — Real Infrastructure Bug
+Fixes (BC-028)" below.
+
+**Still open, flagged not fixed (out of BC-028's explicit scope):**
+ADP-001 (Voiceflow Adapter) is documented as "Production" in n8n_
+Workflow_Specification_v1.md Part 17 but no matching n8n workflow was
+found live in the instance (BC-027 finding) — a real doc/reality
+mismatch, still not investigated. UTIL-002 (Data Validator) still has
+no real caller anywhere — real but not urgent, no live risk currently
+(BC-027 finding, explicitly out of scope again this session).
+UTIL-007's Calendly/Cal.com synchronous-refresh branches are not
+implemented (return an honest "unsupported provider" error rather than
+silently failing) — Google is the only provider with real tested
+credentials across every session to date; a real, disclosed scope cut,
+not an oversight. SCH-006 was not refactored to also call UTIL-007
+(its own working inline refresh logic was left untouched) — a possible
+future consolidation, not required for BC-028's fix.
+
+**`06_Infrastructure/n8n/Workflow_Registry.md`** — check there first
+for "what does workflow X actually do" (now 20 real entries, updated
+BC-028 for every workflow this session touched). All 10 BC-026
 workflows (INT-001–005, WF-013–017) remain built, published, and
 E2E-verified against both roster clients with real DB state confirmed
-at every step. Every currently-built workflow (19 real ones) now has a
-live-verified reference entry in `06_Infrastructure/n8n/
-Workflow_Registry.md` (BC-027) — check there first for "what does
-workflow X actually do."
+at every step.
 
 **BC-021 THROUGH BC-025 ARE ALL COMPLETE.** BC-025: verified the real
 Google scope request is one combined request (matches code + live
@@ -3074,6 +3257,74 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 29 — 2026-08-07 — BC-028 COMPLETE: every real gap from BC-027's audit fixed and verified — ADP-002's human-handoff path fully repaired (Convocore's actual escalation path), UTIL-003/005/006/Tool Execution Fallback all fixed with first-ever real executions, a real cross-tenant RLS-bypass security gap fixed, new UTIL-007 synchronous-refresh helper built and proven against a genuinely-expired real production connection
+- Step 0 — verified `claude-remember` honestly via its own `doctor.sh`:
+  installed, hook fires, but has never completed a save for this
+  project (0 memory files, explicit FAIL line) — not relied on this
+  session. Added the standing "use available tools, verify before
+  trusting" rule to CLAUDE.md.
+- Step 1 — pulled `control.client_connections_display`'s real
+  definition, confirmed via `reloptions` it had never had
+  `security_invoker` set (a real Supabase Dashboard default quirk, not
+  a deliberate choice) — meaning it bypassed `client_connections`' real
+  RLS entirely, a genuine cross-tenant data-exposure gap (same class as
+  BC-024's `connection_snapshots` finding), not just a lint nag. Fixed
+  with `ALTER VIEW ... SET (security_invoker = true)`; Security Advisor
+  re-run confirmed clean.
+- Step 2 — fixed UTIL-003 + UTIL-005 via 3 new `public` RPC wrappers,
+  same proven pattern as BC-026. Found and fixed a real, newly-
+  discovered n8n quirk along the way: `responseFormat: json` forced on
+  a bare JSON scalar lands the value as the item's whole `.json`
+  directly, not nested under `.data` the way `text`-format scalars
+  work — caught via a real execution showing an inverted suppression
+  result. Re-verified all 4 real branches against real data.
+- Step 3 — fixed ADP-002's entire human-handoff path (the actual
+  Convocore escalation path — confirmed via this session's real testing
+  that it had NEVER worked against a real client schema, meaning no
+  real Convocore-triggered escalation could ever have succeeded
+  before). Found and fixed 6 separate real bugs along the way: the
+  broken direct-client-schema pattern (2 new RPCs, one a backward-
+  compatible overload of `insert_client_escalation`); a missing
+  table-level GRANT on `control.convocore_agent_map` (zero grants ever
+  existed — never caught because no real row existed before this
+  session created one); an array-unwrap bug across 5 nodes/expressions
+  (same class as BC-026's INT-002 finding); a missing responseFormat on
+  the Bearer-secret read; a lost-context reference to `client_schema_
+  name`; the known UTIL-004 single-output-pin gotcha. Real end-to-end
+  test via the actual production webhook: Stage 1 created a real
+  escalation, Stage 2 (repeat call) correctly detected it and did NOT
+  duplicate, both confirmed via direct SQL.
+- Step 4 — replaced Tool Execution Fallback's dead Slack node (same
+  unmigrated-Slack pattern BC-025 fixed elsewhere) with Gmail/UTIL-004.
+  Found and fixed 2 more real bugs testing it (also never execution-
+  tested before): 2 nodes with zero credential attached, 1 missing
+  responseFormat. Real test via a disposable connection: confirmed real
+  `status='error'` DB state and a real Gmail message sent.
+- Step 5/6 — built a new shared workflow, UTIL-007 Refresh Connection
+  Token, extracting SCH-006's real Google refresh logic (Calendly/
+  Cal.com explicitly flagged as not-yet-implemented, a real disclosed
+  scope cut). Wired a synchronous expiry check into UTIL-006 (checks
+  `token_expires_at` at time of use, refreshes synchronously if
+  expiring/expired, falls through to Tool Execution Fallback on a
+  genuine refresh failure) — closing the real dead-token-window gap
+  between SCH-006's sweep runs. Found and fixed 3 more real bugs
+  (UTIL-006 itself had never been execution-tested: 2 nodes with zero
+  credential attached, 1 missing responseFormat). Real test — not
+  artificially forced: found Client A's real `google`/`email`
+  connection was already genuinely expired at test time; snapshotted it
+  first (BC-024 safety pattern), then confirmed via direct SQL that a
+  real, freshly-minted Google access token was returned and
+  `token_expires_at` was updated to a real ~1-hour-future value. A
+  genuine production fix, not a disposable test.
+- Step 7 — updated every touched workflow's Workflow_Registry.md entry
+  (UTIL-003, UTIL-005, UTIL-006, ADP-002, Tool Execution Fallback) to
+  reflect the real fixed/verified state, added a new UTIL-007 entry.
+- 0 self-resolved document-level items — every finding this session was
+  ordinary bug-catching (missing credentials, missing grants,
+  array-shape assumptions, response-format quirks, a lost-context
+  reference), never a genuine document-level conflict. No standing-rule
+  stop applies; this session's work is fully closed out.
 
 ### Session 28 — 2026-08-07 — BC-027 COMPLETE: Commander acknowledged BC-026's self-resolved item, pending commit pushed, every real workflow (19) documented live in a new Workflow_Registry.md, standing per-workflow-documentation requirement added to CLAUDE.md + Protocol v2, BC-026 section expanded with a plain point-by-point summary, SCH-006's 2-hour interval confirmed live
 - Step 0 — the Commander's BC-027 text itself formally acknowledged
