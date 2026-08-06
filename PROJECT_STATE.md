@@ -15,10 +15,34 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-07 — by Claude Code, Session 29 (BC-028 — COMPLETE: fixed every real bug BC-027's audit surfaced. `control.client_connections_display`'s SECURITY DEFINER view (a real cross-tenant data-exposure gap, not just a lint nag) fixed with `security_invoker=true`. UTIL-003 and UTIL-005 fixed via the proven RPC-wrapper pattern, re-verified against real client-schema data on all branches. ADP-002's ENTIRE human-handoff path (Stage 1 + Stage 2) fixed and verified end-to-end for the first time ever — 6 separate real bugs found along the way (broken RPC pattern, a missing table-level GRANT on `convocore_agent_map`, an array-unwrap bug across 5 nodes, a response-format bug, a lost-context bug, the known UTIL-004 output-pin gotcha). Tool Execution Fallback's dead Slack node replaced with Gmail/UTIL-004, plus 3 more real bugs fixed (2 nodes with zero credential attached, 1 missing responseFormat) — first-ever confirmed live execution. UTIL-006 given a new synchronous token-expiry check (new shared UTIL-007 helper, extracted from SCH-006's real Google refresh logic) closing a genuine dead-token window between sweep runs — 3 more real "never had a credential attached" bugs found and fixed, first-ever confirmed live execution tested against a REAL production connection that was genuinely expired at test time, confirmed fixed with real fresh DB state. `claude-remember` plugin verified honestly (installed, hook fires, but has never completed a save for this project — not relied on this session). New standing "use available tools, verify before trusting" rule added to CLAUDE.md)
+2026-08-07 — by Claude Code, Session 30 (BC-029 — COMPLETE: Phase 7 (Growth Agent) begins and completes — WF-001 CreateLead built, tested against all 5 required test categories with real production data, and published. While testing, found and fixed 3 more real pre-existing infrastructure bugs, none previously caught because no real data had ever exercised the affected paths: `client_test_001_acme_emergency_test.leads` was missing migration 028's `convocore_*` columns (schema-provisioning drift); the same schema's `escalations` table was missing migration 032's `escalation_team` column (same drift class); and — the most severe finding — BC-028's 10-arg `insert_client_escalation` overload had silently broken WF-017 NotifyHuman (and therefore WF-013/WF-016's handoff path) for every 9-arg caller since BC-028, via a PostgREST overload-ambiguity error (`PGRST203`) that BC-028's own test never hit because it always passed the 10th argument. All 3 fixed live. Also found 3 n8n node-behavior quirks while building WF-001 itself (an IF-node `rightValue: ''` + boolean-operator crash; `retryOnFail`+`continueErrorOutput` landing a retry-exhausted failure on the main pin instead of the error pin; an explicit `responseFormat: json` crashing on WF-017's own response shape). 0 self-resolved document-level items — every finding was ordinary bug-catching, not a document conflict, so no standing-rule stop applies. CancelAppointment/UpdateCustomer 3rd-verification-tier redesign idea logged as future work, per Commander instruction — flag only, no build action.)
 
 ## Current Phase
-Phase 6 remains the current phase — **BC-028 was a bug-fix card closing
+**Phase 7 (Growth Agent) — BC-029 COMPLETE.** WF-001 CreateLead is the
+single Tool this phase required (Part 7.2's hard rule: Growth Agent
+never calls a conversion action directly). Built, published, and
+genuinely tested against real production data across all 5 required
+categories (Success, Failure, Security, Retry, Duplicate) — see WF-001's
+entry in `06_Infrastructure/n8n/Workflow_Registry.md` for full detail.
+Real duplicate-prevention is backed by an actual per-schema partial
+`UNIQUE` index on `(customer_id, convocore_conversation_id)`, not just
+the idempotency-key string format. While testing, found and fixed 3
+real pre-existing infrastructure bugs unrelated to this card's own
+build but blocking its Retry/Pattern-D test: 2 schema-provisioning
+drift gaps on `client_test_001_acme_emergency_test` (missing `leads`
+convocore_* columns from migration 028; missing `escalations.
+escalation_team` from migration 032) and, most significantly, a
+PostgREST overload-ambiguity bug (`PGRST203`) in
+`public.insert_client_escalation` that BC-028's own 10-arg overload
+addition had introduced — this had silently broken WF-017 NotifyHuman
+(and therefore WF-013/WF-016's always-handoff behavior) for every real
+9-arg caller since BC-028, entirely undetected because BC-028's own
+ADP-002 test always passed the 10th argument explicitly. Fixed by
+dropping the redundant 9-arg overload. 0 self-resolved document-level
+items this session (all ordinary bug-catching) — no standing-rule stop
+required; Phase 8 (Conversion Engine) may proceed in the next session.
+
+Phase 6 remains otherwise complete — **BC-028 was a bug-fix card closing
 out every real gap BC-027's documentation audit surfaced, not a new
 build phase.** Full detail in "Phase 6 — Real Infrastructure Bug Fixes
 (BC-028)" below. Headline results: ADP-002's human-handoff path — the
@@ -2796,6 +2820,27 @@ roster test clients).
 ## Blockers Right Now
 
 ```
+**FUTURE WORK (flagged per BC-029 Step 4, not built this card):**
+Commander/human have discussed redesigning WF-013 CancelAppointment
+(and likely WF-016 UpdateCustomer) toward a THIRD verification tier
+beyond today's binary auto-execute/always-handoff — a config-driven
+"queue for one-click human dashboard approval, then auto-execute for
+real" pattern, with the real cancellation/update happening only after
+approval, and any client-facing confirmation sent from the CLIENT's
+own connected email (not Zenny's). This connects to Phase 5C
+Appointments becoming a real write-capable dashboard, not just
+read-only. No build action taken — captured here so it isn't lost.
+
+**BC-029 COMPLETE — Phase 7 (Growth Agent) done.** WF-001 CreateLead
+built, published, and genuinely tested against all 5 required
+categories with real production data. 3 real pre-existing
+infrastructure bugs found and fixed while testing (2 schema-drift gaps
+on `client_test_001`; a PostgREST overload-ambiguity bug that had
+silently broken WF-017 NotifyHuman for every 9-arg caller since
+BC-028 — see WF-017's Workflow Registry entry for full detail). 0
+self-resolved document-level items — no standing-rule stop applies.
+Phase 8 (Conversion Engine, 11 Tools) is next, new session.
+
 **BC-028 COMPLETE — every real gap BC-027's documentation audit
 surfaced is now fixed and verified.** UTIL-003, UTIL-005, ADP-002's
 human-handoff path (Convocore's actual escalation path — was fully
@@ -3257,6 +3302,107 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 30 — 2026-08-06/07 — BC-029 COMPLETE: Phase 7 (Growth Agent) — WF-001 CreateLead built and genuinely tested against all 5 required categories; 3 real pre-existing infrastructure bugs found and fixed, including a severe PostgREST overload ambiguity that had silently broken WF-017 NotifyHuman since BC-028
+- Step 0 — live audit via `search_workflows`: the only existing "WF-001"
+  in the n8n instance is the pre-rebuild legacy `WF-001 — LEAD CREATION
+  ENGINE` (`RJwCyNXEp4HM83il`, inactive, `availableInMCP: false`) —
+  confirmed genuinely unrelated to the current architecture, matching
+  the Workflow Registry's existing Legacy note. Built fresh.
+- Step 1 — checked the real `leads` table schema (`public`/`tpl_*`
+  templates and both roster clients' actual schemas) before building.
+  Found a real, previously-unnoticed schema-provisioning drift bug:
+  `client_test_001_acme_emergency_test.leads` was missing every
+  `convocore_*` column migration 028 (2026-08-05) added — that client
+  schema was provisioned before the migration ran and was never
+  back-filled. Fixed via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
+  Also added a real per-schema partial `UNIQUE` index on
+  `(customer_id, convocore_conversation_id)` on both roster clients'
+  `leads` tables, backing the idempotency-key format with an actual DB
+  constraint (Integration Contract Part 11.4).
+- Step 2 — built 2 new `public`-schema RPCs matching the proven
+  wrapper pattern (migrations 052/053, BC-026/BC-028):
+  `client_customer_exists` (explicit cross-client security check,
+  used instead of relying on an incidental FK-violation error) and
+  `insert_client_lead` (real duplicate detection built in — checks
+  `(customer_id, convocore_conversation_id)` before inserting and
+  returns the existing row if found, rather than trusting the key
+  format alone).
+- Step 3 — built WF-001 (webhook → normalize → Validate Input
+  (Pattern A) → Resolve Client Schema (UTIL-001) → Check Customer
+  Exists (RPC, security) → Insert Lead (RPC, Pattern B silent retry:
+  `retryOnFail`, `maxTries: 2`, `waitBetweenTries: 1000`) → success, or
+  Pattern D handoff to WF-017 on unresolvable failure). Found and fixed
+  2 real n8n node-behavior bugs live during this build: (a) an IF node
+  combining a boolean `"true"` operator with an explicit `rightValue:
+  ''` throws `NodeOperationError` — WF-013's identical-looking IF nodes
+  omit `rightValue` entirely for this operator; matched that working
+  shape. (b) `retryOnFail` + `onError: continueErrorOutput` does NOT
+  route a retry-exhausted failure to the node's error output pin
+  (index 1) — it lands on the regular pin (index 0) as an item
+  carrying an `.error` field. Added an explicit `Insert Succeeded?` IF
+  node checking for a real `lead_id` rather than trusting which
+  physical pin fired.
+- Step 4 (STANDING RULE — real-tested before Done) — genuinely executed
+  all 5 required test categories against real production data via the
+  actual production webhook, not simulated:
+  - **Success:** real `leads` row confirmed via direct SQL.
+  - **Failure** (missing `customer_id`): real `VALIDATION_ERROR`
+    response, confirmed no DB call was made.
+  - **Security** (cross-client `customer_id` — Client B's real
+    customer passed against Client A's schema): real `CUSTOMER_NOT_
+    FOUND` rejection, confirmed via the new `client_customer_exists`
+    check, not an incidental FK error.
+  - **Retry** (forced a 1ms client-side HTTP timeout to genuinely
+    simulate a Supabase timeout, not assumed): confirmed one real
+    silent retry, then — after finding and fixing 3 more real
+    pre-existing bugs (below) blocking this exact path — a genuine
+    Pattern D handoff with a real `escalations` row created and a real
+    `escalation_id` returned in the response.
+  - **Duplicate** (same `conversation_id` sent twice): confirmed via
+    direct SQL — exactly 1 row exists, both calls returned the
+    identical `lead_id`.
+  While running the Retry test, found and fixed 2 MORE real
+  pre-existing bugs, unrelated to WF-001's own build but blocking its
+  Pattern D path: `client_test_001_acme_emergency_test.escalations`
+  was missing migration 032's `escalation_team` column (same
+  schema-drift class as Step 1's finding) — fixed the same way. Far
+  more significantly: BC-028's addition of a 10-arg
+  `insert_client_escalation` overload (`p_escalation_team text DEFAULT
+  NULL`) made every 9-arg call ambiguous to PostgREST (`PGRST203 —
+  Could not choose the best candidate function`) — and WF-017
+  NotifyHuman's own real call is a 9-arg call. **This means WF-017 (and
+  therefore WF-013/WF-016's always-handoff behavior) had been silently
+  broken for every real caller since BC-028**, entirely undetected
+  because BC-028's own ADP-002 test always passed the 10th argument
+  explicitly. Fixed by dropping the redundant 9-arg overload (matching
+  the same fix migration 022 already applied once before for
+  `upsert_client_connection`'s identical ambiguity class). Re-verified
+  live post-fix: real escalation `6e7c768f-...` created end-to-end.
+  Also found (fixed, then reverted the fix): setting `options.response.
+  response.responseFormat: 'json'` explicitly on the `Route To Human
+  Handoff (WF-017)` HTTP call crashed with a real internal n8n error
+  (`Cannot read properties of undefined (reading 'data')`) — reverted
+  to no explicit `responseFormat`, matching WF-013's already-working
+  pattern; WF-001's own `handoff` echo field is consequently sparse
+  (`{}`), a real minor cosmetic gap shared with WF-013/WF-016, not
+  fixed here (their scope).
+- Step 5 — updated `06_Infrastructure/n8n/Workflow_Registry.md` with
+  WF-001's full entry (written from a live `get_workflow_details` read)
+  before considering this session's Definition of Done met, per the
+  standing Per-Workflow Documentation rule — including a note added to
+  WF-017's own entry about the overload-ambiguity bug just fixed there.
+- Step 6 — logged the CancelAppointment/UpdateCustomer 3rd-verification
+  -tier redesign idea as future work in Blockers, per the Build Card's
+  explicit flag-only instruction — no build action taken.
+- **0 self-resolved document-level items this session.** Every finding
+  above (missing columns, an ambiguous function overload, IF-node/
+  retry-pin/responseFormat node-behavior quirks) is ordinary code/
+  schema bug-catching — none of it is a document-level conflict, gap,
+  or correction to what a system document says. The Document
+  Resolution Authority logging/stop gate does not apply; Phase 8
+  (Conversion Engine) may proceed in the next session without waiting
+  for Commander acknowledgment.
 
 ### Session 29 — 2026-08-07 — BC-028 COMPLETE: every real gap from BC-027's audit fixed and verified — ADP-002's human-handoff path fully repaired (Convocore's actual escalation path), UTIL-003/005/006/Tool Execution Fallback all fixed with first-ever real executions, a real cross-tenant RLS-bypass security gap fixed, new UTIL-007 synchronous-refresh helper built and proven against a genuinely-expired real production connection
 - Step 0 — verified `claude-remember` honestly via its own `doctor.sh`:

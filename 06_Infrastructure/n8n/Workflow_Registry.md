@@ -21,7 +21,22 @@ Execution Fallback's PostgREST/Slack/missing-credential bugs fixed and
 re-verified; UTIL-006 fixed (missing credentials on 3 nodes, none ever
 previously attached) and given its first-ever confirmed live execution,
 plus a new synchronous token-expiry check; new UTIL-007 shared refresh
-helper added.
+helper added. Updated 2026-08-06/07 (BC-029): new WF-001 CreateLead
+built and added (Phase 7, Growth Agent). While testing it, found and
+fixed 3 more real pre-existing infrastructure bugs that had never
+surfaced before because no real test data had hit the affected paths:
+(1) `client_test_001_acme_emergency_test.leads` was missing migration
+028's `convocore_*` columns entirely (schema-provisioning drift); (2)
+the same schema's `escalations` table was missing migration 032's
+`escalation_team` column (same drift class); (3) BC-028's 10-arg
+`insert_client_escalation` overload made every 9-arg call (i.e. every
+real call WF-017 NotifyHuman itself makes) ambiguous to PostgREST
+(`PGRST203`) — silently broken since BC-028, undetected because
+BC-028's own ADP-002 test always passed the 10th argument explicitly.
+This means WF-017 (and therefore WF-013/WF-016's handoff path) had been
+broken for any 9-arg caller since BC-028 until this session's fix
+(dropped the redundant 9-arg overload). See WF-001's own entry below
+for detail, and PROJECT_STATE.md's Session Log for the full account.
 ```
 
 ---
@@ -427,6 +442,50 @@ helper added.
 **REAL DEPENDENCIES:** UTIL-001, UTIL-004 (via Execute Workflow — **both of UTIL-004's output pins must be wired to the response node**, see UTIL-004's entry above; this exact bug existed here until fixed BC-026).
 
 **LAST VERIFIED:** BC-026, 2026-08-06 — real escalation rows confirmed via direct SQL (`d073d15c-...` pre-fix — proving the DB write itself always worked even while the response was broken; `655dc334-...` post-fix, `455b6eca-...` for Client B). Real Gmail message confirmed sent: `id: 19fd832788ca2c8d`, `labelIds: ["SENT"]`.
+
+**FIXED BC-029 (major, found live while testing WF-001's Pattern D path):** `Insert Escalation Row` calls `public.insert_client_escalation` with exactly 9 named args — this workflow's own real call, unchanged since BC-026. BC-028 added a 10-arg overload (`p_escalation_team text DEFAULT NULL`) alongside the original 9-arg one; PostgREST could no longer disambiguate a 9-arg call between the two (`PGRST203 — Could not choose the best candidate function`), so **every 9-arg caller of WF-017 — this workflow's own internal call, and therefore WF-013/WF-016's handoff path too — had been silently broken since BC-028**, undetected because BC-028's own ADP-002 test always passed the 10th argument explicitly. Fixed by dropping the redundant 9-arg overload (migration `drop_ambiguous_insert_client_escalation_9arg_overload`) — the 10-arg version's `DEFAULT NULL` is a strict, fully backward-compatible superset. Also found: `client_test_001_acme_emergency_test.escalations` was missing migration 032's `escalation_team` column entirely (schema-provisioning drift, same class as the `leads` gap below) — fixed via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS escalation_team text`. Re-verified live via WF-001's Retry test: a real escalation (`6e7c768f-...`) was created end-to-end post-fix.
+
+---
+
+## Growth Agent — Tools (Part 13)
+
+### WF-001 — Zenny Growth Agent - CreateLead (WF-001)
+**n8n ID:** `fjJkKxA3o6kfeLoz` · **published**, active
+
+**PURPOSE:** Growth Agent's ONLY Tool (Part 7.2's hard rule — Growth Agent never calls a conversion action tool directly). Creates the SOFT LEAD RECORD (Agent_Runtime_System_v1.md Module 2 §4.1) at Tier 2 capture — no lead-scoring logic here, per Planning_to_Build_Transition_v1.md Phase 7's note that scoring defers to Convocore's funnel.
+
+**TRIGGER:** Webhook, `POST /create-lead` (production: `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/create-lead`).
+
+**INPUT (Standard Request Contract):** `{ client_id, conversation_id, payload: { customer_id, archetype, intent, source_channel, conversation_summary } }`. `archetype` must be one of the 6 real `archetype_enum` values; `source_channel` one of the 6 real `source_channel_enum` values — both checked by a dedicated `Validate Input` node (Pattern A) before any DB call, not left to a raw enum-cast DB error.
+
+**OUTPUT / END STATE:**
+- Success: 200, `{ result: { lead_id, status: "new" } }` — a real new row in `{client_schema_name}.leads` (via the new `public.insert_client_lead` RPC), `status='new'`, `validation_flag=false`.
+- Missing/invalid required field: 400, `{ error: { code: "VALIDATION_ERROR", message, details: [...] } }` (Pattern A) — no DB call made.
+- Unknown `client_id`: 400, `{ error: { code: "UNKNOWN_CLIENT" } }`.
+- `customer_id` doesn't belong to this client's own schema (cross-client / security case): 400, `{ error: { code: "CUSTOMER_NOT_FOUND" } }` — checked explicitly via the new `public.client_customer_exists` RPC before insert, not left to an incidental FK-violation error.
+- Duplicate (`client_id` + `conversation_id` repeated, matching the `create-lead_{client_id}_{conversation_id}` idempotency key): 200, same `lead_id` as the first call — `insert_client_lead` checks `(customer_id, convocore_conversation_id)` first and returns the existing row instead of inserting a second one. Backed by a real per-schema partial `UNIQUE` index on `(customer_id, convocore_conversation_id)` (Integration Contract Part 11.4's "database is the final guarantee"), not just the key format.
+- DB call fails/times out: one silent automatic retry (Pattern B — `retryOnFail`, `maxTries: 2`, `waitBetweenTries: 1000`). If still unresolved: 200, `{ result: { status: "pending_human_review" }, handoff: {...} }` — routes to WF-017 NotifyHuman (Pattern D) with a real new `escalations` row created.
+
+**REAL DEPENDENCIES:** UTIL-001 (schema resolution), WF-017 (direct HTTP POST to its production webhook, matching the WF-013/WF-016 pattern — not an Execute Workflow node).
+
+**STEP 0 AUDIT:** confirmed live via `search_workflows` — the only existing "WF-001" in the n8n instance is `WF-001 — LEAD CREATION ENGINE` (`RJwCyNXEp4HM83il`), inactive, `availableInMCP: false`, part of the pre-rebuild legacy series (Workflow Registry's "Legacy" section) — genuinely unrelated to this current-architecture build, confirmed before building.
+
+**REAL BUGS FOUND + FIXED WHILE BUILDING/TESTING THIS WORKFLOW (BC-029):**
+1. An `IF` node condition combining a boolean `"true"` operator with an explicit `rightValue: ''` throws `NodeOperationError` (strict type validation tries to coerce `''` to boolean) — WF-013's identical-looking IF nodes omit `rightValue` entirely for this operator; matched that working shape on all 3 boolean IF nodes here.
+2. `retryOnFail` + `onError: continueErrorOutput` together do NOT route a retry-exhausted failure to the node's error output pin (index 1) — it lands on the regular output pin (index 0) as an item carrying an `.error` field instead. Fixed by adding an explicit `Insert Succeeded?` IF node checking for a real `lead_id` after the main pin, rather than relying on the second pin (kept as a defensive fallback connection).
+3. `client_test_001_acme_emergency_test.leads` was missing migration 028's `convocore_*` columns entirely — a real schema-provisioning drift (that client schema was created before the migration ran and was never back-filled). Fixed via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
+4. `client_test_001_acme_emergency_test.escalations` was missing migration 032's `escalation_team` column — same drift class as #3. Fixed the same way.
+5. BC-028's 10-arg `insert_client_escalation` overload made every 9-arg call (i.e. every real call WF-017 itself makes) ambiguous to PostgREST (`PGRST203`) — see WF-017's own entry above for full detail. Fixed by dropping the redundant 9-arg overload.
+6. Setting `options.response.response.responseFormat: 'json'` explicitly on the `Route To Human Handoff (WF-017)` HTTP node caused a real internal n8n crash (`Cannot read properties of undefined (reading 'data')`) — reverted to no explicit `responseFormat`, matching WF-013's already-proven pattern exactly. The `handoff` echo field in WF-001's own Pattern-D response is consequently sparse (`{}`) rather than carrying WF-017's `escalation_id` back — a real, minor, shared cosmetic gap also true of WF-013/WF-016, not fixed here (their scope, not this card's).
+
+**REAL NEW DB OBJECTS (BC-029):** `public.insert_client_lead` (RPC, with built-in duplicate detection), `public.client_customer_exists` (RPC, security check), plus the schema-drift and overload fixes above (all applied directly via Supabase migrations, not workflow logic touching schema).
+
+**LAST VERIFIED:** BC-029, 2026-08-06 — all 5 required test categories genuinely executed against real production data (not simulated/assumed):
+- Success: real `leads` row confirmed via direct SQL (`294e9af5-...` final clean run; `b602285b-...` initial).
+- Failure (missing `customer_id`): real `VALIDATION_ERROR` response, no DB call made.
+- Security (cross-client `customer_id` — Client B's real customer against Client A's schema): real `CUSTOMER_NOT_FOUND` rejection, confirmed no row was ever at risk of being created (FK-backed).
+- Retry (forced 1ms client-side timeout to genuinely simulate a Supabase timeout): confirmed one real silent retry (~1s = one `waitBetweenTries`), then genuine Pattern D handoff — real escalation `6e7c768f-...` confirmed via direct SQL, real `escalation_id` returned in the response.
+- Duplicate (same `conversation_id` sent twice): confirmed via direct SQL — exactly 1 row exists for `test-conv-success-002`, both calls returned the identical `lead_id`.
 
 ---
 
