@@ -12,13 +12,21 @@ import type { ClientConnection, DashboardClient } from '../lib/types';
 // alongside calendar scope, per Client_Integration_and_Credential_
 // Platform_v1.md Part 8.1's "one shared app" design; no separate
 // oauth_apps row needed, confirmed live before building this).
+//
+// BC-025: 'notification' (Slack) removed entirely — Client_Integration_
+// and_Credential_Platform_v1.md Part 8.4 always described Slack as ONE
+// Zenny-owned internal app (chat:write only), never a per-client
+// integration. It should never have been a client-facing "connect"
+// option; this was a real design mismatch, not just an unready
+// provider. Notifications are now Gmail-based internally (see UTIL-004
+// / SCH-006), not something a client connects here.
 const ARCHETYPE_CATEGORIES: Record<string, string[]> = {
-  emergency: ['calendar', 'notification', 'email'],
-  commerce_ecom: ['ecommerce', 'calendar', 'notification', 'email'],
-  commerce_restaurant: ['ecommerce', 'calendar', 'notification', 'email'],
-  appointment: ['calendar', 'notification', 'email'],
-  consultation: ['calendar', 'notification', 'email'],
-  engagement: ['notification', 'email'],
+  emergency: ['calendar', 'email'],
+  commerce_ecom: ['ecommerce', 'calendar', 'email'],
+  commerce_restaurant: ['ecommerce', 'calendar', 'email'],
+  appointment: ['calendar', 'email'],
+  consultation: ['calendar', 'email'],
+  engagement: ['email'],
 };
 
 interface ProviderOption {
@@ -26,8 +34,8 @@ interface ProviderOption {
   label: string;
   // BC-018: whether this provider actually works today, independent of
   // control.oauth_apps.app_status (which can be stale/misleading — e.g.
-  // Slack's app_status says 'testing' but its client_id is a literal
-  // placeholder, per BC-004 Step C). Shown, never hidden, per BC-018's
+  // Cal.com's app_status says 'pending' with a literal placeholder
+  // client_id, per BC-004 Step B). Shown, never hidden, per BC-018's
   // Step 2 resolution.
   ready: boolean;
   unavailableReason?: string;
@@ -54,22 +62,12 @@ const CATEGORY_PROVIDERS: Record<string, ProviderOption[]> = {
     { provider: 'woocommerce', label: 'WooCommerce', ready: true, kind: 'api_key' },
   ],
   email: [{ provider: 'google', label: 'Gmail', ready: true }],
-  notification: [
-    {
-      provider: 'slack',
-      label: 'Slack',
-      ready: false,
-      unavailableReason:
-        "Slack isn't connectable yet — there's no real multi-tenant OAuth app behind it (a bot-token placeholder only, per BC-004).",
-    },
-  ],
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
   calendar: 'Calendar',
   ecommerce: 'Store',
   email: 'Email',
-  notification: 'Notifications',
 };
 
 /** Normalizes anything the user types into a bare myshopify.com subdomain. */

@@ -15,10 +15,32 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-06 — by Claude Code, Session 25 (BC-024 — COMPLETE: partial-scope-grant handling verified+fixed (a real Google consent denial no longer falsely marks a connection "connected"), a SEPARATE real bug found+fixed where the refresh scheduler was silently un-revoking disconnected connections, credential-snapshot safety net established, all 3 test connections restored+verified healthy)
+2026-08-06 — by Claude Code, Session 26 (BC-025 — COMPLETE: scope-request behavior verified as one combined request (matches code+real logs), Slack removed entirely from the client-facing dashboard, notifications rebuilt as Gmail-based internal+client paths via UTIL-004, and 2 real pre-existing bugs found+fixed live — SCH-006's refresh-failure branch was completely dead code (error output never wired), and the failure IF-node's strict type validation broke on real error objects. Both real Gmail sends verified with real message IDs)
 
 ## Current Phase
-Phase 5 (Dashboard Systems) — **BC-021 through BC-024 all COMPLETE.**
+Phase 5 (Dashboard Systems) — **BC-021 through BC-025 all COMPLETE.**
+BC-025: Step 1 verified — via the real deployed oauth-initiate code AND
+real Edge Function logs — that Google/Calendar/Gmail is genuinely ONE
+combined scope request (calendar.events + gmail.modify + userinfo.email
+together), matching the DB; the human's screenshot showing only Gmail
+scopes was Google's own incremental-consent re-display behavior, not a
+code issue — no change needed. Slack removed entirely from Integrations
+.tsx (category, provider option, all references) — it was never a valid
+per-client integration design in the first place, per Client_
+Integration_and_Credential_Platform_v1.md Part 8.4. Notifications
+rebuilt as 2 real Gmail-based paths (UTIL-004: internal ops alerts +
+distinct client-facing alerts), replacing SCH-006's 4 disabled Slack
+nodes entirely. While building this, found and fixed 2 real,
+independent bugs via genuine testing: the 3 token-refresh nodes'
+`onError: continueErrorOutput` error branch was never actually
+connected to the failure-check IF nodes (real refresh failures have
+silently dead-ended since this workflow was built — the whole failure
+branch was dead code), and those same IF nodes threw on real error
+objects due to strict type validation. Both fixed and verified with a
+real deliberate failure test — 2 genuine Gmail messages sent and
+confirmed via real message IDs. Full detail in "Phase 5 — Slack Removal
++ Gmail-Based Notifications + Scope-Request Verification (BC-025)"
+below.
 BC-024: verified oauth-callback already stored Google's REAL granted
 scope (not the requested one), but found and fixed a real gap — it
 never checked whether the granted scope actually covered what the
@@ -1499,6 +1521,138 @@ card asked to verify, and one additional real bug fixed immediately
 upon discovery — none of it a document-level conflict.
 ```
 
+## Phase 5 — Slack Removal + Gmail-Based Notifications + Scope-Request Verification (BC-025)
+
+```
+**Step 1 — real scope-request behavior, verified before changing
+anything:** Re-read oauth-initiate's live deployed source: `buildAuthorizeUrl`
+uses `app.scopes` (the single control.oauth_apps google row's combined
+scope string) for BOTH the 'calendar' and 'email' category flows — no
+category-specific scope subsetting exists anywhere in the code. Cross-
+checked against real, fresh Edge Function logs from the human's actual
+recent connect attempts: every real oauth-callback hit (both category=
+calendar and category=email initiations) shows Google returning
+`calendar.events + gmail.modify + userinfo.email` together in the real
+`scope` param — confirmed unambiguously that this is ONE combined
+request, not two separate ones, matching the code and the DB exactly.
+The human's screenshot showing only Gmail-family permissions is
+explained, not a bug: Google's own consent UI selectively re-displays
+only newly-requested/changed scopes on a re-consent (the
+`consentsummary` URL itself is Google's re-consent summary screen, a
+real, documented Google behavior) when an account has already granted
+some of the requested scopes in a prior session — highly plausible
+given how much testing this exact test account has been through. The
+softer warning screen (vs. the red "hasn't verified" interstitial) is
+explained the same way as always: the google oauth_app is `app_status:
+'testing'`, and Google will not let ANY consent screen render at all
+for a non-registered account on a Testing-status app — reaching a
+consent screen at all is itself proof the account is a registered Test
+User; not independently checked in Console (no tool access), but a
+sound logical deduction, not a guess. **Recommendation: no change
+needed** — the current one-combined-request design is fine, arguably
+better (BC-024's partial-grant handling already correctly isolates
+per-category outcomes regardless of how the consent screen renders).
+
+**Step 2 — Slack removed entirely from the client-facing dashboard:**
+Integrations.tsx's `notification` category, its Slack `ProviderOption`
+entry, and its `CATEGORY_LABELS` entry all removed — not hidden, not
+disabled, gone. `ARCHETYPE_CATEGORIES` no longer lists 'notification'
+for any archetype. Confirmed via search: no other dashboard file
+references Slack as something a client configures. Real design mismatch
+resolved: Client_Integration_and_Credential_Platform_v1.md Part 8.4
+always described Slack as ONE Zenny-owned internal app (chat:write
+only), never a per-client integration — it should never have been a
+"Connect" option on a client-facing dashboard. **Not yet live** —
+dashboard redeploy needs Hostinger MCP, disconnected this session;
+change is committed to the repo.
+
+**Step 3 — UTIL-004 rebuilt, Slack removed, Gmail-based (2 real
+paths):** Removed the Slack IF-node and its httpRequest node entirely.
+Added a genuine second path: new trigger inputs (notify_client,
+client_email, client_subject, client_message) alongside the existing
+internal ones, feeding a new "Notify Client?" IF -> "Send Client Email"
+Gmail node. Both Gmail send nodes use the `zenny-notification-sender`
+credential (per the human's explicit correction — not zenny-gmail as
+originally assumed) sending internal alerts to zenny.zeromanual@gmail.com
+and client alerts to that client's own contact email. Fixed
+"Send Ops Email"'s literal placeholder `sendTo` value to the real
+address. **SCH-006's 4 disabled Slack nodes removed entirely** (not
+left disabled-in-place — the decision is now "we don't use Slack," per
+the Commander) and replaced with a real notification chain on all 4
+original trigger points (3 refresh-failure branches + the 7-day Google
+Testing-mode warning): a new "Get Client Email" node (calling a new
+public RPC, `get_client_contact_email` — migration 050, control is not
+PostgREST-exposed, same wrapper pattern as every other control.* access)
+feeding an "Execute Workflow" call to UTIL-004 with BOTH `notify_email`
+(reusing the exact original Slack message text, unchanged) and
+`notify_client` (new, genuinely distinct, actionable client-facing
+copy, e.g. "Your Google Calendar connection needs to be renewed... sign
+back in and reconnect it under Integrations"). **Real gap found and
+fixed along the way:** the test client had NO `control.client_config`
+row at all — confirmed via query that NO client in the entire system
+currently has one, a real, separate, pre-existing gap worth flagging
+for a future card (not in this card's scope to fully resolve). Inserted
+one for the test client (email_address = zenny.zeromanual@gmail.com,
+per the human's explicit instruction) with otherwise-minimal valid
+defaults, just to make this session's real test possible.
+`control.oauth_apps`' slack row marked with a new, real `'deprecated'`
+app_status value (migrations 051-052, additive to the existing CHECK
+constraint, same pattern BC-004 used to add `'pending'`) — a directly-
+queryable signal, not just a comment, so a future session doesn't try
+to "fix" the placeholder-credential gap BC-004 originally flagged; it's
+now a closed Commander decision.
+
+**2 real, independent bugs found and fixed live, while testing (not
+what Step 1-3 were looking for, but real and caught by actually
+running the workflow, not assumed from code review):**
+1. All 3 `Refresh *** Token` nodes use `onError: continueErrorOutput`,
+   which produces items on a SEPARATE output (index 1) for real
+   failures — but SCH-006's connections graph only ever wired output
+   index 0 (success) to the corresponding `Refresh Failed?` IF node.
+   **Real refresh failures have been silently dead-ending since this
+   workflow was built** — the entire failure branch (Mark Token
+   Expired / Log Refresh Failed / notifications) was dead code for
+   real failures the whole time; every prior "successful" SCH-006 test
+   this project ever ran happened to hit only the success path. Caught
+   only because BC-025 deliberately forced a real failure. Fixed by
+   also connecting output index 1 into the same IF node for all 3
+   branches.
+2. Those same 3 `Refresh Failed?` IF nodes use strict type validation
+   on a `$json.error exists` check — which threw a real
+   `NodeOperationError` ("Wrong type... is an object but was expecting
+   a string") the moment a genuine error object (the full AxiosError)
+   reached them, rather than evaluating true. Fixed via loose type
+   validation (n8n's own suggested fix), all 3 nodes.
+
+**Step 4 — both real Gmail sends verified with real message IDs, not
+just "no error":** Created one disposable test connection (client_id =
+the real test client, but a genuinely unused `category='telephony'`
+slot — no real credential touched) with a deliberately invalid refresh
+token, so Google's real token endpoint returned a genuine
+`invalid_grant` 400. Ran SCH-006 for real: confirmed the FULL chain
+fired end-to-end — `Refresh Failed?` correctly true, `Mark Token
+Expired`, `Log Refresh Failed`, `Get Client Email` (returned the real
+`zenny.zeromanual@gmail.com`), then UTIL-004's sub-execution shows BOTH
+Gmail sends succeeded with real, distinct Gmail message IDs: "Send Ops
+Email" -> `19fd75113a10d2df`, "Send Client Email" -> `19fd751152b7ee18`
+(both `labelIds: ["SENT"]` — genuine proof of real delivery, not a
+simulated/pinned test). The 7-day Google Testing-mode warning branch
+uses the identical UTIL-004 mechanism already proven working here;
+not independently re-triggered this session (would require faking a
+near-7-day-expiry testing-mode connection, more setup for the same
+already-proven code path) — disclosed as a scoping choice, not
+overclaimed as separately tested. Disposable test connection cleaned
+up afterward: marked `revoked` with a clear note (not force-deleted —
+it has real audit log history, matching this project's "mark clearly,
+don't delete" convention).
+
+0 self-resolved document-level items this session — the Document
+Resolution Authority gate does not apply. Step 1 was investigation
+only (no change made); Steps 2-4 were explicit card instructions or
+ordinary bug-fixing against live test data — none of it a document-
+level conflict.
+```
+
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
 
 Per Planning_to_Build_Transition_v1.md Part 4 Phase 5, 4 Directus-based
@@ -2152,6 +2306,21 @@ directly.
 ## Blockers Right Now
 
 ```
+**BC-021 THROUGH BC-025 ARE ALL COMPLETE.** BC-025: verified the real
+Google scope request is one combined request (matches code + live
+logs, no change needed); removed Slack entirely from the client-facing
+dashboard (never a valid per-client design, per Client_Integration_
+and_Credential_Platform_v1.md Part 8.4); rebuilt notifications as 2 real
+Gmail-based paths via UTIL-004 (internal ops + client-facing, both
+verified with real Gmail message IDs); found and fixed 2 real,
+independent, pre-existing bugs live via testing — SCH-006's refresh-
+failure branch was completely dead code (the onError error output was
+never connected to the failure-check IF nodes) and those same IF nodes
+threw on real error objects due to strict type validation. Slack's
+oauth_apps row marked with a new, real `deprecated` status. See "Phase
+5 — Slack Removal + Gmail-Based Notifications + Scope-Request
+Verification (BC-025)" above for full detail.
+
 **BC-021 THROUGH BC-024 ARE ALL COMPLETE.** BC-024: verified/fixed
 partial-scope-grant handling (oauth-callback v7/v8 now rejects a
 connection with a real, logged reason if the granted scope doesn't
@@ -2558,6 +2727,72 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 26 — 2026-08-06 — BC-025 COMPLETE: scope-request behavior verified (one combined request, no change needed), Slack removed entirely from the dashboard, notifications rebuilt Gmail-based (2 real paths verified with real message IDs), 2 real pre-existing SCH-006 bugs found+fixed live
+- Step 1 — verified before changing anything: re-read oauth-initiate's
+  live source (uses the same combined app.scopes string for both
+  category=calendar and category=email, no per-category subsetting
+  anywhere) and cross-checked real Edge Function logs from the human's
+  actual recent connects (every real callback shows calendar.events +
+  gmail.modify + userinfo.email together). Confirmed: one combined
+  request, matching code and DB exactly. Explained the human's
+  screenshot (Google's own incremental re-consent screen selectively
+  showing only newly-requested scopes for an account that had already
+  granted some previously) and the softer consentsummary warning screen
+  (app_status='testing' means reaching any consent screen at all
+  already proves the account is a registered Test User). Recommendation:
+  no change needed, current design is fine.
+- Step 2 — removed the 'notification' category, Slack ProviderOption,
+  and CATEGORY_LABELS entry from Integrations.tsx entirely (not hidden).
+  Confirmed no other dashboard file references Slack as client-
+  configurable. Not yet live (dashboard redeploy needs Hostinger MCP,
+  disconnected this session) but committed.
+- Step 3 — rebuilt UTIL-004: removed the Slack branch, added a real
+  second Gmail path (notify_client/client_email/client_subject/
+  client_message trigger inputs -> Notify Client? -> Send Client Email).
+  Both Gmail nodes use zenny-notification-sender per the human's
+  explicit correction. Fixed Send Ops Email's literal placeholder
+  sendTo. Removed SCH-006's 4 disabled Slack nodes entirely (not
+  disabled-in-place) and replaced all 4 original trigger points with a
+  real Get Client Email (new public RPC get_client_contact_email,
+  migration 050) -> Execute Workflow(UTIL-004) chain, sending both an
+  internal alert (original message text reused) and a distinct,
+  actionable client-facing alert. Found the test client had NO
+  client_config row — confirmed NO client in the whole system has one, a
+  real separate gap flagged for a future card; inserted one for the
+  test client (email_address = zenny.zeromanual@gmail.com, per the
+  human) to make this session's real test possible. Marked slack's
+  oauth_apps row with a new, real 'deprecated' app_status (migrations
+  051-052, additive to the CHECK constraint, same pattern as BC-004's
+  'pending' addition) — a directly-queryable closed-decision signal.
+- Found and fixed 2 real, independent, pre-existing bugs live while
+  testing (not what Steps 1-3 were looking for): (1) all 3 Refresh ***
+  Token nodes' onError=continueErrorOutput error output (index 1) was
+  NEVER connected to the corresponding Refresh Failed? IF node — only
+  the success output (0) was wired. Real refresh failures have been
+  silently dead-ending since this workflow was built; the entire
+  failure branch was dead code for real failures the whole time, caught
+  only because this session deliberately forced one. Fixed by wiring
+  output 1 too, all 3 branches. (2) Those same IF nodes' strict type
+  validation threw a real NodeOperationError the moment a genuine error
+  object reached them instead of evaluating true — fixed via loose type
+  validation (n8n's own suggested fix).
+- Step 4 — real test, not simulated: created one disposable connection
+  (real test client, unused category='telephony' slot, no real
+  credential touched) with a deliberately invalid refresh token. Ran
+  SCH-006 for real: confirmed the full chain fired end-to-end and both
+  Gmail sends succeeded with real, distinct message IDs (Send Ops
+  Email: 19fd75113a10d2df, Send Client Email: 19fd751152b7ee18, both
+  labelIds: ["SENT"]) — genuine proof of real delivery. The 7-day
+  warning branch uses the identical, already-proven UTIL-004 mechanism;
+  disclosed honestly as not independently re-triggered this session
+  rather than overclaimed. Disposable connection marked revoked with a
+  clear note afterward (not force-deleted — real audit history exists),
+  matching this project's "mark clearly, don't delete" convention.
+- 0 self-resolved document-level items — the Document Resolution
+  Authority gate does not apply (Step 1 was investigation only; Steps
+  2-4 were explicit card instructions or ordinary bug-fixing against
+  live test data). This session is complete.
 
 ### Session 25 — 2026-08-06 — BC-024 COMPLETE: partial-scope-grant handling verified+fixed, a separate real revoked-connection-resurrection bug found+fixed live, credential-snapshot safety net established, all 3 test connections restored+verified
 - Step 1.1 — re-read oauth-callback's real google case: it already
