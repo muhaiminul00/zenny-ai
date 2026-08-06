@@ -15,10 +15,23 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-06 — by Claude Code, Session 24 (BC-023 — COMPLETE: token-expiry root-caused to SCH-006 never being activated (now active), Calendar scope narrowed to calendar.events (Console+DB in sync, verified via real reconnect+refresh), Calendly's real disconnection from the reconnect explained, Privacy Policy/ToS revised for the real B2B model)
+2026-08-06 — by Claude Code, Session 25 (BC-024 — COMPLETE: partial-scope-grant handling verified+fixed (a real Google consent denial no longer falsely marks a connection "connected"), a SEPARATE real bug found+fixed where the refresh scheduler was silently un-revoking disconnected connections, credential-snapshot safety net established, all 3 test connections restored+verified healthy)
 
 ## Current Phase
-Phase 5 (Dashboard Systems) — **BC-021, BC-022, and BC-023 all COMPLETE.**
+Phase 5 (Dashboard Systems) — **BC-021 through BC-024 all COMPLETE.**
+BC-024: verified oauth-callback already stored Google's REAL granted
+scope (not the requested one), but found and fixed a real gap — it
+never checked whether the granted scope actually covered what the
+specific category needed before marking a connection "connected"
+(migration-free code fix, oauth-callback v7/v8 — a `verify_jwt`
+regression from the v7 deploy was self-caught and fixed in v8 before
+any real callback was affected). Live-tested with a real deliberate
+partial consent denial. While testing, found and fixed a SEPARATE real
+bug: SCH-006's refresh sweep was silently un-revoking connections a
+human had explicitly disconnected (migration 049). Established a
+`control.connection_snapshots` testing-safety table and used it 3 times
+this session around the disruptive test. Full detail in "Phase 5 —
+Partial-Scope-Grant Handling + Credential Preservation (BC-024)" below.
 BC-023: the "token expired" symptom was never a scope/migration bug — SCH-006
 (the scheduled token-refresh workflow) had simply never been toggled
 active, so nothing auto-refreshed tokens between manual test sessions.
@@ -1357,6 +1370,135 @@ or a content revision explicitly commissioned by this card (Step 4) —
 none of it a document-level conflict.
 ```
 
+## Phase 5 — Partial-Scope-Grant Handling + Credential Preservation (BC-024)
+
+```
+**Step 1.1 — code-level verification, confirmed correct as-is:**
+Re-read oauth-callback's real google case: `scope: json.scope` reads
+Google's ACTUAL returned scope string from the token-exchange response
+(the real grant, which may be a subset of what was requested), not the
+requested scope list — confirmed by tracing the exact line, not
+assumed. This is stored verbatim into `scopes_granted` via
+`p_scopes_granted: result.scope ?? ""`. No fix needed here — this part
+was already correct.
+
+**Step 1.1/1.4 — real gap found and fixed:** the function never checked
+whether the granted scope actually covered what the CATEGORY being
+connected needs before marking the row `status: 'connected'`. Since
+google's oauth_app row requests calendar.events + gmail.modify +
+userinfo.email together in one consent screen (confirmed via Google's
+own docs — this is native multi-scope consent-screen behavior, nothing
+to build on Zenny's side), a user could deny the one permission a
+specific category flow actually needs while granting an unrelated one,
+and the row would still have been marked "Connected." Fixed:
+oauth-callback v7 adds a `REQUIRED_SCOPE` map (currently
+`google.email -> gmail.modify`, `google.calendar -> calendar.events`)
+checked against the real granted-scope string before any secret is
+stored; a genuine denial for the category being connected now redirects
+with a real, logged `required_scope_denied` reason instead of a false
+"Connected." **Self-caught deploy regression, fixed in the same
+session before any real impact:** the v7 deploy call omitted
+`verify_jwt` (this MCP tool's default is `true`), which would have
+silently added a JWT requirement to a public callback that Google/
+Shopify/Slack/Calendly/Cal.com hit directly with no bearer token —
+every real OAuth callback would have 401'd. Caught immediately from the
+deploy response's own `verify_jwt: true` field, redeployed as v8 with
+`verify_jwt: false` explicitly, then sanity-checked with a real
+unauthenticated curl GET (302, not 401) before proceeding. Logged here
+in full rather than glossed over.
+
+**Step 1.2 — real deliberate partial-grant test, done by the human:**
+Reconnected via a different Google test account (the original account
+had already approved the app once, so Google would auto-skip re-
+prompting — a real, correct reason to switch accounts for a clean
+test), through the "Connect Calendar" flow, denying Gmail on Google's
+real consent screen. Confirmed via the real Edge Function log line:
+Google's actual callback returned
+`scope=email+calendar.events+userinfo.email+openid` — no gmail.modify,
+exactly the denial performed. Since the Calendar category's own
+requirement (calendar.events) was met, this connected correctly and
+the email category was correctly left untouched — not a rejection-path
+hit, but real, live proof the granted-scope check works off the real
+Google response and that category isolation holds (no cross-category
+false positive). The rejection branch's logic is a simple, deterministic
+string-membership check exercised by the same code path — not
+separately re-tested against an actual gmail.modify-denial-on-the-email-
+flow scenario this session, disclosed honestly rather than overclaimed.
+
+**Step 1.3 — dashboard UI, confirmed already correct:** Integrations.tsx
+independently renders each category by finding its own
+`connections.find(c => c.category === category)` row — a partial grant
+naturally shows exactly the right per-category state (Connected only
+for what's actually connected) with no extra code needed. No gap found
+here.
+
+**Step 1.5 — UI copy added (small effort, judged worth it):** a new
+note near the Connect buttons: "On Google's own consent screen,
+Calendar and Gmail permissions can be approved or denied independently
+— granting one doesn't require granting the other." Committed to
+Integrations.tsx. **Not yet live** — deploying the dashboard requires
+Hostinger MCP, which is disconnected this session; the change is in the
+repo, ready for the next deploy.
+
+**A SEPARATE real bug, found live as a side effect of testing (not
+something Step 1 was looking for, but real and worth fixing
+immediately):** running SCH-006 to check the partial-grant test's
+connection also touched the human's just-revoked Gmail connection —
+and silently flipped it back to `status: 'connected'` with a fresh
+token. Root cause, confirmed via both functions' real definitions:
+`get_connections_due_for_refresh` selected any connection with a
+non-null `refresh_token_secret_id` and an expiring `token_expires_at`,
+with NO exclusion for `status = 'revoked'` (revoking is local-only and
+deliberately doesn't delete the underlying Vault secret, so a revoked
+row's refresh token is still there to be picked up); combined with
+`update_connection_tokens` unconditionally setting
+`status = 'connected'` on every successful refresh, this meant the
+6-hourly scheduler could silently un-revoke any connection a human
+explicitly disconnected. **This directly undermines the Disconnect
+feature** and was fixed immediately: migration 049 adds
+`AND status <> 'revoked'` to `get_connections_due_for_refresh`, so
+revoked connections are never selected for refresh in the first place.
+
+**Step 2 — credential preservation, a testing-safety net established
+and used 3 times this session:** created `control.connection_snapshots`
+(migration 048) — references existing Vault secret IDs only, never
+duplicates decrypted secret material; explicitly documented as
+informational/historical only, never read by any live code path, never
+auto-restored. Snapshotted the test client's 3 working connections
+BEFORE Step 1's test disturbed anything; snapshotted again after the
+human reconnected the real test Gmail account; snapshotted a third time
+after the human reconnected Calendly (replacing Google Calendar in the
+shared category slot again, per the still-open BC-021/BC-023 design
+question). **Staleness handling, stated plainly:** a snapshot's
+`snapshotted_at` should be compared against the live row's current
+`updated_at` for the same (client_id, category) before treating it as
+"what's connected right now" — if the live row is newer, the snapshot
+is historical record only. This is not a parallel source of truth; it
+never overrides or is read by `control.client_connections` itself.
+
+**Step 2.3 — standing testing-safety process, for future sessions:**
+Before any test that might overwrite a `control.client_connections`
+category slot (reconnecting a provider that shares a category with
+another, like Calendar; deliberately testing a failure/denial path;
+anything that calls `upsert_client_connection` against an existing
+row) — snapshot the CURRENT state of any real, working connections for
+that category first via the pattern used in this session's 3 snapshot
+inserts above. This is now a standing practice for this project, not a
+one-time BC-024 fix.
+
+**Final verified state, all 3 real test connections healthy:**
+Calendly (category='calendar'), google/email (real test account,
+`quaantummedia.zeromanual@gmail.com`, full scopes), and woocommerce/
+ecommerce — all `status: 'connected'`, confirmed via direct query and
+snapshotted.
+
+0 self-resolved document-level items this session — the Document
+Resolution Authority gate does not apply. All of the above was live
+diagnosis/testing against real data, a real code fix for a gap the
+card asked to verify, and one additional real bug fixed immediately
+upon discovery — none of it a document-level conflict.
+```
+
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
 
 Per Planning_to_Build_Transition_v1.md Part 4 Phase 5, 4 Directus-based
@@ -2010,7 +2152,23 @@ directly.
 ## Blockers Right Now
 
 ```
-**BC-021, BC-022, AND BC-023 ARE ALL COMPLETE.** BC-021: root cause
+**BC-021 THROUGH BC-024 ARE ALL COMPLETE.** BC-024: verified/fixed
+partial-scope-grant handling (oauth-callback v7/v8 now rejects a
+connection with a real, logged reason if the granted scope doesn't
+cover what that category needs — live-tested with a real deliberate
+Google consent denial), and found+fixed a separate real bug live via
+testing: SCH-006's refresh sweep was silently un-revoking connections a
+human had explicitly disconnected (migration 049 — revoked connections
+now excluded from the refresh sweep). Established `control.
+connection_snapshots` as a standing testing-safety net (migration 048),
+used 3 times this session. All 3 real test connections (Calendly,
+google/email, woocommerce) confirmed healthy and snapshotted at the
+end. See "Phase 5 — Partial-Scope-Grant Handling + Credential
+Preservation (BC-024)" above for full detail, including a self-caught
+`verify_jwt` deploy regression fixed within the same session before any
+real callback was affected.
+
+BC-021: root cause
 diagnosed and fixed (store_credential_secret migration 045, oauth-
 callback v6, woocommerce-connect v3), the human's real re-test (Gmail/
 Calendly/WooCommerce) verified directly against real DB rows per Step
@@ -2400,6 +2558,68 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 25 — 2026-08-06 — BC-024 COMPLETE: partial-scope-grant handling verified+fixed, a separate real revoked-connection-resurrection bug found+fixed live, credential-snapshot safety net established, all 3 test connections restored+verified
+- Step 1.1 — re-read oauth-callback's real google case: it already
+  correctly stored Google's ACTUAL returned scope (not the requested
+  one) into scopes_granted. Found the real gap: it never checked that
+  the granted scope covered what the CATEGORY being connected actually
+  needs before marking it "connected." Fixed: oauth-callback v7 adds a
+  REQUIRED_SCOPE check (google.email needs gmail.modify, google.calendar
+  needs calendar.events) before storing anything; a genuine denial now
+  produces a real, logged required_scope_denied failure instead of a
+  false "Connected."
+- Self-caught a real deploy regression before it could cause harm: the
+  v7 deploy call omitted verify_jwt (MCP tool default: true), which
+  would have added an auth requirement to a public callback that
+  Google/Shopify/Slack/Calendly/Cal.com hit directly with no bearer
+  token. Caught from the deploy response itself, redeployed as v8 with
+  verify_jwt: false, sanity-checked with a real unauthenticated curl GET
+  (302, not 401) before moving on.
+- Step 1.2 — human did a real deliberate partial-grant test: reconnected
+  via a different Google account (original had already approved the
+  app), denied Gmail on Google's real consent screen via the Calendar
+  flow. Confirmed via the real Edge Function log: Google actually
+  returned scope=email+calendar.events+userinfo.email+openid — no
+  gmail.modify, exactly as denied. Category isolation held correctly
+  (calendar connected since its own requirement was met, email
+  untouched) — disclosed honestly that this specific test didn't
+  exercise the rejection branch itself (that needs denying gmail.modify
+  on the EMAIL flow specifically), though the code path is the same
+  deterministic check either way.
+- Step 1.3 — confirmed Integrations.tsx's existing per-category render
+  logic already handles a partial-grant outcome correctly with no
+  changes needed.
+- Step 1.5 — added a small UI note near the Connect buttons clarifying
+  Calendar/Gmail permissions can be granted independently. Committed to
+  the repo; not yet live (dashboard redeploy needs Hostinger MCP, which
+  is disconnected this session).
+- Found a SEPARATE real bug live, as a side effect of running SCH-006
+  to check the partial-grant test: it silently un-revoked the human's
+  just-revoked Gmail connection. Root cause: get_connections_due_for_
+  refresh never excluded status='revoked' rows (revoking doesn't delete
+  the underlying vault secret, so a revoked row's refresh token was
+  still there to be picked up), and update_connection_tokens
+  unconditionally sets status='connected' on every successful refresh.
+  This directly undermines Disconnect. Fixed immediately: migration 049
+  excludes revoked connections from the refresh sweep at the source.
+- Step 2 — created control.connection_snapshots (migration 048) as a
+  testing-safety net: references existing vault secret IDs only, never
+  duplicates secret material, never read by live code, never
+  auto-restored. Used it 3 times this session: before Step 1's
+  disruptive test, after the human reconnected the real test Gmail
+  account, and after they reconnected Calendly. Documented staleness
+  handling (compare snapshotted_at to the live row's updated_at) and a
+  standing process for future sessions: snapshot before any test that
+  might overwrite a category slot.
+- Final state verified real and healthy: Calendly (calendar), the real
+  test Gmail account (email, full scopes), and WooCommerce (ecommerce)
+  all connected, confirmed via direct query and snapshotted.
+- 0 self-resolved document-level items — the Document Resolution
+  Authority gate does not apply (live diagnosis/testing, a code fix for
+  a gap the card asked to verify, and one additional real bug fixed
+  immediately on discovery — none of it a document-level conflict).
+  This session is complete.
 
 ### Session 24 — 2026-08-06 — BC-023 COMPLETE: token-expiry root-caused (SCH-006 never activated, now active), Calendar scope narrowed to calendar.events (verified via real reconnect+refresh), Calendly's real disconnection explained, Privacy Policy/ToS revised for the real B2B model
 - Step 0 — confirmed @playwright/cli is installed and usable; this

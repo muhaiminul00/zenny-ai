@@ -405,6 +405,10 @@ export function Integrations() {
         app" — that's Google's own trust warning, not a bug here. It goes away once Google's
         verification review finishes; nothing in this dashboard can remove it sooner.
       </p>
+      <p className="note">
+        On Google's own consent screen, Calendar and Gmail permissions can be approved or denied
+        independently — granting one doesn't require granting the other.
+      </p>
 
       {popupNote && (
         <p className={popupNote.kind === 'error' ? 'error-text' : 'note'}>{popupNote.text}</p>
