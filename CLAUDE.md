@@ -137,6 +137,24 @@ fix without asking — that's unaffected by this rule either way.
   ordinary code/schema work against an already-clear card — none of the
   logging/stopping requirements apply. Proceed normally.
 
+## Standing Rule — Per-Workflow Documentation (added BC-027)
+
+Every workflow is documented immediately with real information — not
+summarized after the fact from memory. Any Build Card that creates or
+meaningfully modifies an n8n workflow must add/update that workflow's
+entry in `06_Infrastructure/n8n/Workflow_Registry.md` **before that
+session's own Definition of Done is considered met** — not deferred to
+a later documentation pass. Each entry is written from a live
+`get_workflow_details` read of the actual built workflow, not
+reconstructed from PROJECT_STATE.md's session prose (which is a
+session-history log, not a current-state reference, and may drift from
+the real built shape). Minimum entry contents: workflow ID + real n8n
+name, PURPOSE, TRIGGER (the real trigger node's real config), INPUT,
+OUTPUT/END STATE (concrete success state + failure state, not just
+"returns 200"), REAL DEPENDENCIES, LAST VERIFIED (date + Build Card
+ID of the most recent real execution test). Full detail and the
+existing registry: `06_Infrastructure/n8n/Workflow_Registry.md`.
+
 ## Standing Rule — Credential Gate
 
 AI never creates or invents credentials. If a Build Card needs one:

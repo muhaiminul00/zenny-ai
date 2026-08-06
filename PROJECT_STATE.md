@@ -15,9 +15,23 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-06 — by Claude Code, Session 27 (BC-026 — COMPLETE: Core Agent built — 5 internal workflows (INT-001–005) + 5 Tools (WF-013–017) — all 10 execution-tested end-to-end against 2 real roster clients with real DB state confirmed after every step. 6 new `public`-schema RPC wrappers built to route around a major, previously-undiscovered PostgREST schema-exposure gap. 6 real bugs found and fixed live during testing, one of them (missing `USAGE` grant on the `control` schema) a project-wide gap retroactively implicating UTIL-001/003/005 and ADP-002. 1 self-resolved document-level item logged below — session stops per the standing rule pending Commander acknowledgment)
+2026-08-07 — by Claude Code, Session 28 (BC-027 — COMPLETE: BC-026's self-resolved item formally acknowledged by the Commander (Step 0); BC-026's pending commit pushed; every currently-built workflow (19 real ones) documented live in a new `06_Infrastructure/n8n/Workflow_Registry.md`, one entry each, read fresh via `get_workflow_details` rather than reconstructed from prose; a standing per-workflow-documentation requirement added to CLAUDE.md and Claude_Build_Command_Protocol_v2.md (now part of Definition of Done); BC-026's PROJECT_STATE.md section expanded with a plain point-by-point summary; SCH-006 confirmed live at a genuine 2-hour interval, its 7-day Google Testing-mode refresh-token constraint documented as sweep-interval-independent)
 
 ## Current Phase
+Phase 6 remains the current phase — **BC-027 was a documentation card,
+not a new build phase.** It formally closed out BC-026's standing-rule
+stop (Commander acknowledgment, Step 0), pushed BC-026's pending
+commit, and created the permanent per-workflow reference
+(`06_Infrastructure/n8n/Workflow_Registry.md`, one live-verified entry
+per real built workflow — 19 total) plus the standing requirement to
+keep it updated going forward (CLAUDE.md + Claude_Build_Command_
+Protocol_v2.md, now part of Definition of Done). No new workflows were
+built or modified in BC-027 itself, aside from a SCH-006 config check
+(no change — the human had already retuned its interval to 2 hours
+directly in n8n; this session only confirmed it live). See
+"Phase 6 — Core Agent Build (BC-026)" below for the actual build detail
+this documentation covers.
+
 Phase 6 (Core Agent) — **BC-026 COMPLETE.** Built the 10 workflows every
 other future module depends on: INT-001 Create Customer, INT-002 Load
 Client Configuration, INT-003 Load Archetype Configuration, INT-004
@@ -2344,6 +2358,69 @@ directly.
 
 ## Phase 6 — Core Agent Build (BC-026)
 
+**Point-by-point session summary (added BC-027, for the human's own
+understanding of what this session actually did — the detailed
+technical reference below remains the citable full record):**
+
+1. Confirmed live that none of the 10 target workflows existed yet
+   under any name — a clean build, not a rebuild.
+2. Set up 2 reusable test clients ("Client A" = commerce_ecom, "Client
+   B" = emergency) with real `control.client_config` rows pointing at
+   real inboxes, documented as a standing reference for future Phase 6+
+   sessions.
+3. Built all 5 internal workflows (INT-001 through INT-005 — Create
+   Customer, Load Client Configuration, Load Archetype Configuration,
+   Initialize Conversation, Archive Conversation) and all 5 Core Agent
+   Tools (WF-013 through WF-017 — CancelAppointment, GetOrderStatus,
+   GetBookingStatus, UpdateCustomer, NotifyHuman).
+4. Hit a real problem partway through: nothing could actually read or
+   write a real client's data. Diagnosed it down to client schemas not
+   being exposed to PostgREST at all — a platform-level gap that had
+   silently existed since early sessions, never caught because nothing
+   had actually been execution-tested against a real client schema
+   until this session. Built 6 small database functions as a
+   workaround (all in the shared `public` schema, each one safely
+   scoped to a single client's schema) and rewired every affected new
+   workflow to call them instead of hitting the client schema directly.
+5. Hit a SECOND, separate real problem while testing config-loading:
+   even the shared `control` database, which should have always been
+   reachable, was returning "permission denied." Traced it to a
+   missing basic access grant that should have existed since this
+   schema was first created. Asked for approval before applying the
+   fix (a database permission change), got it, applied it, and
+   everything downstream started working correctly.
+6. While actually running each workflow for real (not just checking
+   that it built without errors), found and fixed 3 more ordinary bugs
+   — each one where the workflow LOOKED like it worked, but was quietly
+   reporting the wrong result to whatever calls it next: a config-load
+   step that never actually recognized a real config even when one
+   existed; a notification step that silently failed to respond about
+   half the time even though it had done its job correctly; and a
+   "delete this row" step that always reported failure even after
+   successfully deleting the row.
+7. Nothing was abandoned or left half-done — every one of the 6 real
+   bugs found (2 infrastructure-level, 1 database-permission, 3
+   ordinary code bugs) was fixed and then re-verified with a fresh,
+   real test before moving on, not just patched and assumed fixed.
+8. Ran the complete sequence for real against Client A (create a
+   customer, load their config, load their archetype settings, start a
+   conversation, check a real order, check a real booking, attempt an
+   update, attempt a cancellation, fire a human notification, close the
+   conversation) and a meaningful shorter version against Client B —
+   checking the real database after every single step, not just
+   trusting that the workflow reported success.
+9. One real, previously-unnoticed bug was found but deliberately NOT
+   fixed this session — 3 other, already-"complete" workflows from
+   earlier sessions (the Error Logger, the Stop Checker, and the
+   Convocore Adapter's human-handoff path) turn out to use the exact
+   same broken direct-schema-access pattern the new workflows hit, and
+   were flagged for a future card rather than fixed as a scope-creep
+   add-on to this one.
+10. Cleaned up: deleted the disposable testing workflow, removed one
+    leftover duplicate test row from an earlier failed attempt, left
+    the real successful test data in place (clearly named, matching
+    this project's convention).
+
 ```
 **Step 0 — live audit:** `search_workflows` across the n8n instance
 confirmed none of the 10 target workflows (INT-001–005, WF-013–017)
@@ -2548,27 +2625,33 @@ roster test clients).
 ## Blockers Right Now
 
 ```
-**BC-026 COMPLETE — SESSION STOPPED PER STANDING RULE, AWAITING
-COMMANDER ACKNOWLEDGMENT.** Per the Document Resolution Authority
-standing rule: this session self-resolved one document-level gap (no
-`conversations` table exists anywhere; Convocore owns the real
-conversation record; INT-004/INT-005 map to `active_issues` instead of
-inventing a table — full reasoning in "Phase 6 — Core Agent Build
-(BC-026)" above). Logged here and in that section as required. **Per
-the rule, no further Build Card work should begin until the Commander
-has explicitly acknowledged this specific resolution**, even if a next
-card has already been issued. Two real infrastructure bugs were also
-found and fixed this session (PostgREST client-schema exposure;
-missing `USAGE` grant on the `control` schema) — these are ordinary
-bug-catching, not document-level items, so they don't trigger the same
-stop, but are flagged clearly: **3 pre-existing workflows (UTIL-003
-Error Logger, UTIL-005 Stop Checker, ADP-002 Convocore Adapter) use the
-same broken direct-client-schema-access pattern the PostgREST-exposure
-bug invalidated, and were never fixed this session (out of BC-026's
-scope) — a real, latent bug in already-"complete" prior work that
-needs a future card.** All 10 new workflows (INT-001–005, WF-013–017)
-are built, published, and E2E-verified against both roster clients with
-real DB state confirmed at every step.
+**BC-026 COMPLETE — self-resolved item (no `conversations` table
+exists; Convocore owns the real conversation record; INT-004/INT-005
+map to `active_issues` instead) FORMALLY ACKNOWLEDGED by the Commander
+in BC-027 Step 0** — the standing-rule stop is lifted, Phase 6 work may
+be built upon. Full reasoning in "Phase 6 — Core Agent Build (BC-026)"
+below. Two real infrastructure bugs were also found and fixed during
+BC-026 (PostgREST client-schema exposure; missing `USAGE` grant on the
+`control` schema) — ordinary bug-catching, not document-level items.
+**Still flagged, not yet fixed:** 3 pre-existing workflows (UTIL-003
+Error Logger, UTIL-005 Stop Checker, ADP-002 Convocore Adapter's
+human-handoff path) use the same broken direct-client-schema-access
+pattern the PostgREST-exposure bug invalidated — a real, latent bug in
+already-"complete" prior work that needs a future card. Also flagged
+during BC-027's documentation pass: UTcdzMvOb7gCQM5J (Tool Execution
+Fallback)'s human-notification step is a dead Slack node with no valid
+credential — the credential-failure path currently fails to notify a
+human even though it correctly marks the connection errored and logs
+it; and ADP-001 (Voiceflow Adapter) is documented as "Production" in
+n8n_Workflow_Specification_v1.md Part 17 but no matching n8n workflow
+was found live in the instance — a real doc/reality mismatch, not
+investigated further (BC-027 was a documentation card). All 10 BC-026
+workflows (INT-001–005, WF-013–017) remain built, published, and
+E2E-verified against both roster clients with real DB state confirmed
+at every step. Every currently-built workflow (19 real ones) now has a
+live-verified reference entry in `06_Infrastructure/n8n/
+Workflow_Registry.md` (BC-027) — check there first for "what does
+workflow X actually do."
 
 **BC-021 THROUGH BC-025 ARE ALL COMPLETE.** BC-025: verified the real
 Google scope request is one combined request (matches code + live
@@ -2991,6 +3074,67 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 28 — 2026-08-07 — BC-027 COMPLETE: Commander acknowledged BC-026's self-resolved item, pending commit pushed, every real workflow (19) documented live in a new Workflow_Registry.md, standing per-workflow-documentation requirement added to CLAUDE.md + Protocol v2, BC-026 section expanded with a plain point-by-point summary, SCH-006's 2-hour interval confirmed live
+- Step 0 — the Commander's BC-027 text itself formally acknowledged
+  BC-026's self-resolved `conversations`-table mapping, closing the
+  standing-rule stop from Session 27.
+- Step 1 — `git push origin main` failed (`origin` isn't this repo's
+  remote name); retried with `git push zenny-sync main`, succeeded
+  (`d8473fb..a44efc7`). Not a permission-classifier block this time —
+  a genuine remote-name mismatch on my end, reported as such rather
+  than assumed to be the same class of issue as the earlier blocked
+  `apply_migration`/push attempts.
+- Step 2 — full live audit via `search_workflows` (54 total workflows
+  in the instance) to separate real current-architecture workflows from
+  legacy/unrelated ones. Read all 19 real workflows live via
+  `get_workflow_details` (11 already read fresh during BC-026 itself,
+  7 read fresh this session, 1 — SCH-006 — read via the raw JSON file
+  since its response exceeded the tool's inline size limit). Created
+  `06_Infrastructure/n8n/Workflow_Registry.md`: one entry per workflow
+  (UTIL-001–006, Tool Execution Fallback, SCH-006, ADP-002, INT-001–005,
+  WF-013–017), each with real PURPOSE/TRIGGER/INPUT/OUTPUT-END-STATE/
+  DEPENDENCIES/LAST VERIFIED, explicitly flagging known-broken pieces
+  found along the way (UTIL-003/UTIL-005/ADP-002's human-handoff path
+  all still use the broken direct-client-schema pattern; UTIL-002 has
+  no caller and has never been execution-tested; Tool Execution
+  Fallback's human-notification step is a dead Slack node with no valid
+  credential — a real gap on the credential-failure path, found while
+  documenting, not previously flagged anywhere). Also noted ADP-001
+  (Voiceflow Adapter) is documented as "Production" in n8n_Workflow_
+  Specification_v1.md Part 17 but no matching workflow exists live in
+  the instance — a real doc/reality mismatch, flagged not investigated
+  (this was a documentation card, not a fix card). A legacy/excluded
+  section lists the pre-rebuild `WF-001`/`WF-002`/`WF-003` engines and
+  other unrelated workflows explicitly, to prevent future confusion
+  with the real Part 13 `WF-01x` Tool numbering.
+- Step 3 — added the Per-Workflow Documentation standing rule to
+  CLAUDE.md (new section, same pattern as the existing Document
+  Resolution Authority rule) and to Claude_Build_Command_Protocol_v2.md
+  (new subsection after Document Resolution Authority, Definition of
+  Done in Section 12 updated to include it as an explicit checklist
+  item, Document Changelog bumped to v2.2).
+- Step 4 — expanded PROJECT_STATE.md's BC-026 section with a plain-
+  language, numbered point-by-point summary (what was built, what
+  broke and how it was found/fixed, what was verified) ahead of the
+  existing detailed technical reference, which was left intact rather
+  than rewritten.
+- Step 5 — confirmed live via a direct node-parameter read that
+  SCH-006's real Schedule Trigger config is `hoursInterval: 2` (the
+  node's own display name, "Every 6 Hours," is stale/mislabeled — real
+  behavior is 2 hours, not 6). No change made — the human had already
+  changed this directly in n8n. Documented Google's separate, sweep-
+  interval-independent 7-day Testing-mode refresh-token hard expiry
+  (Part 8.1.1) in SCH-006's registry entry, so a future reader doesn't
+  mistake the tighter sweep interval as having solved that constraint.
+- 0 new self-resolved document-level items this session — the doc-
+  location choice for Workflow_Registry.md was an explicit judgment
+  call the card itself delegated ("Claude Code's call, state where"),
+  and the ADP-001 doc/reality mismatch was flagged, not resolved (no
+  answer was decided, just reported as a discrepancy) — neither
+  triggers the Document Resolution Authority gate. BC-026's own item
+  was closed by the Commander's Step 0 acknowledgment above, not
+  self-resolved again here.
 
 ### Session 27 — 2026-08-06 — BC-026 COMPLETE: Core Agent built (10 workflows: INT-001–005 + WF-013–017), 2 real infrastructure bugs found+fixed (PostgREST client-schema exposure; missing control-schema USAGE grant), 3 more real code bugs found+fixed live during E2E testing, both roster clients fully verified, 1 self-resolved document-level item logged — session stops for Commander acknowledgment
 - Step 0 — live audit via `search_workflows`: confirmed none of the 10

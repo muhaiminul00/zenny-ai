@@ -177,6 +177,41 @@ a build action and doesn't require credential-gate handling.
 
 ------------------------------------------------------------------------
 
+### Per-Workflow Documentation (Standing Rule, added BC-027)
+
+Every workflow is documented immediately with real information as it is
+built or meaningfully modified — not summarized after the fact from
+memory, and not deferred to a later documentation-catchup card.
+
+```
+Any Build Card that creates or meaningfully modifies an n8n workflow
+must add/update that workflow's entry in
+06_Infrastructure/n8n/Workflow_Registry.md BEFORE that session's own
+Definition of Done is considered met.
+```
+
+- Each entry is written from a live `get_workflow_details` read of the
+  actual built workflow — never reconstructed from PROJECT_STATE.md's
+  session-log prose, which records session history, not current-state
+  fact, and can drift from what was actually built (repeatedly observed
+  across this project's sessions).
+- Minimum entry contents: workflow ID + real n8n name, PURPOSE (plain
+  language), TRIGGER (the real trigger node's real configuration — not
+  the spec's intended design if the two differ), INPUT (real payload
+  shape, cross-checked against n8n_Workflow_Specification_v1.md Part 13
+  where applicable, with any drift flagged), OUTPUT/END STATE (the
+  concrete real success state — e.g. "a new escalations row exists with
+  status='open'," not just "returns 200" — and the concrete real
+  failure state), REAL DEPENDENCIES (which other workflows/utilities it
+  actually calls), LAST VERIFIED (date + Build Card ID of the most
+  recent real execution test).
+- This is a Definition-of-Done gate, the same weight as the existing
+  PROJECT_STATE.md sync requirement (Section 10.E) — a session that
+  built or changed a workflow but didn't update its registry entry has
+  not met Definition of Done, regardless of what else it accomplished.
+
+------------------------------------------------------------------------
+
 # 3. Required Reading Before Building
 
 Per `Planning_to_Build_Transition_v1.md`, the current entry point. That
@@ -512,13 +547,15 @@ Draft → Implemented → Test Blocked → Tested → Approved → Production Re
 
 ------------------------------------------------------------------------
 
-# 12. Definition of Done — Unchanged
+# 12. Definition of Done — updated BC-027
 
 A Build Card is complete only when: the artifact exists, correct
 folder/location, correct naming, utilities reused, schema targeting
 implemented, logging implemented, retry implemented (where applicable),
 idempotency implemented (where applicable), standard response
-implemented, tests passed, Commander approved.
+implemented, tests passed, **the workflow's Workflow_Registry.md entry
+is added/updated (Per-Workflow Documentation standing rule, above)**,
+Commander approved.
 
 ------------------------------------------------------------------------
 
@@ -586,3 +623,15 @@ here.
   to the Commander, with one asymmetry: the Commander flags document
   corrections, Claude Code performs the actual file edit and commit
   (unchanged execution split, extended to this new authority).
+- **v2.2 (BC-027)** — added the Per-Workflow Documentation standing rule
+  (Section 2, after Document Resolution Authority): every Build Card
+  that creates or meaningfully modifies an n8n workflow must add/update
+  that workflow's entry in the new `06_Infrastructure/n8n/
+  Workflow_Registry.md` before that session's own Definition of Done is
+  met — written from a live `get_workflow_details` read, not
+  reconstructed from PROJECT_STATE.md's session prose. Section 12
+  (Definition of Done) updated to include this as an explicit checklist
+  item. Prompted by BC-027's own retroactive documentation pass, which
+  found the registry didn't exist at all and several already-"complete"
+  workflows had real, previously-unnoticed defects that a per-workflow,
+  live-verified reference would have caught sooner.
