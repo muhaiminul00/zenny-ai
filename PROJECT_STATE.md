@@ -15,10 +15,18 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-06 — by Claude Code, Session 22 (BC-021 — COMPLETE: real root cause of "connects then reverts" found + fixed across ALL providers, human re-test verified against real DB rows, SCH-006 tested against real stored tokens with 3 more real pre-existing bugs found+fixed, full regression pass clean)
+2026-08-06 — by Claude Code, Session 23 (BC-022 — COMPLETE: proxy-domain decision settled, codebase-memory-mcp onboarded+verified, Gmail account-label root cause found+fixed (missing OAuth scope), SCH-006 Slack node state verified/matches prior report, UI polish backlog logged)
 
 ## Current Phase
-Phase 5 (Dashboard Systems) — **BC-021 COMPLETE.** Root cause found and
+Phase 5 (Dashboard Systems) — **BC-021 and BC-022 both COMPLETE.**
+BC-022 found and fixed one more real bug while diagnosing the Gmail
+account-label gap: the google OAuth app's requested scopes never
+included anything granting access to Google's userinfo endpoint, so
+the account-email lookup oauth-callback already had code for has been
+silently failing since it was built (migration 046 fix — see "Phase 5
+— Small Fix Pass..." section below). BC-021's original root cause fix
+and SCH-006 findings, below, remain the larger prior body of work. Root
+cause found and
 fixed for the "real OAuth/API-key connections silently fail to persist"
 defect the human reported: `store_
 credential_secret` used a STATIC Vault secret name per client+category
@@ -1121,6 +1129,110 @@ disclosed as undiagnosable from historical data; full regression pass
 clean.
 ```
 
+## Phase 5 — Small Fix Pass + SCH-006 Slack State Verification + codebase-memory-mcp Onboarding (BC-022)
+
+```
+**Step 0.5 — codebase-memory-mcp, real capabilities verified (not
+assumed from the name), first-time onboarding for this tool:**
+Confirmed loaded this session (`list_projects` returned this repo,
+already indexed) and functional via real read-only calls, not just tool
+presence. What it actually is: a local graph-augmented code+doc index
+of THIS repo (not a cross-session memory of conversations, despite the
+name) — `list_projects`/`index_status` showed it auto-indexed this
+project (4405 nodes, 4559 edges) already at the current HEAD commit
+(8224ec5), status "ready", no manual indexing step needed this session.
+It indexes both code (functions/classes with real line ranges,
+complexity metrics, call graph in/out-degree) AND markdown docs
+(PROJECT_STATE.md, the spec docs) as searchable nodes. Real, useful
+proof of value: `search_code` for "provider_account_id" instantly found
+the exact 3 real files/line ranges that reference it (Integrations.tsx
+line 445, the ClientConnection type, 2 spec docs) — including the exact
+UI rendering logic — in one call, faster than a manual grep+read cycle
+would have been; `get_code_snippet` then pulled the full real function
+body with call-graph metadata. **Genuinely useful, used for real this
+session** — Step 1's diagnosis below started from this tool's output
+rather than a manual file search. One real gap: it does NOT index
+Supabase Edge Functions or n8n workflows (they aren't local files) —
+those still need `get_edge_function`/`get_workflow_details` directly,
+which is what Step 1/2 below actually used for the backend-side
+diagnosis. Recommendation for future cards: use it first for
+"where in the dashboard/docs does X live" questions; it's not a
+substitute for the Supabase/n8n MCPs for anything server-side.
+
+**Step 1 — Gmail account-label gap: REAL ROOT CAUSE, NOT a UI bug,
+fixed at the source.** Confirmed via `codebase-memory-mcp` that
+Integrations.tsx's render logic already correctly displays
+`provider_account_id` when truthy (`{existing.provider_account_id ? \`
+· ${existing.provider_account_id}\` : ''}`) — so a missing label could
+only mean missing data, not a rendering gap. Queried
+`control.client_connections` directly: `provider_account_id` is
+genuinely `NULL` for the google/email connection. Traced why: oauth-
+callback's google case DOES call
+`https://www.googleapis.com/auth/oauth2/v2/userinfo` to populate this
+field (confirmed reading its real source, v6) — but `control.oauth_apps`
+row for google only ever requested
+`.../auth/calendar` + `.../auth/gmail.modify` scopes, checked via a
+direct query. Neither scope grants access to the userinfo endpoint, so
+that call has been failing (403, caught by oauth-callback's own
+non-fatal try/catch) on EVERY Google connect since this feature was
+built — confirmed via real Edge Function logs showing the exact real
+callback hit for the human's actual working BC-021 reconnect (scope=
+`calendar+gmail.modify` only, no `userinfo.email`/`openid`). **Fixed**:
+migration 046 adds `https://www.googleapis.com/auth/userinfo.email` to
+the google oauth_apps row's `scopes` column — a non-sensitive scope,
+adds no new Google verification/review burden beyond what calendar+
+gmail.modify already require. Existing connections (the one real Gmail
+connection in the DB right now) will only pick up a real account email
+on their NEXT reconnect (a new consent grant with the new scope) — not
+retroactive; this is disclosed, not silently claimed fixed for the
+already-connected account.
+
+**Step 2 — SCH-006's real Slack node state: VERIFIED, matches
+PROJECT_STATE.md, no discrepancy to reconcile.** Pulled
+`get_workflow_details` live: all 4 Slack alert nodes ("Alert Token
+Refresh Failed (Google/Calendly/Cal.com)", "Alert Google Testing 7-Day
+Reminder") are PRESENT, not disabled (no `disabled: true`), not deleted
+— each still holds the exact placeholder `channelId: {mode: "id",
+value: "C00000000"}` that BC-021 documented installing. This is
+"present-with-placeholder", the same state BC-021's own report already
+described — no correction needed. The human's "remove those Slack
+nodes if blocked" instruction was a contingency for if the placeholder
+approach failed; it didn't fail (SCH-006's real execution succeeded
+with the placeholder in place, confirmed against real DB rows in
+BC-021), so removal was never actually triggered. The real, unchanged
+underlying gap: no real multi-tenant Slack OAuth app exists (BC-004/
+BC-008) — these 4 nodes will never actually deliver a Slack message
+until that's built; they exist today only so n8n's static validation
+doesn't block the rest of the workflow.
+
+**Step 3 — Deferred UI Polish backlog:** see the new, separate "Deferred
+UI Polish (BC-022)" section below — not mixed into Blockers since none
+of these block anything.
+
+0 self-resolved document-level items this session — the Document
+Resolution Authority gate does not apply (Step 1's fix is ordinary
+bug-fixing against live data — a missing OAuth scope preventing an
+already-built, already-coded feature from working — not a document-
+level conflict; Steps 0/2/3 were verification/documentation only).
+```
+
+## Deferred UI Polish (BC-022)
+
+```
+Logged per the human's own words, verbatim, not built this session —
+**deferred until all core functional dashboards (5A/5D) and Phase 6+
+backend work are further along — functionality before polish, per
+standing instruction:**
+- Favicon needed.
+- Mobile responsiveness is currently poor — needs a real responsive
+  pass across all 3 dashboards.
+- Visual alignment needs a general pass.
+- Orders dashboard should get a more "database-record" visual feel;
+  Appointments dashboard should get a more "calendar" visual feel
+  (distinct from each other — currently share the same generic table
+  styling).
+```
+
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
 
 Per Planning_to_Build_Transition_v1.md Part 4 Phase 5, 4 Directus-based
@@ -1774,30 +1886,39 @@ directly.
 ## Blockers Right Now
 
 ```
-**BC-021 IS COMPLETE.** All 5 steps done: root cause diagnosed and
-fixed (store_credential_secret migration 045, oauth-callback v6,
+**BC-021 AND BC-022 ARE BOTH COMPLETE.** BC-021: root cause diagnosed
+and fixed (store_credential_secret migration 045, oauth-callback v6,
 woocommerce-connect v3), the human's real re-test (Gmail/Calendly/
 WooCommerce) verified directly against real DB rows per Step 0.5,
 SCH-006 tested against real stored tokens (3 more real pre-existing
 bugs found+fixed along the way), full regression pass clean. See
 "Phase 5 — Real OAuth Connection Persistence Bug (BC-021)" above for
-full detail. One real open product question surfaced, not resolved
-unilaterally: Google Calendar and Calendly currently share the same
-`category='calendar'` slot (UNIQUE(client_id, category)), so a client
-can only hold one calendar provider connected at a time — flagged for
-the Commander in that section above.
+full detail. BC-022: proxy-domain decision settled as a documented
+alternative (not open), codebase-memory-mcp onboarded and verified
+useful, Gmail's missing account-label root-caused to a missing OAuth
+scope and fixed (migration 046), SCH-006's Slack node state confirmed
+matching BC-021's report exactly, UI polish backlog logged separately.
+See "Phase 5 — Small Fix Pass + SCH-006 Slack State Verification +
+codebase-memory-mcp Onboarding (BC-022)" above for full detail. One
+real open product question surfaced (BC-021), not resolved unilaterally:
+Google Calendar and Calendly currently share the same `category=
+'calendar'` slot (UNIQUE(client_id, category)), so a client can only
+hold one calendar provider connected at a time — flagged for the
+Commander in that section above.
 
 0 self-resolved document-level items this session — the Document
 Resolution Authority gate does not apply. Diagnosing and fixing a real
 reported defect via live data (Postgres logs, audit tables) is ordinary
 engineering bug-fixing, not a document-level conflict.
 
-Proxy-domain workaround (BC-020 feasibility investigation): confirmed
-technically plausible but does NOT fix Google verification (the actual
-friction) — Commander decision: SKIP for now, revisit only if a future
-concrete need arises (e.g. cosmetic requirement from a client, or the
-raw Supabase domain needs to change). Not blocking anything currently.
-CLOSED (BC-021 Step 0) — no longer an open question.
+Proxy-domain workaround (BC-020 feasibility investigation): Investigated
+(BC-020), discussed (post-BC-021) — technically light to build (~half a
+session: 1 DNS record, 1 Traefik router, 2 redirect_uri values kept in
+sync) and inexpensive (VPS-hosted, no Supabase Pro required), but does
+NOT fix Google verification friction (the original motivating problem)
+— only cosmetic benefit. Commander/human decision: SKIP for now, revisit
+only if a concrete future need arises. Not blocking anything. Settled,
+documented alternative as of BC-022 Step 0 — no longer an open question.
 
 2 doc diffs flagged for Commander to apply (not applied by Claude Code —
 Section 13 standing rule, same pattern as BC-006/009/010):
@@ -1819,13 +1940,15 @@ Still open, unresolved by design (not this card's scope):
   requires a Pro-tier upgrade, a plan/cost decision for the human, not
   actioned. BC-020 adds: even with Pro tier, this fixes cosmetics only,
   not the verification warning — see correction above.
-- Proxy-domain workaround (BC-020 feasibility investigation): confirmed
-  technically plausible but does NOT fix Google verification (the
-  actual friction) — Commander decision: SKIP for now, revisit only if
-  a future concrete need arises (e.g. cosmetic requirement from a
-  client, or the raw Supabase domain needs to change). Not blocking
-  anything currently. CLOSED (BC-021 Step 0) — no longer an open
-  question.
+- Proxy-domain workaround (BC-020 feasibility investigation): Investigated
+  (BC-020), discussed (post-BC-021) — technically light to build (~half
+  a session: 1 DNS record, 1 Traefik router, 2 redirect_uri values kept
+  in sync) and inexpensive (VPS-hosted, no Supabase Pro required), but
+  does NOT fix Google verification friction (the original motivating
+  problem) — only cosmetic benefit. Commander/human decision: SKIP for
+  now, revisit only if a concrete future need arises. Not blocking
+  anything. Settled, documented alternative as of BC-022 Step 0 — no
+  longer an open question.
 - SCH-007 Inventory/Catalogue Sync itself (BC-019, still open) — logged
   as a real future-phase requirement, not built; schema/workflow design
   not
@@ -2141,6 +2264,61 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 23 — 2026-08-06 — BC-022 COMPLETE: proxy-domain decision settled, codebase-memory-mcp onboarded+verified, Gmail account-label root cause found+fixed (missing OAuth scope), SCH-006 Slack state verified, UI polish backlog logged
+- Step 0 — updated both Blockers mentions of the proxy-domain workaround
+  to the Commander's exact BC-022 language: "technically light to build
+  ... does NOT fix Google verification friction ... SKIP for now,
+  revisit only if a concrete future need arises." Settled/documented,
+  not an open question.
+- Step 0.5 — verified `codebase-memory-mcp` live (not assumed from the
+  name): `list_projects`/`index_status` confirmed this repo already
+  indexed (4405 nodes, 4559 edges, status "ready", at HEAD 8224ec5, no
+  manual indexing needed). Real capability confirmed via actual use, not
+  just tool presence: it's a local graph-augmented index of THIS repo's
+  code AND markdown docs (not a cross-session conversation memory,
+  despite the name) — `search_code`/`get_code_snippet` for
+  "provider_account_id" instantly surfaced the exact Integrations.tsx
+  function/line range and its full source with call-graph metadata,
+  faster than a manual grep+read would have been, and this became the
+  actual starting point for Step 1's diagnosis below. Confirmed gap: it
+  does not index Supabase Edge Functions or n8n workflows (not local
+  files) — those still need the Supabase/n8n MCPs directly, which is
+  what Step 1/2 used for the backend half of the diagnosis.
+- Step 1 — diagnosed the Gmail/Integrations missing account-label gap.
+  Confirmed via codebase-memory-mcp that the UI's render logic already
+  correctly displays provider_account_id when present — ruling out a
+  rendering bug. Queried control.client_connections directly: real NULL
+  confirmed for the google/email row. Traced to a real, confirmed root
+  cause: oauth-callback's google case already calls Google's userinfo
+  endpoint to populate this field, but control.oauth_apps' google row
+  only ever requested calendar + gmail.modify scopes — neither grants
+  userinfo access, so that call has silently 403'd (caught non-fatally)
+  on every Google connect ever made, confirmed via the real Edge
+  Function log line for the human's actual working BC-021 reconnect
+  (exact scope param, no userinfo.email/openid). Fixed via migration
+  046: added https://www.googleapis.com/auth/userinfo.email to the
+  google oauth_apps scopes (non-sensitive scope, no added Google
+  verification burden). Disclosed, not silently claimed: the existing
+  real Gmail connection needs a fresh reconnect to actually pick up an
+  account email — not retroactive.
+- Step 2 — pulled get_workflow_details live for SCH-006: all 4 Slack
+  alert nodes are present, not disabled, not deleted, still holding the
+  exact C00000000 placeholder Channel ID BC-021 documented — real state
+  matches PROJECT_STATE.md's prior report exactly, nothing to reconcile.
+  The real Slack gap (no multi-tenant OAuth app, BC-004/BC-008) remains
+  completely unchanged; these nodes exist only to satisfy n8n's static
+  validation, they don't and can't deliver real messages yet.
+- Step 3 — logged the human's exact UI polish backlog (favicon, mobile
+  responsiveness, visual alignment, Orders/Appointments needing distinct
+  visual identities) in a new, separate "Deferred UI Polish (BC-022)"
+  section — explicitly not mixed into Blockers, explicitly marked
+  deferred until 5A/5D + Phase 6+ backend work are further along.
+- 0 self-resolved document-level items — the Document Resolution
+  Authority gate does not apply (Step 1's fix was ordinary bug-fixing
+  against live data — ordinary code fixing, not a document-level
+  conflict; the other 3 steps were verification/logging only). This
+  session is complete.
 
 ### Session 22 — 2026-08-05/06 — BC-021 COMPLETE: real root cause of failed OAuth persistence found+fixed, human re-test verified against real DB, SCH-006 tested against real tokens (3 more real bugs found+fixed), full regression pass clean
 - Step 0 — updated the Blockers entry for the proxy-domain question to
