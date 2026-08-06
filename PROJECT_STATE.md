@@ -15,13 +15,12 @@ Location:  Project root. Committed to git (zenny-sync) after every
 ---
 
 ## Last Updated
-2026-08-05 — by Claude Code, Session 22 (BC-021 — real root cause of "connects then reverts" found + fixed across ALL providers; awaiting human re-test)
+2026-08-06 — by Claude Code, Session 22 (BC-021 — COMPLETE: real root cause of "connects then reverts" found + fixed across ALL providers, human re-test verified against real DB rows, SCH-006 tested against real stored tokens with 3 more real pre-existing bugs found+fixed, full regression pass clean)
 
 ## Current Phase
-Phase 5 (Dashboard Systems) — **BC-021 IN PROGRESS, awaiting the
-human's re-test per this session's own hand-off request** (see Session
-Log / Blockers). Root cause found and fixed for the "real OAuth/API-key
-connections silently fail to persist" defect the human reported: `store_
+Phase 5 (Dashboard Systems) — **BC-021 COMPLETE.** Root cause found and
+fixed for the "real OAuth/API-key connections silently fail to persist"
+defect the human reported: `store_
 credential_secret` used a STATIC Vault secret name per client+category
 — any reconnect/retry hit Vault's real `secrets_name_idx` UNIQUE
 constraint, which NEITHER `oauth-callback` nor `woocommerce-connect`
@@ -41,11 +40,13 @@ diagnose from). Also found and fixed, while tracing Shopify's real
 callback logs: a genuine double-`.myshopify.com`-suffix bug that would
 500 any Shopify connection that got PAST the distribution-method screen
 (confirmed via a real callback hit with real Shopify HMAC/shop params
-that 500'd). Full detail in the new "Phase 5 — Real OAuth Connection
-Persistence Bug (BC-021)" section below. **Not yet re-verified against
-a real human-driven reconnect** — that's the explicit next step,
-following this card's own Step 0.5 hand-off process, not assumed
-working from the fix alone.
+that 500'd). Full detail in the "Phase 5 — Real OAuth Connection
+Persistence Bug (BC-021)" section below. **Re-verified against a real
+human-driven reconnect, confirmed against real DB rows** (not assumed
+from the fix alone) — Gmail, Calendly, and WooCommerce all genuinely
+connected. SCH-006 Token Refresh Sweep also tested against these real
+tokens this session (3 more real pre-existing bugs found and fixed —
+it had never executed successfully before). Full detail below.
 
 Earlier this session (BC-020): OAuth connects use a popup instead of
 a full-page redirect. **This required discovering and working
@@ -1022,12 +1023,102 @@ that now (post-fix) would exist on retry. Flagged honestly as
 unresolved rather than guessed at; the next real Calendly attempt will
 have a full audit trail to diagnose from if it fails again.
 
-**NOT YET DONE this session, explicitly pending human re-test per this
-card's own Step 0.5 process:** Steps 3-5 (re-test Google Calendar/
-Gmail/Calendly/WooCommerce against the real fix, verify against real DB
-rows not just UI, test SCH-006 against a real stored token, full
-regression pass). See Blockers/Session Log for the exact hand-off
-request made to the human.
+**Steps 3-5 — COMPLETED, later in this same session, after the human's
+real re-test:** the human reported Gmail, WooCommerce, and Calendly all
+now showing "Connected" (Calendly's consent screen auto-skipped since
+the test account had already authorized this app previously — a benign,
+expected OAuth behavior, confirmed real by fetching Calendly's own
+`/users/me` and getting back a real account email,
+`quaantummedia.zeromanual@gmail.com`, which cannot happen without a
+genuinely valid token). Verified directly against `control.
+client_connections`/`connection_audit_log` per Step 0.5 — all 3 rows
+clean, real provider data, no errors, no null connection_ids.
+
+**Google Calendar vs Calendly — real, pre-existing design overlap,
+confirmed not a bug:** both map to the dashboard's `category = 'calendar'`
+slot, and `client_connections` has `UNIQUE(client_id, category)` — so
+connecting Calendly replaced whatever previously held that slot. Google
+itself is still connected, but only under `category = 'email'` (Gmail) —
+there is currently no way for a client to hold both a Google Calendar
+connection AND a Calendly connection at the same time. This is a real
+open product question for the Commander (should Google's calendar+gmail
+combined OAuth grant produce two separate category rows, or is "one
+calendar provider at a time" the intended design?) — flagged here, not
+resolved unilaterally.
+
+**SCH-006 Token Refresh Sweep — tested against real stored tokens,
+multiple real pre-existing bugs found and fixed (this workflow had
+NEVER been executed successfully before this session):**
+1. All 4 Slack alert nodes had no `Channel` parameter configured at all
+   (not even a placeholder), which blocks n8n's static validation for
+   the ENTIRE workflow regardless of which branch real data would reach
+   — set a clearly-labeled placeholder Channel ID (`C00000000`, not a
+   real channel/credential) purely to unblock testing the real refresh
+   logic; the actual Slack gap (zero real multi-tenant Slack OAuth app,
+   per BC-004/BC-008) is completely unchanged.
+2. All 22 of the workflow's Supabase HTTP Request nodes had ZERO
+   credential attached — confirmed this workflow could not have ever
+   successfully executed before. Attached the existing real
+   `zenny-vault-suparbase` n8n credential (already used by other working
+   Zenny workflows in this instance) — not a new/invented credential.
+3. A real response-parsing bug: several RPC calls (`read_credential_
+   secret`, `store_credential_secret`, `insert_audit_log_event`) return
+   a bare scalar (a decrypted secret, or a newly-created UUID) via
+   PostgREST's `application/vnd.pgrst.object+json` Accept header — n8n's
+   response-format autodetect doesn't recognize that content-type as
+   JSON, and the original node expressions referenced the wrong field
+   entirely (the whole raw-response wrapper object instead of its `.data`
+   property). Fixed by explicitly setting `responseFormat: "text"` on
+   these HTTP nodes (confirmed via live execution that this returns the
+   plain unwrapped value in `.data`, not further JSON-encoded — an
+   earlier `JSON.parse(...)` attempt was tried and confirmed wrong via a
+   live 400 from Google's token endpoint, then removed) and correcting
+   every downstream expression that consumed these nodes' output.
+4. A workflow-editor interaction caught live: opening/closing the
+   workflow in the n8n UI mid-session reverted several of the API-applied
+   node edits (credentials + responseFormat) back to their pre-fix state
+   — re-applied after the editor closed. Documented here since it's a
+   real n8n platform behavior worth knowing for future sessions: editing
+   a workflow via MCP while it's also open in the browser editor is not
+   safe: the editor's own save-on-close can silently clobber API edits.
+
+**Real, verified result (execution ID 14, `status: success`):** a live
+Google token refresh (new `ya29....` access token obtained from Google's
+real token endpoint) and a live Calendly token refresh (new access token
++ rotated refresh token from Calendly's real token endpoint) both
+completed and persisted. Confirmed directly against
+`control.client_connections` after the run — NOT just trusted from the
+execution log:
+  - google/email (`abd84801-...`): `access_token_secret_id` = the exact
+    new secret UUID from the execution, `token_expires_at` correctly
+    advanced ~1 hour, `status` still `connected`.
+  - calendly/calendar (`609559ce-...`): `access_token_secret_id` /
+    `refresh_token_secret_id` match the execution's new UUIDs,
+    `token_expires_at` correctly advanced ~2 hours, `status` still
+    `connected`.
+SCH-006 remains **inactive** (not toggled on this session — activating
+a real scheduled workflow is a separate decision, out of this card's
+"tested against a real token" scope).
+
+**Step 5 — full regression pass, done via live Playwright against the
+deployed dashboard:** Orders (5B) — 3 real seeded orders render
+correctly with correct statuses. Appointments (5C) — both seeded rows
+render correctly, read-only monitoring copy intact. Integrations page —
+stable, accurate real state with no silent reverts: Store (WooCommerce)
+Connected, Calendar (Calendly) Connected, Email (Google) Connected,
+Notifications (Slack) correctly shows "Not connected" / "not yet
+available" per the known, unchanged Slack gap.
+
+**BC-021 is now COMPLETE.** All Definition of Done items satisfied:
+root cause identified and fixed for all 4 providers; Shopify correctly
+diagnosed as a non-code, human-action item; Google (Gmail) + Calendly
+re-tested and verified against real DB state; SCH-006 tested against
+real stored tokens and verified against real DB state; WooCommerce's
+revert behavior explained and re-confirmed stable; Calendly's original
+failure explained (missing audit logging on early-exit branches, now
+fixed) with the residual "exact original failure point" honestly
+disclosed as undiagnosable from historical data; full regression pass
+clean.
 ```
 
 ## Phase 5 Discovery Findings (BC-012 — discovery only, no build)
@@ -1683,16 +1774,18 @@ directly.
 ## Blockers Right Now
 
 ```
-**BC-021 IS MID-FLIGHT, blocked on the human's re-test — not a code
-blocker, a real hand-off.** Step 1's diagnosis is complete and the real
-root cause is fixed (store_credential_secret migration 045,
-oauth-callback v6, woocommerce-connect v3 — see "Phase 5 — Real OAuth
-Connection Persistence Bug (BC-021)" above), but per this card's own
-Step 0.5 process, Claude Code does NOT proceed to Steps 3-5 (re-test
-Google/Gmail/Calendly/WooCommerce, SCH-006, regression pass) without
-first asking the human to redo the real connect flows and waiting for
-their confirmation. **Explicit ask made this session, response
-pending** — see Session Log for the exact request.
+**BC-021 IS COMPLETE.** All 5 steps done: root cause diagnosed and
+fixed (store_credential_secret migration 045, oauth-callback v6,
+woocommerce-connect v3), the human's real re-test (Gmail/Calendly/
+WooCommerce) verified directly against real DB rows per Step 0.5,
+SCH-006 tested against real stored tokens (3 more real pre-existing
+bugs found+fixed along the way), full regression pass clean. See
+"Phase 5 — Real OAuth Connection Persistence Bug (BC-021)" above for
+full detail. One real open product question surfaced, not resolved
+unilaterally: Google Calendar and Calendly currently share the same
+`category='calendar'` slot (UNIQUE(client_id, category)), so a client
+can only hold one calendar provider connected at a time — flagged for
+the Commander in that section above.
 
 0 self-resolved document-level items this session — the Document
 Resolution Authority gate does not apply. Diagnosing and fixing a real
@@ -2049,7 +2142,7 @@ card's own instruction — flagged, not applied):
 
 ## Session Log (append-only — newest at top, never delete old entries)
 
-### Session 22 — 2026-08-05 — BC-021 (IN PROGRESS): real root cause of failed OAuth persistence found+fixed; human re-test requested, awaiting response
+### Session 22 — 2026-08-05/06 — BC-021 COMPLETE: real root cause of failed OAuth persistence found+fixed, human re-test verified against real DB, SCH-006 tested against real tokens (3 more real bugs found+fixed), full regression pass clean
 - Step 0 — updated the Blockers entry for the proxy-domain question to
   the Commander's exact given language: SKIP for now, closed, not an
   open question anymore.
@@ -2125,11 +2218,63 @@ card's own instruction — flagged, not applied):
   Function redeployed (v3: error checking, full audit logging);
   PROJECT_STATE.md. No dashboard frontend changes this session — the
   bug and fix were entirely server-side.
-- **This session so far: 0 self-resolved document-level items — the
-  Document Resolution Authority gate does not apply. This session is
-  NOT complete — Steps 3-5 remain, blocked on the human's real re-test
-  per Step 0.5's explicit hand-off process. Do not treat this as a
-  finished Build Card.**
+- **Steps 3-5 — done later this same session, after the human's real
+  re-test.** The human reported (verbatim): "Gmail, WooCommerce,
+  Calendly Now connected. BUt I clicked connect Calendly -> Outh screen
+  popuped -> url was loading -> auto closed url -> shows connected,
+  inshort I didn't press install/approve this time." Per Step 0.5,
+  verified this against real data rather than taking the report at face
+  value: fetched Calendly's own `/users/me` with the newly-stored token
+  and got back a real account email (`quaantummedia.zeromanual@gmail.
+  com`) — impossible without a genuinely valid token — and confirmed the
+  consent screen auto-skip is expected OAuth behavior for an
+  already-authorized app, not a bug. Queried control.client_connections/
+  connection_audit_log directly for Gmail/Calendly/WooCommerce: all 3
+  clean, real provider data, no errors, no null connection_ids.
+- Surfaced (not resolved unilaterally): Google Calendar and Calendly
+  both map to `category='calendar'` and `client_connections` has
+  `UNIQUE(client_id, category)` — connecting one replaces the other.
+  Flagged as a real open product question for the Commander in the
+  "Phase 5 — Real OAuth Connection Persistence Bug (BC-021)" section
+  above, not decided here.
+- SCH-006 Token Refresh Sweep tested against the real Gmail/Calendly
+  tokens above (workflow ID rKlJYukwRexlYRYM) — discovered it had NEVER
+  executed successfully before this session, for 3 separate real,
+  pre-existing reasons, all fixed: (1) 4 Slack alert nodes had no
+  Channel parameter at all, blocking n8n's static validation for the
+  whole workflow — set a clearly-labeled placeholder Channel ID
+  (`C00000000`, not a real channel/credential) purely to unblock testing
+  the real refresh logic, leaving the actual Slack gap (BC-004/BC-008)
+  completely untouched; (2) all 22 Supabase HTTP nodes had zero
+  credential attached — attached the existing real `zenny-vault-
+  suparbase` n8n credential (not invented); (3) several RPC calls return
+  a bare scalar via a content-type n8n doesn't autodetect as JSON,
+  causing wrong-field expressions — fixed via explicit `responseFormat:
+  "text"` plus corrected downstream `.data` references (an intermediate
+  `JSON.parse(...)` attempt was tried, proven wrong via a live 400 from
+  Google's token endpoint, then removed). Also caught live: opening/
+  closing the workflow in the n8n browser editor mid-session reverted
+  several already-applied API edits (credentials + responseFormat) back
+  to their pre-fix state — a real n8n platform behavior worth knowing:
+  editing via MCP while the same workflow is open in the browser editor
+  is not safe. Final execution (ID 14): `status: success`, both a real
+  Google token refresh and a real Calendly token refresh (with refresh
+  token rotation) completed. Verified directly against
+  control.client_connections after the run, not just the execution log:
+  both rows show the exact new secret UUIDs and correctly-advanced
+  token_expires_at values from the execution. SCH-006 left INACTIVE
+  (activating a real schedule is a separate decision, out of scope).
+- Step 5 — full regression pass via live Playwright against the deployed
+  dashboard: Orders (5B) — 3 seeded orders render correctly. Appointments
+  (5C) — both seeded rows render correctly, read-only copy intact.
+  Integrations — stable, accurate, no silent reverts: WooCommerce/
+  Calendly/Gmail all show Connected, Slack correctly still "Not
+  connected."
+- **BC-021 Definition of Done — fully satisfied.** This session: 0
+  self-resolved document-level items — the Document Resolution Authority
+  gate does not apply (this was all ordinary bug-fixing against live
+  data, including SCH-006's 3 newly-found bugs, none of which were
+  document-level conflicts). This session IS complete.
 
 ### Session 21 — 2026-08-05 — BC-020: OAuth popup flow (2 real platform constraints found+fixed), proxy-domain feasibility reported
 - Step 1 — first attempt: rewrote oauth-callback to return an HTML page
