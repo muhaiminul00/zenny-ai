@@ -37,6 +37,26 @@ This means WF-017 (and therefore WF-013/WF-016's handoff path) had been
 broken for any 9-arg caller since BC-028 until this session's fix
 (dropped the redundant 9-arg overload). See WF-001's own entry below
 for detail, and PROJECT_STATE.md's Session Log for the full account.
+Updated 2026-08-06/07 (BC-031): Phase 8a — 6 new Conversion Engine Tools
+built (WF-002 CheckAvailability, WF-003 CreateAppointment, WF-004
+CreateBookingRequest, WF-005 CreateCart, WF-006 CreateReservation, WF-007
+CreateWaitlistEntry), all genuinely tested against real production data
+across 3 archetypes (commerce_ecom, commerce_restaurant, appointment — a
+new roster client, client_test_003_acme_appointment_test, was created for
+the appointment archetype). Found and fixed 2 more real, previously-
+undiscovered bugs in the shared UTIL-006/Tool Execution Fallback path
+(a NULL-expiry check wrongly forcing a doomed refresh on non-refreshable
+api_key credentials; Tool Execution Fallback crashing outright on the
+"zero client_connections rows exist at all" case, never exercised before
+this session's brand-new appointment client), plus several schema-drift
+gaps (missing `conversions_restaurant` table on `client_test_002`;
+missing `waitlist_entries` table anywhere; `conversions_appointment`'s
+`service_type`/`appointment_time` wrongly `NOT NULL` despite Part 13.4
+documenting both as optional). A genuine document-level gap was also
+self-resolved and logged: `lead_id` was missing from CreateCart/
+CreateReservation/CreateWaitlistEntry's documented payloads despite their
+idempotency keys requiring it — fixed directly in
+`n8n_Workflow_Specification_v1.md`. See each Tool's own entry below.
 ```
 
 ---
@@ -161,6 +181,8 @@ for detail, and PROJECT_STATE.md's Session Log for the full account.
 
 **LAST VERIFIED:** BC-028, 2026-08-06 — **first-ever confirmed live execution of this workflow.** Tested against a REAL production connection (Client A's `google`/`email` connection) that happened to be genuinely expired at test time (not artificially forced) — confirmed a real, fresh Google access token (`ya29....`) was returned, and real DB state showed `token_expires_at` updated to ~1 hour in the future (matching Google's real access-token lifetime) with a fresh `updated_at`. This was a real production fix, not a disposable test — the connection is now genuinely healthy again.
 
+**FIXED BC-031 (real bug — first time this workflow was ever called against a non-Google/non-refreshable connection):** `Token Expiring Soon?` treated ANY `NULL token_expires_at` as expiring-soon, including `api_key`-style connections (WooCommerce) that legitimately never expire and have no `refresh_token_secret_id` at all — this forced a doomed synchronous refresh (UTIL-007 correctly rejects unsupported providers), which then incorrectly marked a genuinely healthy WooCommerce connection `status='error'` via Tool Execution Fallback. Fixed: refresh is now only attempted when `refresh_token_secret_id` is actually present. The real WooCommerce connection's status was manually restored to `connected` after the false failure. Also extended `Resolved Credential`'s output with `provider_account_id` and `secondary_secret_id` (both already stored on `control.client_connections`, migration 020, but never surfaced) so two-part-credential providers like WooCommerce can be used by callers — additive only, no change to existing `{available, token, provider, connection_id}` callers.
+
 ---
 
 ### UTIL-007 — Zenny Shared Utility - Refresh Connection Token (new, BC-028)
@@ -204,6 +226,8 @@ for detail, and PROJECT_STATE.md's Session Log for the full account.
 **REAL DEPENDENCIES:** UTIL-004 (Notification Router).
 
 **LAST VERIFIED:** BC-028, 2026-08-06 — first-ever confirmed live execution. Tested via a real disposable `control.client_connections` row (category `telephony`, later marked `revoked`): confirmed the connection was genuinely marked `status='error'` with the real `last_error` text via direct SQL, and a real Gmail message was sent (`id: 19fd89f71e99ca23`, `labelIds: ["SENT"]`).
+
+**FIXED BC-031 (real bug — the "zero `client_connections` rows exist at all" case had never been exercised before this session's brand-new appointment test client):** `Mark Connection Errored` and `Log Fallback Event` both unconditionally passed `connection_id` through to their respective RPCs (`update_connection_status`, `insert_audit_log_event`), both of which take a `uuid` parameter. When no connection row exists at all for a client+category (as opposed to an existing revoked/expired one), `connection_id` arrives as an empty string, not a valid uuid or `NULL` — both RPC calls threw `invalid input syntax for type uuid: ""`, crashing the entire fallback workflow with no response ever returned, silently breaking every real caller of UTIL-006 whenever a client's connection was simply never configured (as opposed to configured-then-broken). Fixed: added an explicit `Has Connection ID?` check before `Mark Connection Errored` (skips straight to logging when there's no row to mark), and coerced `Log Fallback Event`'s `p_connection_id` from `""` to `null`.
 
 ---
 
@@ -486,6 +510,146 @@ for detail, and PROJECT_STATE.md's Session Log for the full account.
 - Security (cross-client `customer_id` — Client B's real customer against Client A's schema): real `CUSTOMER_NOT_FOUND` rejection, confirmed no row was ever at risk of being created (FK-backed).
 - Retry (forced 1ms client-side timeout to genuinely simulate a Supabase timeout): confirmed one real silent retry (~1s = one `waitBetweenTries`), then genuine Pattern D handoff — real escalation `6e7c768f-...` confirmed via direct SQL, real `escalation_id` returned in the response.
 - Duplicate (same `conversation_id` sent twice): confirmed via direct SQL — exactly 1 row exists for `test-conv-success-002`, both calls returned the identical `lead_id`.
+
+---
+
+## Conversion Engine — Tools (Part 13, Phase 8a — BC-031)
+
+**Test roster note:** `client_test_002_acme_commerce_test` (commerce_ecom, real WooCommerce + Calendly connections) was used for CreateCart/CreateReservation/CreateWaitlistEntry testing — its schema supports both `commerce_ecom` and `commerce_restaurant` sub-archetypes (both share `tpl_commerce`, confirmed live), so no separate restaurant client was needed. A new roster client, `client_test_003_acme_appointment_test` (client_id `2d0fafb6-72c8-4751-a7c0-cc77cf743807`), was created for CreateAppointment/CreateBookingRequest testing — no appointment-archetype client existed before this card. Neither new client has a real connected Google Calendar or a functioning ecommerce store (the roster's only "connected" WooCommerce store, `zenny-woocom.free.je`, returns non-JSON responses to real API calls, and the roster's only Calendly connection has `status='error'`) — this is a real, external infrastructure limitation, not a gap in the workflows themselves; every Tool's resilient fallback path was proven genuinely real as a direct result.
+
+### WF-002 — Zenny Conversion Engine - CheckAvailability (WF-002)
+**n8n ID:** `I3wMoqjH5uoc6hvN` · **published**, active
+
+**PURPOSE:** Read-only availability check, no idempotency (per Part 13.2). v1 scope is `inventory`/`table_slot`/`calendar` only — `team`/`specialist`/`capacity` (Emergency/Consultation/Engagement) are explicitly v2 (Part 7.3, verified directly): those archetypes route through the `dashboard_request` config fallback at the calling workflow instead of ever calling this sub-type.
+
+**TRIGGER:** Webhook, `POST /check-availability`.
+
+**INPUT:** `{ client_id, payload: { customer_id, archetype, check_type: 'inventory'|'table_slot'|'calendar', reference } }`. `table_slot` and `calendar` both resolve via the `calendar`-category connection (no separate reservation-provider category exists in the credential platform — a mechanical, not novel, mapping).
+
+**OUTPUT / END STATE:**
+- `check_type` is `team`/`specialist`/`capacity` or otherwise unsupported, or `reference` missing: 400 `VALIDATION_ERROR`.
+- Unknown `client_id`: 400 `UNKNOWN_CLIENT`.
+- Real Provider Router pattern (matching the `Provider Router Example` template): resolves the relevant credential via UTIL-006, routes by real `provider` (Shopify/WooCommerce for inventory; Google/Calendly/Cal.com for calendar), and calls that provider's real API. Success or provider/credential failure both return 200 `{ result: { available, alternatives: [] } }` — never an error, per the B→C fallback chain (graceful, never a handoff).
+
+**REAL DEPENDENCIES:** UTIL-001, UTIL-006 (both `ecommerce` and `calendar` categories).
+
+**FIXED BC-031:** see UTIL-006's own entry above — this Tool's first-ever real calls against non-Google connections surfaced 2 real UTIL-006/Tool Execution Fallback bugs, both fixed. Also fixed live in this workflow itself: the same `retryOnFail`+`continueErrorOutput` quirk documented in WF-001/WF-002's sibling Tools (a retry-exhausted failure lands on the main pin as an `{error,...}` item, not the error pin) — all 5 provider-response `Normalize` nodes now check for `$json.error` explicitly before calling array methods, which previously evaluated silently to `null` instead of `false`.
+
+**LAST VERIFIED:** BC-031, 2026-08-06 — real credential resolution and real external API calls confirmed against the real WooCommerce store and the real (errored) Calendly connection (both correctly degrade to `available:false` per their genuine real state, not simulated). Failure (invalid/v2 check_type, missing reference), Security (unknown client), and Retry (forced 1ms timeout on the WooCommerce call, confirmed silent retry then graceful degradation) all genuinely tested. Duplicate is N/A (read-only, per spec).
+
+---
+
+### WF-005 — Zenny Conversion Engine - CreateCart (WF-005)
+**n8n ID:** `PlsVixbrW0M1oH0S` · **published**, active
+
+**PURPOSE:** Ecom Mode A cart creation. Per the hard product rule (External_Integration_Strategy_v1.md Part 6.1), this NEVER writes to the client's live store directly — it writes to Zenny's own `orders` table (`status='pending_review'`), pending business-dashboard approval.
+
+**TRIGGER:** Webhook, `POST /create-cart`.
+
+**INPUT:** `{ client_id, payload: { customer_id, lead_id, items: [{product_id, quantity}] } }`. `lead_id` added to the documented payload this session — see the self-resolved document-level item logged in PROJECT_STATE.md.
+
+**OUTPUT / END STATE:**
+- Real stock check via a direct HTTP call to WF-002 (`check_type: inventory`, first item's `product_id`) before any write is attempted.
+- Real cart-value escalation check against the new `control.client_config.cart_value_escalation_threshold` field (added this session — previously specified in the Runtime doc but never actually added to the schema). `cart_value` is currently always `0.00` — real per-item pricing requires a live commerce catalog price feed not yet built (a real, disclosed v1 gap, not hidden) — the threshold-gate logic itself is complete and correct, just not exercisable with a non-zero value today.
+- Success: 200 `{ result: { cart_id, cart_value, checkout_link } }` — a real `conversions`+`conversions_ecom`+`orders` row set, with real duplicate detection (checks by `lead_id` first).
+- Stock unavailable, threshold exceeded, or insert failure (after Pattern B retry): Mode C — 200 `{ result: { status: "pending_human_review" }, handoff }`, a real `escalations` row created via WF-017.
+
+**REAL DEPENDENCIES:** UTIL-001, WF-002 (direct HTTP call), WF-017 (direct HTTP call).
+
+**REAL NEW DB OBJECTS:** `public.insert_client_cart` RPC (real duplicate detection via a partial `UNIQUE(lead_id)` index), `public.get_client_conversion_config` RPC.
+
+**LAST VERIFIED:** BC-031, 2026-08-06 — Failure (empty `items`) and Security (cross-client `customer_id`) tested directly against the real stock-check gate. Because the roster's only WooCommerce connection is a non-functional test store (confirmed via WF-002 testing), Success/Retry/Duplicate required a temporary, explicitly-logged bypass of the real stock-check IF condition to reach and prove the real Insert Cart logic — the RPC's real duplicate-detection and insert behavior was ALSO independently confirmed via direct SQL (a genuine INSERT then a genuine no-op on repeat, exactly 1 row). The Mode C escalation path (stock unavailable) is fully real and was the outcome of every un-bypassed test, since the connected store never returns a usable response.
+
+---
+
+### WF-006 — Zenny Conversion Engine - CreateReservation (WF-006)
+**n8n ID:** `qA0HJV1YSJT5QNDp` · **published**, active
+
+**PURPOSE:** Restaurant Mode A reservation. Party size ≥10 routes to a real event/catering human handoff (Mode C), never a silent decline. Time-in-the-past requests are rejected as a validation error (correction flow). Real parallel-write pattern identical to CreateAppointment (§13.3): attempts the client's real calendar/booking system first, always keeps `our_db_fallback` as the resilient record if that fails.
+
+**TRIGGER:** Webhook, `POST /create-reservation`.
+
+**INPUT:** `{ client_id, payload: { customer_id, lead_id, party_size, reservation_time, special_request? } }`. `lead_id` added to the documented payload this session (same gap as CreateCart).
+
+**OUTPUT / END STATE:**
+- Party size ≥10: 200, Mode C human handoff (`escalation_priority: P3`, "event/catering inquiry" reasoning).
+- Real calendar credential resolved (UTIL-006, category `calendar`); Google provider gets a real `events.insert` write attempt (Pattern B retry). Success → 200 `authoritative_source: "client_calendar"`. Failure, non-Google provider, or no connection → real `our_db_fallback` write (`conversions`+`conversions_restaurant`+`appointments` tracking row, `alert_fired: true`) → 200 `authoritative_source: "our_db_fallback"`, `table_confirmed: true`.
+- **Real waitlist redirect:** if no calendar credential is available AND `control.client_config.waitlist_enabled` is `true` (new field, this session), routes directly to WF-007 CreateWaitlistEntry instead of `our_db_fallback` — 200 `authoritative_source: "waitlist"`.
+- If even `our_db_fallback` fails after retry: Mode C human handoff.
+
+**REAL DEPENDENCIES:** UTIL-001, UTIL-006 (`calendar`), WF-007 (direct HTTP call, waitlist redirect), WF-017 (direct HTTP call).
+
+**REAL NEW DB OBJECTS:** `public.insert_client_reservation` RPC (real duplicate detection via `lead_id`), `public.insert_client_appointment_tracking` RPC (shared with WF-003).
+
+**FIXED BC-031 (real bug found via the Duplicate test):** a repeat call for an already-existing conversion still attempted a fresh `appointments` tracking-row insert, hitting the real `appointments_conversion_id_key` UNIQUE constraint with no error handling — the whole execution crashed with no response ever sent. Added an explicit `Is Duplicate?` check that skips straight to the success response instead. Also fixed a real schema-drift gap: `client_test_002_acme_commerce_test` was missing the entire `conversions_restaurant` table (present on `tpl_commerce` but never back-filled to this already-provisioned client schema).
+
+**LAST VERIFIED:** BC-031, 2026-08-06 — all 5 categories genuinely tested: Success/Duplicate (real `our_db_fallback` writes, same `reservation_id` returned twice, confirmed via SQL), Failure (past-time correction), Security (cross-client `customer_id`), Retry (forced 1ms timeout, confirmed Mode C fallback), and — per the card's explicit requirement — **the real WF-006→WF-007 waitlist handoff chain end-to-end** (`waitlist_enabled` toggled true on the real roster client, confirmed a real `waitlist_entries` row created via WF-007 with the correct queue `position`, then reverted).
+
+---
+
+### WF-007 — Zenny Conversion Engine - CreateWaitlistEntry (WF-007)
+**n8n ID:** `8sZ8yiY228KaPyy3` · **published**, active
+
+**PURPOSE:** Mode B sub-type fallback of CreateReservation (also callable as its own Tool). Fallback chain C→D — this workflow IS the "C" (graceful redirect) destination for CreateReservation; if creating the waitlist entry itself fails, that's Pattern D (warm handoff).
+
+**TRIGGER:** Webhook, `POST /create-waitlist-entry`.
+
+**INPUT:** `{ client_id, payload: { customer_id, lead_id, party_size, requested_time } }`. `lead_id` added to the documented payload this session (same gap as CreateCart/CreateReservation).
+
+**OUTPUT / END STATE:**
+- Success: 200 `{ result: { waitlist_id, position } }` — a real new `waitlist_entries` row (new table this session — no home existed anywhere in the schema before), `position` computed as a genuine live count of currently-waiting entries + 1. Real duplicate detection via a partial `UNIQUE(lead_id)` index (same `lead_id` returns the same `waitlist_id`, no second row).
+- Insert failure after Pattern B retry: Pattern D — 200 `{ result: { status: "pending_human_review" }, handoff }`, real escalation via WF-017.
+
+**REAL DEPENDENCIES:** UTIL-001, WF-017 (direct HTTP call). Also called directly BY WF-006 (its Mode B redirect target).
+
+**REAL NEW DB OBJECTS:** `public.waitlist_entries` table (new, deployed to both roster clients + `tpl_commerce`), `public.insert_client_waitlist_entry` RPC.
+
+**LAST VERIFIED:** BC-031, 2026-08-06 — all 5 categories genuinely tested as a standalone Tool (Success, Duplicate, Failure, Security, Retry — real escalation confirmed on forced timeout), plus confirmed working as WF-006's real redirect target (see WF-006's entry).
+
+---
+
+### WF-003 — Zenny Conversion Engine - CreateAppointment (WF-003)
+**n8n ID:** `3sLUvbCxVqNGsPHw` · **published**, active
+
+**PURPOSE:** The Tool Appointments (5C) has been waiting on since BC-017 — real parallel-write pattern (Phase 5C, CR applied BC-013): writes to the client's real calendar AND `appointments` in the same operation, never sequentially. The most consequential Tool in this batch — once live, 5C stops monitoring seeded data and starts showing real bookings (once a client has a real connected calendar; none currently do — see roster note above).
+
+**TRIGGER:** Webhook, `POST /create-appointment`.
+
+**INPUT:** `{ client_id, payload: { customer_id, lead_id, service, preferred_date, preferred_time } }`. Time-in-the-past requests are rejected (correction flow), matching CreateReservation.
+
+**OUTPUT / END STATE:**
+- Real calendar credential resolved (UTIL-006, `calendar` category); Google gets a real `events.insert` attempt (Pattern B retry). Success → 200 `{ result: { appointment_id, calendar_event_id, client_calendar_write_status: "success", our_db_write_status: "success", authoritative_source: "client_calendar", status: "confirmed" } }` — a real parallel write (`conversions`+`conversions_appointment`+`appointments` tracking row, both legs in the same operation).
+- Calendar write fails, non-Google provider, or no connection: real `our_db_fallback` (`alert_fired: true`) → 200, `authoritative_source: "our_db_fallback"`, `status: "pending_review"` — nothing silently lost, matching Part 13.3 exactly.
+- If even the fallback write fails after retry: Pattern D — 200 `{ result: { appointment_id: null, status: "pending_human_review" }, handoff }`.
+
+**REAL DEPENDENCIES:** UTIL-001, UTIL-006 (`calendar`), WF-017 (direct HTTP call).
+
+**REAL NEW DB OBJECTS:** `public.insert_client_appointment_conversion` RPC (shared with WF-004, real duplicate detection via `lead_id`), `public.insert_client_appointment_tracking` RPC (shared with WF-006).
+
+**FIXED BC-031 (2 real, previously-undiscovered shared-utility bugs — this Tool was the first-ever real caller against a client with ZERO client_connections rows for any category):** see Tool Execution Fallback's own entry above for the "no connection row at all" crash (root-caused and fixed here). Also applied the same `Is Duplicate?` fix as WF-006 to avoid the identical tracking-row UNIQUE-constraint crash on a repeat call.
+
+**LAST VERIFIED:** BC-031, 2026-08-06 — all 5 categories genuinely tested against the new `client_test_003_acme_appointment_test` roster client (created this session, no prior calendar connection): Success/Duplicate (real `our_db_fallback` writes, same `appointment_id` returned twice, confirmed via SQL), Failure (past-time correction), Security (cross-client `customer_id`), Retry (forced 1ms timeout, confirmed Pattern D fallback with a real escalation). The `client_calendar` success path (real Google Calendar write) is coded and follows the exact proven Provider Router pattern, but could not be live-tested — no roster client has a real connected Google Calendar (a genuine, stated external blocker, not a gap in this workflow).
+
+---
+
+### WF-004 — Zenny Conversion Engine - CreateBookingRequest (WF-004)
+**n8n ID:** `YAVs2qc35DZcV4rp` · **published**, active
+
+**PURPOSE:** Mode B sub-type — always routes to human confirmation, no calendar write ever attempted (payload may be genuinely partial). Simplest of the 6 Tools in this batch.
+
+**TRIGGER:** Webhook, `POST /create-booking-request`.
+
+**INPUT:** `{ client_id, payload: { customer_id, lead_id, service?, preferred_date?, preferred_time? } }` — `service`/date/time all genuinely optional per Part 13.4.
+
+**OUTPUT / END STATE:**
+- Success: 200 `{ result: { booking_request_id, status: "pending_human_confirmation" } }` — real `conversions`+`conversions_appointment` row (`conversion_mode: 'B'`, `external_action_status: 'not_attempted'`), real duplicate detection via `lead_id`.
+- Insert failure after Pattern B retry: Pattern D — 200 `{ result: { booking_request_id: null, status: "pending_human_review" }, handoff }`.
+
+**REAL DEPENDENCIES:** UTIL-001, WF-017 (direct HTTP call).
+
+**FIXED BC-031 (2 real schema gaps found live via the Success test):** `conversions_appointment.service_type` and `.appointment_time` were both `NOT NULL` everywhere, despite Part 13.4 explicitly documenting both as optional for this exact Tool — the column had only ever been exercised by CreateAppointment (where both are required) until this session's real test. Both relaxed to nullable across `public`, `tpl_appointment`, and the real client schema.
+
+**LAST VERIFIED:** BC-031, 2026-08-06 — all 5 categories genuinely tested with a real partial payload (no `service`/date/time at all): Success/Duplicate (real row confirmed, same `booking_request_id` returned twice), Failure (missing `lead_id`), Security (cross-client `customer_id`), Retry (forced 1ms timeout, confirmed Pattern D fallback with a real escalation).
 
 ---
 

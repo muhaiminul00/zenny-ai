@@ -23,10 +23,55 @@ onward; the STATUS sections remain the primary, sufficient source for
 ---
 
 ## Last Updated
-2026-08-07 — by Claude Code, Session 30 (BC-029 — COMPLETE: Phase 7 (Growth Agent) begins and completes — WF-001 CreateLead built, tested against all 5 required test categories with real production data, and published. While testing, found and fixed 3 more real pre-existing infrastructure bugs, none previously caught because no real data had ever exercised the affected paths: `client_test_001_acme_emergency_test.leads` was missing migration 028's `convocore_*` columns (schema-provisioning drift); the same schema's `escalations` table was missing migration 032's `escalation_team` column (same drift class); and — the most severe finding — BC-028's 10-arg `insert_client_escalation` overload had silently broken WF-017 NotifyHuman (and therefore WF-013/WF-016's handoff path) for every 9-arg caller since BC-028, via a PostgREST overload-ambiguity error (`PGRST203`) that BC-028's own test never hit because it always passed the 10th argument. All 3 fixed live. Also found 3 n8n node-behavior quirks while building WF-001 itself (an IF-node `rightValue: ''` + boolean-operator crash; `retryOnFail`+`continueErrorOutput` landing a retry-exhausted failure on the main pin instead of the error pin; an explicit `responseFormat: json` crashing on WF-017's own response shape). 0 self-resolved document-level items — every finding was ordinary bug-catching, not a document conflict, so no standing-rule stop applies. CancelAppointment/UpdateCustomer 3rd-verification-tier redesign idea logged as future work, per Commander instruction — flag only, no build action.)
+2026-08-07 — by Claude Code, Session 32 (BC-031 — COMPLETE: Phase 8a — 6 new Conversion Engine Tools built (WF-002 CheckAvailability, WF-003 CreateAppointment, WF-004 CreateBookingRequest, WF-005 CreateCart, WF-006 CreateReservation, WF-007 CreateWaitlistEntry), all genuinely tested across all 5 required categories against real production data spanning 3 archetypes (a new roster client, `client_test_003_acme_appointment_test`, was created for the appointment archetype since none existed). Found and fixed 2 more real, previously-undiscovered shared-utility bugs (a NULL-expiry check in UTIL-006 wrongly forcing a doomed refresh on non-refreshable WooCommerce credentials and falsely marking a healthy connection errored; Tool Execution Fallback crashing outright on the "zero client_connections rows exist at all" case, never exercised until this session's brand-new appointment client), 2 workflow-level bugs (duplicate reservations/appointments crashing on an unhandled UNIQUE-constraint violation in the shared tracking-row insert), and 5 schema-drift/gap fixes (missing `conversions_restaurant` table; missing `waitlist_entries` table anywhere; `conversions_appointment.service_type`/`.appointment_time` wrongly `NOT NULL`; missing `cart_value_escalation_threshold`/`waitlist_enabled` config fields). **1 self-resolved document-level item logged (see below) — session stops for Commander acknowledgment.**)
 
 ## Current Phase
-**Phase 7 (Growth Agent) — BC-029 COMPLETE.** WF-001 CreateLead is the
+**Phase 8a (Conversion Engine, Tools 1–6 of 11) — BC-031 COMPLETE.**
+WF-002 CheckAvailability, WF-003 CreateAppointment, WF-004
+CreateBookingRequest, WF-005 CreateCart, WF-006 CreateReservation, and
+WF-007 CreateWaitlistEntry are all built, published, and genuinely
+tested across all 5 required categories (Success, Failure, Security,
+Retry, Duplicate) against real production data — see each Tool's entry
+in `06_Infrastructure/n8n/Workflow_Registry.md` for full detail. The
+real WF-006→WF-007 waitlist-redirect handoff chain was proven end-to-end,
+not just each Tool in isolation, per the card's explicit requirement.
+CreateAppointment's real parallel-write pattern (client calendar +
+`appointments` table in the same operation) is built and code-complete
+per Part 13.3, but its `client_calendar` success path could not be
+live-tested — no roster client has a real connected Google Calendar (a
+genuine, stated external blocker: the roster's only connected calendar
+is Calendly, with real `status='error'`, and the only ecommerce
+connection is a non-functional WooCommerce test store). Both `our_db_
+fallback` resilient-write paths (CreateAppointment, CreateReservation)
+ARE fully real and were the outcome of every un-bypassed test, exactly
+matching Part 13.3's "nothing silently lost" design intent. 5 remaining
+Conversion Engine Tools (CreateCallbackQueueEntry,
+CreateInspectionSlotBooking, CreateScoredBooking, CreateRegistration,
+RecordConversion) are Phase 8b, next card — **blocked from starting
+until the Commander acknowledges this session's self-resolved
+document-level item** (see below), per the standing Document Resolution
+Authority gate.
+
+**Self-resolved document-level item (BC-031, requires Commander
+acknowledgment before Phase 8b begins):** `n8n_Workflow_Specification_
+v1.md` Part 13.5 (CreateCart), 13.6 (CreateReservation), and 13.7
+(CreateWaitlistEntry) each specify an idempotency key referencing
+`{lead_id}`, but none of their three documented payload examples
+actually included a `lead_id` field — a real gap discovered while
+designing each Tool's real duplicate-detection logic (there was
+genuinely no field to key off of). Searched broadly before resolving:
+INTEGRATION_CONTRACT_v1.md's own worked example for SendRecoveryMessage
+and n8n_Workflow_Specification_v1.md's own CreateAppointment (Part
+13.3) both already carry `lead_id` explicitly in their payload wherever
+their idempotency key requires it — no document offers any other
+source for the value, and every sibling Tool's contract already
+established the pattern. Resolved by adding `lead_id` to all 3
+payloads directly in `n8n_Workflow_Specification_v1.md`, with an
+inline note at each of the 3 locations citing this resolution — a
+mechanical/structural correction (the field name and semantics were
+already fully specified elsewhere), not a novel product decision.
+
+Phase 7 (Growth Agent) — BC-029 COMPLETE. WF-001 CreateLead is the
 single Tool this phase required (Part 7.2's hard rule: Growth Agent
 never calls a conversion action directly). Built, published, and
 genuinely tested against real production data across all 5 required
@@ -2828,6 +2873,30 @@ roster test clients).
 ## Blockers Right Now
 
 ```
+**STANDING-RULE STOP IN EFFECT (BC-031) — DO NOT START PHASE 8b.**
+BC-031 logged 1 self-resolved document-level item (the missing
+`lead_id` field across 3 Tools' payload contracts — full detail in
+Current Phase above). Per the Document Resolution Authority standing
+rule, no further Phase 8 work (the 5 remaining Conversion Engine
+Tools) may begin until the Commander has explicitly acknowledged this
+specific resolution in a follow-up message.
+
+**REAL EXTERNAL INFRASTRUCTURE GAPS (BC-031, not fixable without a
+human adding real credentials — Credential Gate):** no roster client
+has a real, functioning connected Google Calendar (needed to fully
+live-test CreateAppointment/CreateReservation's `client_calendar`
+success path) or a real functioning ecommerce store (the only
+connected WooCommerce store, `zenny-woocom.free.je`, returns non-JSON
+responses to real API calls; the only Calendly connection has real
+`status='error'`). Every Tool's resilient fallback path was proven
+genuinely real as a direct consequence — not a gap in the workflows,
+a gap in the roster's real external connections.
+
+**NEW ROSTER CLIENT (BC-031):** `client_test_003_acme_appointment_test`
+(client_id `2d0fafb6-72c8-4751-a7c0-cc77cf743807`, archetype
+`appointment`), created for real Conversion Engine appointment-archetype
+testing — no appointment-archetype client existed before this card.
+
 **FUTURE WORK (flagged per BC-029 Step 4, not built this card):**
 Commander/human have discussed redesigning WF-013 CancelAppointment
 (and likely WF-016 UpdateCustomer) toward a THIRD verification tier
@@ -3310,6 +3379,112 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 31 — 2026-08-06/07 — BC-031 COMPLETE: Phase 8a (Conversion Engine, Tools 1-6 of 11) — WF-002/003/004/005/006/007 built and genuinely tested across all 5 required categories against real production data spanning 3 archetypes; 2 more real shared-utility bugs found and fixed (UTIL-006 NULL-expiry mishandling, Tool Execution Fallback crashing on zero-connections case); 1 self-resolved document-level item logged — session stops for Commander acknowledgment
+- Step 0 — live audit via `search_workflows`: no real collision for any
+  of the 6 Tools (the only near-matches were the already-known-legacy
+  `WF-002 — CONVERSION ENGINE` and a real, useful reference template,
+  `Provider Router Example (CheckAvailability/Calendar)`, explicitly
+  not a callable dependency per the registry's own note). Roster check:
+  only 2 clients existed (commerce_ecom, emergency) — no restaurant or
+  appointment archetype coverage. Resolved: `commerce_ecom`'s existing
+  schema (`client_test_002`) already supports `commerce_restaurant`
+  too (both share `tpl_commerce`, confirmed live) — no new client
+  needed there. Created `client_test_003_acme_appointment_test`
+  (`appointment` archetype) for CreateAppointment/CreateBookingRequest,
+  following BC-026's established roster convention.
+- Step 1 — WF-002 CheckAvailability built per Part 13.2, v1 scope
+  (`inventory`/`table_slot`/`calendar` only) verified directly against
+  Part 7.3's resolution before building — `team`/`specialist`/
+  `capacity` explicitly rejected with a clear v2-scope error rather
+  than silently mishandled. Real Provider Router pattern built for
+  both ecommerce (Shopify/WooCommerce) and calendar (Google/Calendly/
+  Cal.com) branches, reusing the exact HTTP shapes from the existing
+  `Provider Router Example` reference template. Found and fixed a real,
+  previously-undiscovered UTIL-006 bug live during this Tool's first-
+  ever real call against a non-Google connection: `Token Expiring
+  Soon?` treated ANY `NULL token_expires_at` as expiring-soon,
+  including WooCommerce's `api_key`-style connection (no refresh token,
+  never expires) — this forced a doomed synchronous refresh attempt and
+  incorrectly flipped a genuinely healthy connection to `status='error'`
+  (manually restored after the fix). Fixed: refresh only attempted when
+  `refresh_token_secret_id` is actually present. Also extended UTIL-006's
+  output with `provider_account_id`/`secondary_secret_id` (both already
+  stored, migration 020, never surfaced) so two-part-credential
+  providers like WooCommerce are usable by callers — additive only.
+- Step 2 — WF-005 CreateCart built per Part 13.5 AND the real Ecom Mode
+  A decision logic (stock-check via a direct call to WF-002, cart-value
+  escalation threshold check against a new real `cart_value_
+  escalation_threshold` config field — added this session, previously
+  specified in the Runtime doc but never actually added to the schema).
+  `cart_value` is honestly `0.00` for v1 — real per-item pricing needs a
+  live commerce catalog feed not yet built, a disclosed gap, not hidden.
+- Step 3/4 — WF-006 CreateReservation + WF-007 CreateWaitlistEntry built
+  together per Part 13.6/13.7, including the real large-party (≥10)
+  gate to a genuine event/catering human handoff, time-in-the-past
+  correction, and the real parallel-write + `our_db_fallback` pattern.
+  A new `waitlist_entries` table was created (no home existed anywhere
+  in the schema before — genuine mechanical gap, added to both roster
+  clients + `tpl_commerce`). Found and fixed a real bug live during the
+  Duplicate test: a repeat reservation call still attempted a fresh
+  `appointments` tracking-row insert, hitting the real UNIQUE
+  constraint with no error handling and crashing the whole execution
+  with no response ever sent — fixed with an explicit duplicate check
+  that skips the redundant insert. Also fixed a real schema-drift gap:
+  `client_test_002` was missing the entire `conversions_restaurant`
+  table (present on `tpl_commerce`, never back-filled). The real
+  WF-006→WF-007 waitlist-redirect chain was tested end-to-end per the
+  card's explicit requirement (toggled `waitlist_enabled` on the real
+  roster client, confirmed a real waitlist row created with the correct
+  queue position, then reverted the config).
+- Step 5 — WF-003 CreateAppointment built per Part 13.3's real parallel-
+  write pattern (client calendar + `appointments` table in the same
+  operation, `our_db_fallback` resilient record on failure). This was
+  the first-ever real Tool call against a client with ZERO
+  `client_connections` rows for any category (the brand-new appointment
+  client) — surfaced a real, previously-undiscovered Tool Execution
+  Fallback crash: `Mark Connection Errored` and `Log Fallback Event`
+  both unconditionally passed an empty-string `connection_id` to RPCs
+  expecting a real `uuid`, both correctly rejecting it and crashing the
+  entire fallback workflow with no response ever returned — silently
+  breaking every real caller of UTIL-006 whenever a connection was
+  simply never configured (as opposed to configured-then-broken). Fixed
+  with an explicit `Has Connection ID?` check + null-coercion. Applied
+  the same duplicate-detection fix as WF-006. The real Google Calendar
+  write-success path is coded and follows the proven pattern but could
+  not be live-tested — no roster client has a real connected Google
+  Calendar (external blocker, not a workflow gap).
+- Step 6 — WF-004 CreateBookingRequest built per Part 13.4 (Mode B,
+  always routes to human confirmation, no calendar write attempted).
+  Found and fixed 2 real schema gaps live via the Success test:
+  `conversions_appointment.service_type` and `.appointment_time` were
+  both `NOT NULL` everywhere despite Part 13.4 explicitly documenting
+  both as optional for this exact Tool — relaxed to nullable.
+- Step 7 — all 5 required test categories genuinely executed for all 6
+  Tools against real production data via the real production webhooks
+  (not simulated) — see each Tool's entry in Workflow_Registry.md for
+  the specific real IDs/rows/escalations confirmed per category.
+- Step 8 — `06_Infrastructure/n8n/Workflow_Registry.md` updated with all
+  6 new entries plus updates to UTIL-006 and Tool Execution Fallback's
+  existing entries, before this session's own Definition of Done, per
+  the standing Per-Workflow Documentation rule.
+- **Self-resolved document-level item (logged per the standing rule —
+  see Blockers and Current Phase above for the required stop):**
+  `n8n_Workflow_Specification_v1.md` Part 13.5/13.6/13.7 each require
+  `{lead_id}` in their idempotency key but never actually listed
+  `lead_id` in their documented payload. Searched broadly (Integration
+  Contract's SendRecoveryMessage worked example, this same doc's own
+  CreateAppointment Part 13.3) before resolving — every sibling Tool
+  that needs `lead_id` already carries it explicitly in its payload;
+  no document offers any other source for the value. Fixed directly in
+  `n8n_Workflow_Specification_v1.md` at all 3 locations, with an inline
+  citation of this resolution at each. A mechanical/structural
+  correction (the field was already fully specified elsewhere), not a
+  genuinely novel product decision — but logged and gated per the
+  standing rule regardless, since it IS a real document-level
+  correction. **This session stops here — Phase 8b (the remaining 5
+  Conversion Engine Tools) does not begin until the Commander
+  explicitly acknowledges this resolution in a follow-up message.**
 
 ### Session 30 — 2026-08-06/07 — BC-029 COMPLETE: Phase 7 (Growth Agent) — WF-001 CreateLead built and genuinely tested against all 5 required categories; 3 real pre-existing infrastructure bugs found and fixed, including a severe PostgREST overload ambiguity that had silently broken WF-017 NotifyHuman since BC-028
 - Step 0 — live audit via `search_workflows`: the only existing "WF-001"

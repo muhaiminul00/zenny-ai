@@ -1091,9 +1091,17 @@ Fallback chain:   B → C  (Mode A → Mode B guided product link on failure)
 ```json
 {
   "customer_id": "uuid",
+  "lead_id": "uuid",
   "items": [{ "product_id": "string", "quantity": 1 }]
 }
 ```
+**Self-resolved document gap (BC-031):** `lead_id` was missing from this
+payload despite the idempotency key above requiring `{lead_id}` — added
+here. Resolved via cross-reference: CreateAppointment (§13.3) and
+SendRecoveryMessage (Integration Contract Part 11's worked example) both
+carry `lead_id` explicitly in their payload wherever their idempotency key
+references it; no document offers any other source for the value. A
+mechanical/structural correction, not a new design decision.
 
 **Response `result`:**
 ```json
@@ -1116,11 +1124,14 @@ Fallback chain:   B → C  (→ CreateWaitlistEntry if no slot, per
 ```json
 {
   "customer_id": "uuid",
+  "lead_id": "uuid",
   "party_size": 1,
   "reservation_time": "ISO 8601",
   "special_request": "string, optional"
 }
 ```
+**Self-resolved document gap (BC-031):** same `lead_id` gap and resolution
+as CreateCart §13.5 above.
 
 **Write behavior (PARALLEL, not sequential — same Phase 5C pattern as
 CreateAppointment §13.3, Change Request applied BC-013):** writes to BOTH
@@ -1156,8 +1167,10 @@ Fallback chain:   C → D  (Mode B sub-type fallback of CreateReservation)
 
 **Payload:**
 ```json
-{ "customer_id": "uuid", "party_size": 1, "requested_time": "ISO 8601" }
+{ "customer_id": "uuid", "lead_id": "uuid", "party_size": 1, "requested_time": "ISO 8601" }
 ```
+**Self-resolved document gap (BC-031):** same `lead_id` gap and resolution
+as CreateCart §13.5 above.
 
 **Response `result`:**
 ```json
