@@ -23,10 +23,12 @@ onward; the STATUS sections remain the primary, sufficient source for
 ---
 
 ## Last Updated
-2026-08-07 — by Claude Code, Session 32 (BC-032 — Infrastructure catch-up: Step 0 standing rules added to CLAUDE.md (codebase-memory-mcp priority, MCP connectivity check at session start — human instruction); Step 1 dashboard redeployed and verified (Slack removal + partial-grant copy confirmed live via Playwright); Step 4 ADP-002's "standard tool" routing fixed — it had NEVER actually forwarded to any downstream Tool for any tool_name (only echoed the built contract back), now correctly forwards to all 12 real built Tools, tested with 4 real curl calls; Step 2 Shopify Client Credentials Grant connection path built across UTIL-006/UTIL-007/a new `shopify-connect` Edge Function/dashboard UI, live-tested against a real (nonexistent) store domain to confirm genuine external calls, but not exercised end-to-end through a real production connection (disclosed limitation — no built Tool yet makes a live ecommerce call that would trigger it); Step 5 Workflow_Registry.md updated for all of the above. **Step 3 (Traefik proxy for OAuth redirect domain) NOT STARTED this session — requires explicit human confirmation before any DNS write, per the standing rule; still pending.** A self-resolved document-level item was found and logged (see below): Shopify's Custom App static-token form, what this card originally asked for, was removed by Shopify on Jan 1 2026 (confirmed live) — pivoted to Client Credentials Grant per human direction after flagging the conflict.)
+2026-08-07 — by Claude Code, Session 33 (BC-033 — closing BC-032's Step 3: new `auth.zeromanuals.com` Traefik proxy live with a real trusted Let's Encrypt cert, correctly proxying oauth-initiate/oauth-callback to Supabase with a verified-correct Host-header rewrite (`passHostHeader=false` + a DNS-named backend URL — NOT `customRequestHeaders.Host`, which Traefik's own maintainers confirm does not work for this), a real independent `/health` endpoint served locally (not proxied), and Google's stored `redirect_uri` updated to the new domain — confirmed live in a real Google authorize URL. **BLOCKED mid-card, waiting on human action**: Step 3 (adding the new redirect URI in Google Cloud Console) cannot be done by any available tool; Step 4's real end-to-end OAuth round-trip test is paused until the human confirms that Console change is done, per the card's own explicit wait instruction — Google OAuth connects will genuinely fail with `redirect_uri_mismatch` until then, an expected, disclosed transitional state, not a regression.)
 
 ## Current Phase
-**BC-032 (Infrastructure catch-up) — PARTIAL: Steps 0/1/2/4/5 complete, Step 3 not started.**
+**BC-033 (closing BC-032's Step 3) — IN PROGRESS: Steps 1/1.5/2 complete and verified live; Step 3 is a pending human action; Step 4 blocked on it; Step 5 (this doc) partially done, will be finished once Step 4 completes.**
+
+**BC-032 (Infrastructure catch-up) — PARTIAL: Steps 0/1/2/4/5 complete, Step 3 (this card) now in progress.**
 
 **Self-resolved document-level item (BC-032):** Client_Integration_and_Credential_Platform_v1.md Part 8.2 already documented Shopify's Custom App static-token model as discontinued in favor of the shared-app Authorization Code Grant, and explicitly said not to use Client Credentials Grant for that shared-app case. This Build Card's Step 2 nonetheless asked for a Custom App static-token form (the exact mechanism Part 8.2 already said was gone) — live verification (WebSearch) confirmed Shopify removed the ability to generate new static Custom App tokens entirely as of Jan 1, 2026. Per Mandatory MCP Verification, did not build the requested dead functionality; stopped and asked the human via AskUserQuestion instead of silently building or silently skipping the step. The human's own answer directed a pivot to Shopify's **Client Credentials Grant** (a genuinely different, still-live mechanism: per-client Client ID + Client Secret, Zenny auto-requests a short-lived token on each call) — verified live (WebSearch/WebFetch) that this mechanism is real and current (`POST https://{shop}.myshopify.com/admin/oauth/access_token`, form-urlencoded `client_id`/`client_secret`/`grant_type=client_credentials`, returns `{access_token, scope, expires_in: 86399}`). This is architecturally distinct from the shared-app case Part 8.2 rejected Client Credentials Grant for (this is a genuine per-client alternative fallback, matching Part 8.5.1's general API-key-fallback principle), so it does not contradict Part 8.2 — it fills a different, real gap. Built accordingly. **Per the standing gate, this session stops here for Commander acknowledgment of this resolution before Phase 8b or any other new Build Card begins** — routine documentation/commit work below this point is not new build scope.
 
@@ -3384,6 +3386,97 @@ card's own instruction — flagged, not applied):
 ---
 
 ## Session Log (append-only — newest at top, never delete old entries)
+
+### Session 33 — 2026-08-07 — BC-033 (closing BC-032's Step 3): auth.zeromanuals.com Traefik proxy live, real Host-header-rewrite mechanism verified, Google redirect_uri updated — PAUSED for human Google Console action before Step 4's real E2E test
+
+- **DNS pre-confirmed by the human** (`auth.zeromanuals.com -> 187.127.217.123`) before this card was issued — re-verified live via `nslookup auth.zeromanuals.com 8.8.8.8` before touching anything, no DNS write attempted this session (out of scope, correctly not repeated).
+
+- **New Traefik router (`zenny-auth` Docker Compose project, srv1881104)**,
+  mirroring `zenny-dashboard`'s exact working label pattern
+  (`traefik.enable=true`, `Host()` rule, `entrypoints=websecure`,
+  `tls.certresolver=letsencrypt`). One `nginx:alpine` container carries
+  all 3 routers' labels (Traefik's Docker provider only requires *a*
+  running container to hang labels on — the two OAuth services'
+  `loadbalancer.server.url` labels fully override the actual backend
+  address, so the label-holder container doesn't need real network
+  reachability to Supabase itself).
+
+- **Host-header-rewrite mechanism — the one part of BC-020's reasoning
+  that was never actually tested, now verified live, and found to need
+  a DIFFERENT real mechanism than BC-020/this card's own text assumed.**
+  Researched before building (WebSearch + WebFetch against Traefik's own
+  docs and community forum): `customRequestHeaders.Host` — the
+  mechanism BC-020's reasoning implied — does **not** work; a Traefik
+  maintainer states directly on the community forum: "Traefik does not
+  currently support modification of the Host header [via that
+  mechanism]. It interferes with how the proxy works." The real,
+  confirmed mechanism is **`loadbalancer.passhostheader=false`** on the
+  service, combined with a DNS-named (not IP-based) `server.url` — with
+  `passHostHeader` false, Traefik's underlying Go HTTP client naturally
+  uses the target URL's own hostname as the outbound Host header instead
+  of forwarding the inbound request's Host. **This is a genuinely new
+  platform-behavior discovery for this project, logged here per the
+  established pattern for capturing this class of finding** (same
+  discipline as BC-014's Compose-`build:`-doesn't-work finding, BC-020's
+  own COOP/window.opener finding, etc.).
+  - Path rewrite: Supabase Edge Functions live at `/functions/v1/
+    {name}`, not bare `/oauth-initiate` — an `addPrefix` middleware
+    (`prefix=/functions/v1`) handles this; query strings pass through
+    untouched by path-only middlewares, confirmed live (state UUIDs and
+    provider params all arrived intact on the backend).
+  - **Verified live, both endpoints, real backend effects, not just
+    "no curl error":** `GET https://auth.zeromanuals.com/oauth-initiate?
+    ...&provider=calendly` returned a real 302 to a genuine Calendly
+    authorize URL with a real `state` UUID, and that exact state row was
+    confirmed inserted in `control.oauth_state` via direct SQL — proving
+    the full proxy chain (Host rewrite + path rewrite + real Supabase
+    execution + real DB write) works, not just that headers looked
+    right. `GET .../oauth-callback?state=nonexistent...` returned the
+    real, correct `invalid_state` error redirect — proving oauth-callback
+    is reached correctly too.
+
+- **`/health` endpoint (Step 1.5) — served locally, not proxied,
+  confirmed independent of Supabase.** Same `nginx:alpine` container
+  writes a static `ok` file at build/start time and serves it directly;
+  no Traefik middleware or backend call touches Supabase for this route.
+  Verified: `curl https://auth.zeromanuals.com/health` → `200`, body
+  `ok`, fast (~local nginx response time, no upstream round-trip).
+
+- **Real trusted cert confirmed** (same standard as BC-016 — an actual
+  chain read, not just a successful curl): `Issuer: C=US, O=Let's
+  Encrypt, CN=YR1`, `Subject: CN=auth.zeromanuals.com`, valid through
+  2026-11-05. ACME issued fast (within the same deploy) since DNS was
+  already propagated before this session started.
+
+- **Step 2 — real gap found in the card's own assumption, corrected
+  mechanically (not a document-level conflict, no stop required).** The
+  card described this as "the code that builds the redirect_uri" — live
+  verification of `oauth-initiate`'s actual deployed source (Mandatory
+  MCP Verification) found it does NOT build this string at all; it reads
+  `app.redirect_uri` from `control.oauth_apps` via `get_oauth_app()`, a
+  stored per-provider config value. The real, correct fix is an UPDATE
+  to that table, not an Edge Function code change/redeploy — applied via
+  a tracked migration
+  (`update_google_oauth_redirect_uri_to_auth_subdomain`), scoped to
+  `provider = 'google'` only (matching this card's Step 3 scope — only
+  Google Console is being updated this session; updating
+  shopify/calendly/cal_com/slack's stored `redirect_uri` too would have
+  broken their real authorize flows against consoles that weren't also
+  being updated). Verified live: a real `oauth-initiate` call for
+  `google` now returns an authorize URL with `redirect_uri=https%3A%2F
+  %2Fauth.zeromanuals.com%2Foauth-callback` — the new domain, confirmed
+  in Google's own real accounts.google.com endpoint response.
+
+- **Step 3 — human action required, flagged, PAUSED here per the card's
+  explicit instruction.** Cannot add a Google Cloud Console redirect URI
+  via any available tool. Google OAuth connects will genuinely return
+  `redirect_uri_mismatch` until the human adds `https://
+  auth.zeromanuals.com/oauth-callback` as an Authorized redirect URI on
+  the existing OAuth client (keeping the old Supabase-domain one in
+  place during transition, per the card's explicit instruction not to
+  remove it yet). Step 4's real end-to-end test is intentionally not
+  attempted until this is confirmed done — attempting it now would only
+  produce an expected, uninformative failure, not a real test.
 
 ### Session 32 — 2026-08-07 — BC-032 (Infrastructure catch-up): Steps 0/1/2/4/5 complete, Step 3 not started; 1 self-resolved document-level item logged — session stops for Commander acknowledgment
 
