@@ -23,10 +23,10 @@ onward; the STATUS sections remain the primary, sufficient source for
 ---
 
 ## Last Updated
-2026-08-07 — by Claude Code, Session 33 (BC-033 — closing BC-032's Step 3: new `auth.zeromanuals.com` Traefik proxy live with a real trusted Let's Encrypt cert, correctly proxying oauth-initiate/oauth-callback to Supabase with a verified-correct Host-header rewrite (`passHostHeader=false` + a DNS-named backend URL — NOT `customRequestHeaders.Host`, which Traefik's own maintainers confirm does not work for this), a real independent `/health` endpoint served locally (not proxied), and Google's stored `redirect_uri` updated to the new domain — confirmed live in a real Google authorize URL. **BLOCKED mid-card, waiting on human action**: Step 3 (adding the new redirect URI in Google Cloud Console) cannot be done by any available tool; Step 4's real end-to-end OAuth round-trip test is paused until the human confirms that Console change is done, per the card's own explicit wait instruction — Google OAuth connects will genuinely fail with `redirect_uri_mismatch` until then, an expected, disclosed transitional state, not a regression.)
+2026-08-07 — by Claude Code, Session 33 (BC-033 COMPLETE — closing BC-032's Step 3: new `auth.zeromanuals.com` Traefik proxy live with a real trusted Let's Encrypt cert, correctly proxying oauth-initiate/oauth-callback to Supabase with a verified-correct Host-header rewrite (`passHostHeader=false` + a DNS-named backend URL — NOT `customRequestHeaders.Host`, which Traefik's own maintainers confirm does not work for this), a real independent `/health` endpoint served locally (not proxied), and Google's stored `redirect_uri` updated to the new domain. The human added the new redirect URI in Google Cloud Console and, in the course of verifying it, performed a genuine disconnect+reconnect of the real Google Calendar connection — **this constitutes real, conclusive Step 4 proof**: a real Google authorization code (`code=4/0AXEQ...`) was exchanged through oauth-callback at the exact same second (08:35:28 UTC) the connection's audit log recorded a real `connected` event, with the new `redirect_uri` already in place beforehand — proving the full chain (Google Console -> Traefik Host+path rewrite -> Supabase -> token exchange -> DB write) genuinely works end-to-end. No further isolated test was needed.)
 
 ## Current Phase
-**BC-033 (closing BC-032's Step 3) — IN PROGRESS: Steps 1/1.5/2 complete and verified live; Step 3 is a pending human action; Step 4 blocked on it; Step 5 (this doc) partially done, will be finished once Step 4 completes.**
+**BC-033 (closing BC-032's Step 3) — COMPLETE. All 5 steps done and verified live.**
 
 **BC-032 (Infrastructure catch-up) — PARTIAL: Steps 0/1/2/4/5 complete, Step 3 (this card) now in progress.**
 
@@ -3387,7 +3387,7 @@ card's own instruction — flagged, not applied):
 
 ## Session Log (append-only — newest at top, never delete old entries)
 
-### Session 33 — 2026-08-07 — BC-033 (closing BC-032's Step 3): auth.zeromanuals.com Traefik proxy live, real Host-header-rewrite mechanism verified, Google redirect_uri updated — PAUSED for human Google Console action before Step 4's real E2E test
+### Session 33 — 2026-08-07 — BC-033 COMPLETE: auth.zeromanuals.com Traefik proxy live, real Host-header-rewrite mechanism verified, Google redirect_uri updated, Google Console updated by human, real end-to-end OAuth round trip confirmed via a genuine reconnect
 
 - **DNS pre-confirmed by the human** (`auth.zeromanuals.com -> 187.127.217.123`) before this card was issued — re-verified live via `nslookup auth.zeromanuals.com 8.8.8.8` before touching anything, no DNS write attempted this session (out of scope, correctly not repeated).
 
@@ -3467,16 +3467,58 @@ card's own instruction — flagged, not applied):
   %2Fauth.zeromanuals.com%2Foauth-callback` — the new domain, confirmed
   in Google's own real accounts.google.com endpoint response.
 
-- **Step 3 — human action required, flagged, PAUSED here per the card's
-  explicit instruction.** Cannot add a Google Cloud Console redirect URI
-  via any available tool. Google OAuth connects will genuinely return
-  `redirect_uri_mismatch` until the human adds `https://
+- **Step 3 — human action, DONE.** The human added `https://
   auth.zeromanuals.com/oauth-callback` as an Authorized redirect URI on
-  the existing OAuth client (keeping the old Supabase-domain one in
-  place during transition, per the card's explicit instruction not to
-  remove it yet). Step 4's real end-to-end test is intentionally not
-  attempted until this is confirmed done — attempting it now would only
-  produce an expected, uninformative failure, not a real test.
+  the existing Google OAuth client (confirmed via screenshot — "OAuth
+  client saved"). Only the new URI is visible in the client's own
+  "Authorized redirect URIs" list post-save; the old Supabase-domain one
+  the card asked to keep during transition does not appear to still be
+  listed — not independently confirmed either way, flagged for the
+  human's own awareness rather than blocking on it, since Step 4 (below)
+  already proves the NEW path works regardless of whether the old one
+  was kept.
+
+- **Step 4 — real end-to-end test, CONFIRMED via a genuine human-driven
+  round trip (no separate isolated test needed).** While verifying the
+  Console change, the human disconnected and reconnected the real
+  Google Calendar connection through the dashboard. Correlated via 3
+  independent real sources, all agreeing to the same second:
+  - `control.client_connections` row `609559ce-...`: `updated_at =
+    2026-08-07 08:35:28 UTC`, fresh `token_expires_at`.
+  - `control.connection_audit_log`: `revoked_by_client` at 08:32:23 UTC,
+    then `connected` (`auth_method: oauth`, `actor: client`) at exactly
+    08:35:28.454839 UTC.
+  - Supabase Edge Function logs: a real `oauth-callback` hit at the same
+    timestamp carrying a genuine Google authorization code
+    (`code=4/0AXEQ...`, `iss=accounts.google.com`) — a code only appears
+    on a fresh interactive-consent completion, never on a routine token
+    refresh (refreshes hit `oauth2.googleapis.com/token` directly,
+    never `oauth-callback`).
+  Since the DB's `redirect_uri` for `google` already pointed at
+  `auth.zeromanuals.com/oauth-callback` well before this reconnect (Step
+  2 ran earlier in this same session), and Google did not reject the
+  attempt with `redirect_uri_mismatch`, this proves Google's Console
+  already had the new URI authorized AND the full chain — Google's own
+  redirect -> Traefik's Host+path rewrite -> Supabase's real
+  oauth-callback -> real token exchange -> real DB write — genuinely
+  works end-to-end, not just that the generated URL looks correct.
+
+- **Answered live, not part of the card but asked by the human while
+  verifying:** "Authorized domains" on the OAuth consent screen only
+  needs the bare root `zeromanuals.com` (already present) — Google
+  authorizes subdomains automatically once the root is authorized, so
+  `zenny.zeromanuals.com`/`auth.zeromanuals.com` do not need separate
+  entries. The consent screen now showing `zeromanuals.com` instead of
+  the raw Supabase domain (a direct effect of this card's redirect_uri
+  change) is a verification POSITIVE, not a risk — a consistent branded
+  domain across home page/consent screen/redirect is exactly what
+  Google's verification reviewers look for. The 3 branding-verification
+  issues the human's screenshot showed (home page ownership/content,
+  app-name mismatch) are pre-existing marketing-site/Search-Console
+  issues from a prior verification attempt, unrelated to and unaffected
+  by this card's technical work — flagged back to the human, not
+  actioned here (outside this card's scope, no tool available for
+  Search Console verification).
 
 ### Session 32 — 2026-08-07 — BC-032 (Infrastructure catch-up): Steps 0/1/2/4/5 complete, Step 3 not started; 1 self-resolved document-level item logged — session stops for Commander acknowledgment
 
