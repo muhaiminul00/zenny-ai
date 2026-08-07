@@ -57,6 +57,17 @@ self-resolved and logged: `lead_id` was missing from CreateCart/
 CreateReservation/CreateWaitlistEntry's documented payloads despite their
 idempotency keys requiring it — fixed directly in
 `n8n_Workflow_Specification_v1.md`. See each Tool's own entry below.
+Updated 2026-08-07 (BC-032): ADP-002's "standard tool" routing path fixed
+— it had never actually forwarded to any downstream Tool for any
+tool_name, only echoed the built contract back; now correctly forwards
+to any of the 12 real built Tools, tested with 4 real curl calls. UTIL-
+006/UTIL-007 extended with a new real Shopify Client Credentials Grant
+refresh branch (structurally validated and published; not yet exercised
+end-to-end — no built Tool currently makes a live ecommerce call that
+would trigger it, a disclosed limitation, not a shortcut). New Supabase
+Edge Function `shopify-connect` added (mirrors `woocommerce-connect`),
+tested live against a real (nonexistent) store domain to confirm it
+performs a genuine external call rather than a simulated one.
 ```
 
 ---
@@ -167,6 +178,8 @@ idempotency keys requiring it — fixed directly in
 
 **INPUT:** `{ client_id, category, tool_name }`
 
+**UPDATED BC-032:** `Refresh Token Synchronously`'s call into UTIL-007 now also passes `access_token_secret_id`, `secondary_secret_id`, and `provider_account_id` (previously only `connection_id`/`client_id`/`category`/`provider`/`refresh_token_secret_id` were forwarded) — additive only, needed so UTIL-007's new Shopify branch (see below) has the fields it needs. Google's existing refresh path ignores the new fields, unaffected.
+
 **OUTPUT / END STATE:**
 - Connection exists and connected: calls `public.get_client_connection` RPC, then checks `Token Expiring Soon?` (`!token_expires_at || token_expires_at <= now+5min`).
   - Not expiring: reads the existing secret directly via `public.read_credential_secret` → `{ available: true, token, provider, connection_id }`.
@@ -192,16 +205,17 @@ idempotency keys requiring it — fixed directly in
 
 **TRIGGER:** `executeWorkflowTrigger` — no webhook.
 
-**INPUT:** `{ connection_id, client_id, category, provider, refresh_token_secret_id }`
+**INPUT:** `{ connection_id, client_id, category, provider, refresh_token_secret_id, access_token_secret_id, secondary_secret_id, provider_account_id }` — the last 3 fields added BC-032 for the new Shopify branch below (Google's branch ignores them).
 
 **OUTPUT / END STATE:**
-- Success (`google` only — see scope note below): reads the refresh token secret, the OAuth app's client_id, and its client secret; POSTs to `https://oauth2.googleapis.com/token`; on success, stores the new access token via `store_credential_secret` and calls `update_connection_tokens` (1-hour expiry, matching Google's real access-token lifetime) → `{ refreshed: true, access_token_secret_id, token_expires_at }`.
-- Refresh failure (Google returned an error): `{ refreshed: false, error }`.
-- Any other provider (`calendly`, `cal_com`, anything else): `{ refreshed: false, error: "unsupported provider for synchronous refresh: ..." }` — **NOT YET IMPLEMENTED**, a real, deliberate scope cut for this session (Google is the only provider with real, currently-tested credentials across every prior session; Calendly/Cal.com are still `testing`/`pending` app status). Flagged for a future card, not silently left unhandled — the fallback branch returns a clear, honest error rather than crashing or guessing.
+- Success (`google`): reads the refresh token secret, the OAuth app's client_id, and its client secret; POSTs to `https://oauth2.googleapis.com/token`; on success, stores the new access token via `store_credential_secret` and calls `update_connection_tokens` (1-hour expiry, matching Google's real access-token lifetime) → `{ refreshed: true, access_token_secret_id, token_expires_at }`.
+- Success (`shopify`, new BC-032): reads the Shopify Client ID from `refresh_token_secret_id` and the Client Secret from `secondary_secret_id`; POSTs to `https://{provider_account_id}/admin/oauth/access_token` (Client Credentials Grant, `grant_type=client_credentials`); on success, stores the new access token and calls `update_connection_tokens` (86399s expiry, matching Shopify's real token TTL) → same `{ refreshed: true, access_token_secret_id, token_expires_at }` shape as Google. **Field placement is deliberately Google-shaped, not WooCommerce-shaped**: the STABLE Shopify Client ID lives in `refresh_token_secret_id` (the same role Google's actual refresh_token plays), not in `access_token_secret_id` — that slot is reserved for the ROTATING access token every Tool reads for live calls and every refresh overwrites. An earlier draft of this branch got this backwards; caught and fixed before any real connection used it (see Session Log).
+- Refresh failure (Google or Shopify returned an error): `{ refreshed: false, error }`.
+- Any other provider (`calendly`, `cal_com`, anything else): `{ refreshed: false, error: "unsupported provider for synchronous refresh: ..." }` — **NOT YET IMPLEMENTED**, a real, deliberate scope cut (Calendly/Cal.com are still `testing`/`pending` app status). Flagged for a future card, not silently left unhandled — the fallback branch returns a clear, honest error rather than crashing or guessing.
 
-**REAL DEPENDENCIES:** None directly (calls Google's real token endpoint + `public` RPCs).
+**REAL DEPENDENCIES:** None directly (calls Google's and Shopify's real token endpoints + `public` RPCs). The Shopify branch's connection rows are created by a new Supabase Edge Function, `shopify-connect` (BC-032, mirrors `woocommerce-connect`'s live-validate-then-store pattern) — not tracked as its own registry entry here since this file is n8n-scoped and no other Edge Function (including `woocommerce-connect` itself) has one either; noted here as the natural cross-reference instead.
 
-**LAST VERIFIED:** BC-028, 2026-08-06 — verified indirectly via UTIL-006's real E2E test (the Google branch is the one that actually ran and succeeded, confirmed via real DB state). Not directly execution-tested in isolation, nor has the Calendly/Cal.com fallback branch been exercised.
+**LAST VERIFIED:** BC-028, 2026-08-06 — verified indirectly via UTIL-006's real E2E test (the Google branch is the one that actually ran and succeeded, confirmed via real DB state). **BC-032 (Shopify branch):** structurally validated (published, `get_workflow_details` re-confirmed the full node graph and all 5 `Route By Provider` outputs correctly wired) and its request shape/endpoint confirmed correct against Shopify's real, documented Client Credentials Grant contract, but **not exercised end-to-end through a genuine production connection** — no currently-built Tool performs a live ecommerce API call that would trigger this branch naturally (WF-014 GetOrderStatus reads only from Zenny's own DB), and this workflow's `executeWorkflowTrigger` cannot be invoked directly by the available test tooling (no webhook trigger; `test_workflow` forcibly pins all credentialed/HTTP nodes, which would fake the very external call this branch needs to prove). Disclosed limitation, same class as other providers tested without real store credentials — not a shortcut taken silently.
 
 ---
 
@@ -269,7 +283,8 @@ idempotency keys requiring it — fixed directly in
 - System Tool / Shopify → 200, explicit "excluded, out of Adapter scope" note, no further action.
 - `human-handoff`, no existing open escalation → 200 `{ result: { stage: 1, escalated: true } }`, and a real new `escalations` row (`status='open'`, `escalation_type='convocore_human_handoff'`).
 - `human-handoff`, an open escalation already exists for this customer → 200 `{ result: { stage: 2, escalated: true } }`, fires a real UTIL-004 notification instead of writing a duplicate row (per BC-010's Stage-2 decision).
-- Standard tool → 200, the full built Standard Request Contract object (`request_id`, `contract_version: 'v1'`, `correlation_id`, `client_id`, `conversation_id`, `runtime_module: null` — deliberately never inferred, per Part 8 — `tool_name`, `timestamp`, `idempotency_key`, `payload`, `authentication.bearer_verified: true`).
+- Standard tool, real built Tool exists (BC-032 — see fix below): builds the Standard Request Contract, resolves `tool_name` (PascalCase, e.g. `"CreateLead"`) to its kebab-case webhook path (`.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()`), and if that path matches one of the 12 real built Tool webhooks — `create-lead`, `cancel-appointment`, `get-order-status`, `get-booking-status`, `update-customer`, `notify-human`, `check-availability`, `create-appointment`, `create-booking-request`, `create-cart`, `create-reservation`, `create-waitlist-entry` — forwards the contract via a real HTTP POST to that Tool's own production webhook and returns 200 with the Tool's real response body. Forward itself fails (network/5xx from the Tool): 502 `{ error: ... }`.
+- Standard tool, NOT YET BUILT (e.g. `RecordConversion`): 200, the built Standard Request Contract object (`request_id`, `contract_version: 'v1'`, `correlation_id`, `client_id`, `conversation_id`, `runtime_module: null` — deliberately never inferred, per Part 8 — `tool_name`, `timestamp`, `idempotency_key`, `payload`, `authentication.bearer_verified: true`) echoed back as a clean fallback, same shape as before BC-032 — this remains correct behavior for tools that genuinely don't exist yet.
 
 **FIXED BC-028 (major — the entire human-handoff path was non-functional, and several more real bugs surfaced once real test data existed for the first time ever):**
 1. `Check Existing Open Escalation` and `Insert Escalation Row` both used `Content-Profile`/`Accept-Profile` direct client-schema access — same `PGRST106` failure as UTIL-003/UTIL-005. Rewired to two new `public` RPCs: `client_has_open_escalation` (returns the open row or `null`) and a newly-overloaded `insert_client_escalation` (10-arg version adding `p_escalation_team`, fully backward-compatible with WF-017's existing 9-arg calls — Postgres correctly resolves each call to the matching overload).
@@ -279,9 +294,11 @@ idempotency keys requiring it — fixed directly in
 5. `Insert Escalation Row`'s `p_schema` reference (`$json.client_schema_name`) broke because `Check Existing Open Escalation`'s own HTTP response replaces the item's `.json` entirely — fixed to reference the schema-resolver node explicitly via `$('Resolve Client Schema (UTIL-001)')`.
 6. The Stage-2 `Fire Stage 2 Notification (UTIL-004)` → `Respond - Stage 2 Notification Fired` connection had the same single-output-pin gotcha fixed elsewhere this session — wired both pins.
 
-**REAL DEPENDENCIES:** UTIL-001 (schema resolution for the human-handoff path only), UTIL-004 (Stage-2 notification).
+**REAL DEPENDENCIES:** UTIL-001 (schema resolution for the human-handoff path only), UTIL-004 (Stage-2 notification). BC-032: the "standard tool" path now also depends on whichever real Tool webhook it forwards to (12 currently: see OUTPUT/END STATE above).
 
-**LAST VERIFIED:** BC-028, 2026-08-06 — real end-to-end test via the actual production webhook, using a real (test-marked) `convocore_agent_map` row + a real stored Bearer secret. Stage 1: real Bearer auth passed, real `escalations` row created (`escalation_team: 'ops_team'` confirmed via direct SQL). Stage 2 (repeat call, same customer): correctly detected the existing open escalation, did NOT create a duplicate (confirmed exactly one row via SQL), fired a real UTIL-004 notification. The Standard-Request-Contract "normal" tool-call path was not independently re-tested this session (out of BC-028's stated scope, which was specifically the human-handoff path) but shares no code with the parts that were fixed.
+**FIXED BC-032 (major — the entire "standard tool" routing path had never actually forwarded to anything):** the human observed the routing switch only had 3 real `tool_name` cases; live investigation via `get_workflow_details` found the real gap was worse than a missing case — the "standard" fallback branch built a Standard Request Contract and echoed it straight back via `Respond - Standard Request Contract`, with **no forwarding logic to any downstream Tool ever implemented**, for any tool_name, since this Adapter was first built. Every real Convocore Tool call other than the 3 excluded/handoff cases had always silently returned the bare contract instead of the Tool's actual result. Fixed by adding: a `Resolve Tool Webhook Path` Code node (kebab-case conversion + a hardcoded allow-list of the 12 currently-built Tools), a `Tool Is Built?` IF node, a `Forward To Tool` HTTP node (`onError: continueErrorOutput`, POSTs to the resolved Tool's real production webhook), and split success/error response nodes. Also fixed a leak this introduced: the internal routing fields (`_tool_path`, `_kebab_tool_name`) were briefly appearing in the not-yet-built-tool echo response before the response body was made to construct itself explicitly instead of echoing the whole item.
+
+**LAST VERIFIED:** BC-028, 2026-08-06 — real end-to-end test via the actual production webhook (human-handoff path only, see above). **BC-032 (standard tool forwarding):** 4 real curl calls against the live production webhook (`https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter`) using a real test agent (`bc028-test-agent-clientA`) and real Bearer secret: `CheckAvailability` → real WF-002 response; `CreateLead` → real WF-001 response (new lead `b28c4e95-...` confirmed); `GetOrderStatus` → real WF-014 response with full order data; `RecordConversion` (genuinely not yet built) → correctly fell back to the clean untouched echo response, no leaked internal fields.
 
 ---
 
