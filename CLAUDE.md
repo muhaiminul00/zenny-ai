@@ -94,6 +94,24 @@ Verification, above). If a tool turns out not to actually work as
 advertised, say so plainly rather than quietly working around it or
 overstating what it does.
 
+**Specific tool priority (added BC-032):** Use `codebase-memory-mcp` as
+the FIRST stop for any project memory, documentation, or code-location
+search/read/fetch within this repo (proven useful and fast per BC-022)
+— before falling back to manual grep/file reads. For n8n or Supabase-
+specific process questions (node configuration, RLS patterns, migration
+mechanics), consult the n8n-skills and Supabase skill plugins if loaded
+and relevant, rather than reasoning from memory alone.
+
+**MCP connectivity check (added BC-032, human instruction):** At the
+start of every session, before starting that session's build work,
+check whether the MCP servers the work will actually need (per
+`.mcp.json` — `codebase-memory-mcp`, the `hostinger-*` servers, etc.)
+are genuinely connected this session — some are intermittent. If a
+needed server isn't connected, say so plainly and ask the human to
+reconnect/restart before proceeding on the steps that depend on it,
+rather than silently working around it or declaring that step
+blocked without first checking.
+
 ## Standing Rule — Document Resolution Authority
 
 When you hit a conflict, gap, or apparent error in a system document

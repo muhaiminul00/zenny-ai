@@ -58,7 +58,22 @@ const CATEGORY_PROVIDERS: Record<string, ProviderOption[]> = {
     },
   ],
   ecommerce: [
-    { provider: 'shopify', label: 'Shopify', ready: true },
+    { provider: 'shopify', label: 'Shopify (sign in with Shopify)', ready: true },
+    // BC-032: Client Credentials Grant — an alternative to the OAuth row
+    // above, not a replacement (Shopify's Custom App static-token form,
+    // which this card originally asked for, was removed by Shopify on
+    // Jan 1 2026 — confirmed live this session, matching what
+    // Client_Integration_and_Credential_Platform_v1.md Part 8.2 already
+    // flagged as discontinued). Useful before the $19 Public App
+    // submission clears review, or for a client who'd rather paste a
+    // custom app's Client ID/Secret than go through Shopify's consent
+    // screen.
+    {
+      provider: 'shopify_client_credentials',
+      label: 'Shopify (Client ID + Secret)',
+      ready: true,
+      kind: 'api_key',
+    },
     { provider: 'woocommerce', label: 'WooCommerce', ready: true, kind: 'api_key' },
   ],
   email: [{ provider: 'google', label: 'Gmail', ready: true }],
@@ -87,6 +102,17 @@ interface WooForm {
 
 const EMPTY_WOO_FORM: WooForm = { storeUrl: '', consumerKey: '', consumerSecret: '' };
 
+// BC-032: Shopify Client Credentials Grant form — same api_key pattern as
+// WooCommerce above (client-side form + Edge Function POST that validates
+// live before storing), different fields/provider/Edge Function.
+interface ShopifyForm {
+  shopDomain: string;
+  shopifyClientId: string;
+  shopifyClientSecret: string;
+}
+
+const EMPTY_SHOPIFY_FORM: ShopifyForm = { shopDomain: '', shopifyClientId: '', shopifyClientSecret: '' };
+
 export function Integrations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [client, setClient] = useState<DashboardClient | null>(null);
@@ -95,10 +121,15 @@ export function Integrations() {
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
 
   // BC-019: which category's API-key form is currently open, and its
-  // field values. Only one provider (WooCommerce) uses this today —
-  // kept generic in case a second api_key provider shows up later.
+  // field values. BC-032: a second api_key provider (Shopify Client
+  // Credentials Grant) now shares the 'ecommerce' category with
+  // WooCommerce, so which PROVIDER's form is open is tracked separately
+  // from the category — apiKeyFormCategory alone can no longer say which
+  // of the two forms below to render.
   const [apiKeyFormCategory, setApiKeyFormCategory] = useState<string | null>(null);
+  const [apiKeyFormProvider, setApiKeyFormProvider] = useState<string | null>(null);
   const [wooForm, setWooForm] = useState<WooForm>(EMPTY_WOO_FORM);
+  const [shopifyForm, setShopifyForm] = useState<ShopifyForm>(EMPTY_SHOPIFY_FORM);
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
 
   // BC-020: popup-based OAuth. popupNote is a transient status line
@@ -318,6 +349,41 @@ export function Integrations() {
     setApiKeyError(null);
     setWooForm(EMPTY_WOO_FORM);
     setApiKeyFormCategory(category);
+    setApiKeyFormProvider('woocommerce');
+  };
+
+  const openShopifyClientCredentialsForm = (category: string) => {
+    setApiKeyError(null);
+    setShopifyForm(EMPTY_SHOPIFY_FORM);
+    setApiKeyFormCategory(category);
+    setApiKeyFormProvider('shopify_client_credentials');
+  };
+
+  const closeApiKeyForm = () => {
+    setApiKeyFormCategory(null);
+    setApiKeyFormProvider(null);
+  };
+
+  // Both submit* functions share this: supabase-js's FunctionsHttpError
+  // doesn't auto-parse the response body into error.message (stays a
+  // generic "non-2xx status code") — the real reason lives in the raw
+  // Response on error.context. Caught via live testing on the WooCommerce
+  // form; the generic message alone told the user nothing useful (e.g.
+  // which real validation actually failed).
+  const extractFunctionError = async (
+    data: { error?: { message?: string } } | null,
+    error: unknown,
+  ): Promise<string> => {
+    let message = data?.error?.message;
+    if (!message && error && typeof error === 'object' && 'context' in error) {
+      try {
+        const body = await (error as { context: Response }).context.json();
+        message = body?.error?.message;
+      } catch {
+        // context wasn't valid JSON — fall through to the generic message
+      }
+    }
+    return message ?? (error as { message?: string } | null)?.message ?? 'Connection failed.';
   };
 
   const submitWooForm = async () => {
@@ -343,25 +409,39 @@ export function Integrations() {
     });
     setBusyProvider(null);
     if (error || data?.error) {
-      // supabase-js's FunctionsHttpError doesn't auto-parse the response
-      // body into `error.message` (that stays a generic "non-2xx status
-      // code") — the real reason lives in the raw Response on
-      // `error.context`, per supabase-js's own error shape. Caught via
-      // live testing: the generic message alone told the user nothing
-      // useful (e.g. which real WooCommerce validation actually failed).
-      let message = data?.error?.message;
-      if (!message && error && 'context' in error) {
-        try {
-          const body = await (error as { context: Response }).context.json();
-          message = body?.error?.message;
-        } catch {
-          // context wasn't valid JSON — fall through to the generic message
-        }
-      }
-      setApiKeyError(message ?? error?.message ?? 'Connection failed.');
+      setApiKeyError(await extractFunctionError(data, error));
       return;
     }
-    setApiKeyFormCategory(null);
+    closeApiKeyForm();
+    load();
+  };
+
+  const submitShopifyClientCredentialsForm = async () => {
+    if (!client) return;
+    if (!shopifyForm.shopDomain || !shopifyForm.shopifyClientId || !shopifyForm.shopifyClientSecret) {
+      setApiKeyError('All 3 fields are required.');
+      return;
+    }
+    setBusyProvider('shopify_client_credentials');
+    setApiKeyError(null);
+    // Same {client_id, ...} + live-validate-before-store pattern as
+    // woocommerce-connect, calling shopify-connect (BC-032) instead —
+    // real field shape re-read from that Edge Function's own source, not
+    // guessed.
+    const { data, error } = await supabase.functions.invoke('shopify-connect', {
+      body: {
+        client_id: client.client_id,
+        shop_domain: shopifyForm.shopDomain,
+        shopify_client_id: shopifyForm.shopifyClientId,
+        shopify_client_secret: shopifyForm.shopifyClientSecret,
+      },
+    });
+    setBusyProvider(null);
+    if (error || data?.error) {
+      setApiKeyError(await extractFunctionError(data, error));
+      return;
+    }
+    closeApiKeyForm();
     load();
   };
 
@@ -474,7 +554,11 @@ export function Integrations() {
                         <button
                           key={opt.provider}
                           disabled={busyProvider === opt.provider}
-                          onClick={() => openWooForm(category)}
+                          onClick={() =>
+                            opt.provider === 'shopify_client_credentials'
+                              ? openShopifyClientCredentialsForm(category)
+                              : openWooForm(category)
+                          }
                         >
                           Connect {opt.label}
                         </button>
@@ -492,7 +576,7 @@ export function Integrations() {
                 )}
               </div>
 
-              {apiKeyFormCategory === category && (
+              {apiKeyFormCategory === category && apiKeyFormProvider === 'woocommerce' && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                   <p className="note">
                     WooCommerce has no OAuth flow — generate these in your store's wp-admin under
@@ -530,7 +614,59 @@ export function Integrations() {
                     <button disabled={busyProvider === 'woocommerce'} onClick={submitWooForm}>
                       {busyProvider === 'woocommerce' ? 'Validating…' : 'Connect'}
                     </button>
-                    <button className="secondary" onClick={() => setApiKeyFormCategory(null)}>
+                    <button className="secondary" onClick={closeApiKeyForm}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {apiKeyFormCategory === category && apiKeyFormProvider === 'shopify_client_credentials' && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <p className="note">
+                    Uses your own Shopify Custom App's Client ID + Client Secret — Zenny requests a
+                    short-lived access token from Shopify automatically on each API call, so nothing
+                    here ever expires from your side. In your app in the Shopify Partner/Dev
+                    Dashboard, go to Settings, then copy the Client ID and Client Secret and paste
+                    them below. An alternative to "Shopify (sign in with Shopify)" above — use
+                    whichever your store is set up for.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 420 }}>
+                    <label>
+                      Store domain
+                      <input
+                        type="text"
+                        placeholder="yourstore.myshopify.com"
+                        value={shopifyForm.shopDomain}
+                        onChange={(e) => setShopifyForm({ ...shopifyForm, shopDomain: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Client ID
+                      <input
+                        type="text"
+                        value={shopifyForm.shopifyClientId}
+                        onChange={(e) => setShopifyForm({ ...shopifyForm, shopifyClientId: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Client Secret
+                      <input
+                        type="password"
+                        value={shopifyForm.shopifyClientSecret}
+                        onChange={(e) => setShopifyForm({ ...shopifyForm, shopifyClientSecret: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                  {apiKeyError && <p className="error-text">{apiKeyError}</p>}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <button
+                      disabled={busyProvider === 'shopify_client_credentials'}
+                      onClick={submitShopifyClientCredentialsForm}
+                    >
+                      {busyProvider === 'shopify_client_credentials' ? 'Validating…' : 'Connect'}
+                    </button>
+                    <button className="secondary" onClick={closeApiKeyForm}>
                       Cancel
                     </button>
                   </div>
