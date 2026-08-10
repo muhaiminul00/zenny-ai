@@ -9,6 +9,12 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-10] session-BC-037-followup | Commander re-verification of the control.clients.status resolution, before acknowledgment
+
+**Commander (/commander):** Before acknowledging BC-037's self-resolved item, user asked to re-verify whether any document expects `client_status_enum` to gate production behavior anywhere, not just in currently-built n8n workflows. Confirmed again that no built workflow (UTIL-001, ADP-002, WF-018) checks it. But found one real documented precedent missed the first pass: `Template_Migration_Process.md` filters `status NOT IN ('offboarded')` for template syncs, reasoning an offboarded client's schema may not exist and acting on it serves no purpose — the same reasoning applies to recovery sends. **Action required, assigned to BC-038:** exclude `offboarded` clients from INT-006's roster query. `paused` has no documented precedent anywhere and stays open — not resolved, flagged as a genuine product decision. Full detail: `Wiki/platform-quirks/recovery-queue-sweep-design.md` (revised).
+
+---
+
 ## [2026-08-10] session-BC-037 | INT-006 + SCH-001 Process Recovery Queue built, live-verified, self-resolved document-level item
 
 **BC-037 (/execute):** Built INT-006 + SCH-001 as one workflow (`Zenny Recovery Engine - Process Recovery Queue`, n8n ID `crncPUwCbAQn5WgW`) — a 5-minute Schedule Trigger sweep that dispatches WF-018 (SendRecoveryMessage, BC-036) for every `recovery_queue` row due across every client schema, closing the gap where WF-018 only fired on direct call. Pure dispatcher: no state ownership, no changes to WF-018 itself — step-advancement/idempotency stay entirely owned by `advance_client_recovery_step`. Added 1 new RPC, `get_due_recovery_queue(p_schema, p_limit)`, SECURITY DEFINER, same dynamic-SQL-per-schema convention as BC-036's 2 RPCs, filtering `status='active' AND human_ownership_flag=false AND next_follow_up<=now()`. The `human_ownership_flag` filter is a real, previously-uncaught gap: WF-018's own documented gates (UTIL-005 suppression + status=active + step-match) never checked it, meaning a human-owned lead (per Recovery_Engine_Flow.md §1.H Global Active Issue Lock, "Human owns → Pause — do not create/send") could otherwise have received an automated send. Closed at the sweep level, not inside WF-018 (WF-018 itself was not modified).

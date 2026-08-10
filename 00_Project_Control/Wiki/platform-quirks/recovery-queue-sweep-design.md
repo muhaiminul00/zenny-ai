@@ -14,9 +14,23 @@ reads `control.clients` with no status filter. Gating on `status='active'`
 would have silently excluded 100% of the real test roster and introduced a
 filter no other real workflow uses — self-resolved per Document Resolution
 Authority (mechanical decision, one obviously correct answer given UTIL-001's
-own precedent). **Revisit if/when `control.clients.status` is ever wired up
-as a real gate elsewhere** (e.g. a dashboard "pause this client" action) —
-at that point INT-006's sweep should filter on it too, for consistency.
+own precedent).
+
+**Revised BC-038 (verification requested by Commander before acknowledging
+the gate):** re-checked whether any document defines real production
+behavior for `client_status_enum`, not just current n8n workflow behavior.
+Found one real precedent: `Template_Migration_Process.md` filters
+`status NOT IN ('offboarded')` for template syncs, reasoning that an
+offboarded client's schema may not even exist and acting on it serves no
+purpose. That reasoning applies directly to recovery sends too — dispatching
+automated messages for a client who has left the platform is a real risk,
+not just a theoretical inconsistency. **Action taken (BC-038):** `Get Active
+Clients` now excludes `status='offboarded'` clients.
+
+**`paused` intentionally left unfiltered** — no document anywhere defines
+what `paused` means operationally (billing pause? agent pause? both?), so
+there's no mechanical basis to exclude it. This is a genuine open product
+decision, not resolved here — see `Wiki/decisions/` if/when it needs one.
 
 ## `human_ownership_flag` — the one real gate WF-018 itself doesn't cover
 
