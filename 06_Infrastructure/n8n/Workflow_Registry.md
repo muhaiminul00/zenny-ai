@@ -68,6 +68,19 @@ would trigger it, a disclosed limitation, not a shortcut). New Supabase
 Edge Function `shopify-connect` added (mirrors `woocommerce-connect`),
 tested live against a real (nonexistent) store domain to confirm it
 performs a genuine external call rather than a simulated one.
+Updated 2026-08-10 (BC-034): Phase 8b — the final 5 Conversion Engine
+Tools built (WF-008 CreateCallbackQueueEntry, WF-009
+CreateInspectionSlotBooking, WF-010 CreateScoredBooking, WF-011
+CreateRegistration, WF-012 RecordConversion), completing all 11 Tools.
+2 new roster clients created (consultation, engagement — neither
+archetype had one). Found and fixed a real `create_client_schema_from_
+template` function bug (missing `appointments` in its common-tables
+list, silently breaking 3 client schemas), a real `UNIQUE(lead_id)`
+constraint violation in RecordConversion's duplicate check, and a real
+response-field bug in WF-008 (`estimated_callback_window` read from the
+wrong node). Several genuine document-level payload/schema gaps
+self-resolved, same class as BC-031's `lead_id` fixes — see each Tool's
+own entry below.
 ```
 
 ---
@@ -667,6 +680,121 @@ performs a genuine external call rather than a simulated one.
 **FIXED BC-031 (2 real schema gaps found live via the Success test):** `conversions_appointment.service_type` and `.appointment_time` were both `NOT NULL` everywhere, despite Part 13.4 explicitly documenting both as optional for this exact Tool — the column had only ever been exercised by CreateAppointment (where both are required) until this session's real test. Both relaxed to nullable across `public`, `tpl_appointment`, and the real client schema.
 
 **LAST VERIFIED:** BC-031, 2026-08-06 — all 5 categories genuinely tested with a real partial payload (no `service`/date/time at all): Success/Duplicate (real row confirmed, same `booking_request_id` returned twice), Failure (missing `lead_id`), Security (cross-client `customer_id`), Retry (forced 1ms timeout, confirmed Pattern D fallback with a real escalation).
+
+---
+
+## Conversion Engine — Tools (Part 13, Phase 8b — BC-034)
+
+**Test roster note:** two new roster clients created this session — `client_test_004_acme_consultation_test` (`e5f6a7b8-0001-4c1d-9e2a-000000000004`, consultation) and `client_test_005_acme_engagement_test` (`e5f6a7b8-0001-4c1d-9e2a-000000000005`, engagement) — neither archetype had a test client before. Neither has a real connected calendar (same known external limitation as BC-031's roster), so WF-009/WF-010's `client_calendar` success leg is coded/wired per the proven Provider Router pattern but not live-exercised, same disclosed gap as WF-003/WF-006.
+
+**Real infra bugs found and fixed while testing (not pre-existing workflow bugs — genuine first-ever exercise of these paths):**
+1. `create_client_schema_from_template`'s hardcoded common-tables list omitted `appointments` entirely, even though it's real deployed infrastructure (BC-013) used by every calendar-parallel-write Tool — silently produced 3 broken client schemas (`client_test_001`, and the 2 new ones) missing the table. Fixed the function itself (conditional clone: only when the source `tpl_*` template actually has it — `tpl_engagement` genuinely doesn't, Engagement has no calendar-booking Tool) so all future onboarding is correct, plus manually retrofitted the 2 affected existing/new client schemas (`client_test_001`, `client_test_004`) via the established `CREATE TABLE ... LIKE ... INCLUDING ALL` + FK + RLS + grant-revoke pattern.
+2. `conversions.lead_id` has a real system-wide `UNIQUE` constraint (one conversion per lead, ever) that `insert_client_conversion_record`'s original duplicate check didn't respect (it scoped by `(lead_id, conversion_type)` instead) — a real INSERT hit the constraint and crashed instead of gracefully returning the existing row. Fixed the RPC's duplicate check to lead_id-only, matching every other Tool's established pattern.
+3. WF-008's success response read `dispatch_window`/`status` from the wrong node (`$json` instead of `$('Determine Booking Mode')`), silently dropping `estimated_callback_window` from every real response — found via the first live Success test, fixed and re-verified.
+
+**Self-resolved document-level items (same class as BC-031's `lead_id` gap, logged in `Wiki/log.md`):**
+- WF-008/WF-009/WF-010's documented payloads (Part 13.8/13.9/13.10) omit `lead_id` despite their idempotency keys requiring it — added, matching WF-011 (already correct) and the BC-031 precedent.
+- `conversions_emergency.location`/`.dispatch_window` were `NOT NULL`, correct for WF-008 (dispatch) but meaningless for WF-009 (inspection) — relaxed to nullable, added `urgency_level`/`issue_description` columns (needed by both Tools' payloads, previously missing entirely).
+- `conversions_engagement` was missing `amount` (WF-011's donate `amount` field, documented in `Agent_Runtime_System_v1.md`'s Donate flow but never added to the schema doc).
+- Base `conversions` table was missing `conversion_type`/`value`/`archetype_specific_fields` (WF-012's generic, cross-archetype payload — added to the base table since RecordConversion isn't archetype-locked, same placement logic as the table's other generic fields).
+- Consultation Score Gate threshold (WF-010) verified against the live `Agent_Runtime_System_v1.md` Module 3 §3 ("hard gate: score ≥ 50"), not the spec's own "old build guide — re-verify" reference-only note — confirmed identical, no conflict.
+
+### WF-008 — Zenny Conversion Engine - CreateCallbackQueueEntry (WF-008)
+**n8n ID:** `PvzY7qyi8ccBPyRp` · **published**, active
+
+**PURPOSE:** Emergency Mode A (dispatch/callback queue). Single write to `conversions`+`conversions_emergency`. `status` driven by `client_config.archetype_settings.emergency.emergency_booking_mode` (JSONB, same INT-003-style pattern as `freedom_level_override`) — `"direct_calendar"` → `confirmed`, missing/anything else → `pending_review` (v1-safe default per spec).
+
+**TRIGGER:** Webhook, `POST /create-callback-queue-entry`.
+
+**INPUT:** `{ client_id, payload: { customer_id, lead_id, location, urgency_level, issue_description } }`.
+
+**OUTPUT / END STATE:**
+- Success: 200 `{ result: { queue_entry_id, estimated_callback_window, status } }` — `estimated_callback_window` is a business-display string derived from `urgency_level` (critical→"within 1 hour", high→"within 2 hours", else→"within 4 hours"), not itself a stored/configured field (no such config exists in any doc).
+- Insert failure after Pattern B retry: Pattern D — 200 `{ result: { queue_entry_id: null, status: "pending_human_review" }, handoff }`.
+
+**REAL DEPENDENCIES:** UTIL-001, WF-017 (direct HTTP call).
+
+**REAL NEW DB OBJECTS:** `public.insert_client_callback_queue_entry` RPC.
+
+**LAST VERIFIED:** BC-034, 2026-08-10 — Success (real row + correct `estimated_callback_window` after the fix above), Duplicate (same `queue_entry_id` returned twice), Failure (missing `location`), Security (cross-client `customer_id`) all genuinely tested against `client_test_001_acme_emergency_test`. Retry not forced-tested this session (time-scoped, structurally identical `retryOnFail`/`onError` config to every proven sibling Tool).
+
+---
+
+### WF-009 — Zenny Conversion Engine - CreateInspectionSlotBooking (WF-009)
+**n8n ID:** `GMwddv6AJKx0hes6` · **published**, active
+
+**PURPOSE:** Emergency Mode B (non-emergency/quote branch, inspection booking). Real parallel-write pattern identical to CreateAppointment (§13.3): client calendar first, `our_db_fallback` (writes `conversions`+`conversions_emergency`+`appointments` tracking row) if that fails or is unavailable.
+
+**TRIGGER:** Webhook, `POST /create-inspection-slot-booking`.
+
+**INPUT:** `{ client_id, payload: { customer_id, lead_id, preferred_date, preferred_time, issue_description } }`. Time-in-the-past rejected (correction flow, same as CreateAppointment).
+
+**OUTPUT / END STATE:** Same 3-outcome shape as CreateAppointment (`client_calendar` success / `our_db_fallback` / Pattern D), `result.inspection_slot_id` = the conversion's own id (matches CreateAppointment's `appointment_id` naming convention).
+
+**REAL DEPENDENCIES:** UTIL-001, UTIL-006 (`calendar`), WF-017.
+
+**REAL NEW DB OBJECTS:** `public.insert_client_inspection_slot_conversion` RPC (shares `insert_client_appointment_tracking` with WF-003/WF-006/WF-010).
+
+**LAST VERIFIED:** BC-034, 2026-08-10 — Success (real `our_db_fallback` write, no calendar connected — same disclosed external limitation as every prior calendar-integrated Tool), Duplicate (same `inspection_slot_id` returned twice), Failure (past-time correction), Security (cross-client `customer_id`) all genuinely tested against `client_test_001_acme_emergency_test`, after retrofitting that client's missing `appointments` table (see infra bugs above). Retry/calendar-write-failure path not forced-tested this session (time-scoped).
+
+---
+
+### WF-010 — Zenny Conversion Engine - CreateScoredBooking (WF-010)
+**n8n ID:** `pxi9BKZcJxLoryIJ` · **published**, active
+
+**PURPOSE:** Consultation Score Gate (hard gate, score ≥ 50, verified live against `Agent_Runtime_System_v1.md` Module 3 §3) + real parallel-write pattern (client calendar + `conversions_consultation`+`appointments` tracking, same as CreateAppointment).
+
+**TRIGGER:** Webhook, `POST /create-scored-booking`.
+
+**INPUT:** `{ client_id, payload: { customer_id, lead_id, lead_score, service_type, preferred_date, preferred_time } }`. `lead_score < 50` is a validation-style rejection (400 `VALIDATION_ERROR`), not a silent fallback — Score Gate is this Tool's own caller's responsibility (Growth Agent), but a call that violates the hard gate is rejected explicitly rather than booked anyway.
+
+**OUTPUT / END STATE:** Same 3-outcome shape as CreateAppointment, `result.opportunity_score` echoes the input `lead_score`.
+
+**REAL DEPENDENCIES:** UTIL-001, UTIL-006 (`calendar`), WF-017.
+
+**REAL NEW DB OBJECTS:** `public.insert_client_scored_booking_conversion` RPC (shares `insert_client_appointment_tracking`).
+
+**LAST VERIFIED:** BC-034, 2026-08-10 — Success (real `our_db_fallback` write, no calendar connected), Duplicate (same `booking_id` returned twice), Score Gate rejection (`lead_score: 20` → 400), Security (cross-client `customer_id`) all genuinely tested against the new `client_test_004_acme_consultation_test`. Retry/calendar-write-failure path not forced-tested this session (time-scoped).
+
+---
+
+### WF-011 — Zenny Conversion Engine - CreateRegistration (WF-011)
+**n8n ID:** `tTCZpPDibffG95dG` · **published**, active
+
+**PURPOSE:** Engagement Mode A direct registration (donate/volunteer/attend). Single write to `conversions`+`conversions_engagement`. Donate always `confirmed`; volunteer/attend gated by `client_config.archetype_settings.engagement.engagement_capacity_check_mode` (same JSONB pattern as WF-008's emergency gating), v1-safe default `pending_review`.
+
+**TRIGGER:** Webhook, `POST /create-registration`.
+
+**INPUT:** `{ client_id, payload: { customer_id, lead_id, registration_type, program_id, amount } }`.
+
+**OUTPUT / END STATE:** Success: 200 `{ result: { registration_id, status } }`. Insert failure after retry: Pattern D.
+
+**REAL DEPENDENCIES:** UTIL-001, WF-017.
+
+**REAL NEW DB OBJECTS:** `public.insert_client_registration` RPC.
+
+**LAST VERIFIED:** BC-034, 2026-08-10 — Success/Duplicate (donate, always `confirmed`, same `registration_id` twice), volunteer (config-gated branch, correctly `pending_review` on the v1-safe default), Failure (invalid `registration_type`), Security (cross-client `customer_id`) all genuinely tested against the new `client_test_005_acme_engagement_test`.
+
+---
+
+### WF-012 — Zenny Conversion Engine - RecordConversion (WF-012)
+**n8n ID:** `IJo7Nkdu5xlh3kgo` · **published**, active
+
+**PURPOSE:** Generic, cross-archetype conversion logger — the only Tool with no archetype-locked extension table and no `customer_id` in its contract (payload keys directly off `lead_id`, per spec). Single write to the base `conversions` table only.
+
+**TRIGGER:** Webhook, `POST /record-conversion`.
+
+**INPUT:** `{ client_id, payload: { lead_id, conversion_type, value, archetype_specific_fields } }`.
+
+**OUTPUT / END STATE:** Success: 200 `{ result: { conversion_id, status: "confirmed" } }`. Insert failure/duplicate-on-already-consumed-lead after retry: Pattern D, with `customer_id: null` in the handoff payload (this Tool genuinely has no customer_id to pass — a real, expected quirk unique to this Tool, not a bug).
+
+**REAL DEPENDENCIES:** UTIL-001, WF-017.
+
+**REAL NEW DB OBJECTS:** `public.insert_client_conversion_record` RPC.
+
+**FIXED BC-034 (real bug, see infra bugs above):** duplicate check originally scoped to `(lead_id, conversion_type)`, missing the real system-wide `UNIQUE(lead_id)` constraint on `conversions` — fixed to lead_id-only.
+
+**LAST VERIFIED:** BC-034, 2026-08-10 — Success/Duplicate (real row, same `conversion_id` returned twice against a fresh lead), Failure (missing `conversion_type`), Security/Unknown-client (bad `client_id`) all genuinely tested.
 
 ---
 

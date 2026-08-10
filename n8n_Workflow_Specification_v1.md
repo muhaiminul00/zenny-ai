@@ -922,11 +922,11 @@ Cards update this row as a workflow progresses through its lifecycle.
 | WF-005 | CreateCart | Conversion Engine | 03 | Planned |
 | WF-006 | CreateReservation | Conversion Engine | 03 | Planned |
 | WF-007 | CreateWaitlistEntry | Conversion Engine | 03 | Planned |
-| WF-008 | CreateCallbackQueueEntry | Conversion Engine | 03 | Planned |
-| WF-009 | CreateInspectionSlotBooking | Conversion Engine | 03 | Planned |
-| WF-010 | CreateScoredBooking | Conversion Engine | 03 | Planned |
-| WF-011 | CreateRegistration | Conversion Engine | 03 | Planned |
-| WF-012 | RecordConversion | Conversion Engine | 03 | Planned |
+| WF-008 | CreateCallbackQueueEntry | Conversion Engine | 03 | Built |
+| WF-009 | CreateInspectionSlotBooking | Conversion Engine | 03 | Built |
+| WF-010 | CreateScoredBooking | Conversion Engine | 03 | Built |
+| WF-011 | CreateRegistration | Conversion Engine | 03 | Built |
+| WF-012 | RecordConversion | Conversion Engine | 03 | Built |
 | WF-013 | CancelAppointment | Core Agent | 01 | Planned |
 | WF-014 | GetOrderStatus | Core Agent | 01 | Planned |
 | WF-015 | GetBookingStatus | Core Agent | 01 | Planned |
@@ -1192,11 +1192,15 @@ Fallback chain:   B → D  (Emergency Mode A)
 ```json
 {
   "customer_id": "uuid",
+  "lead_id": "uuid",
   "location": "string",
   "urgency_level": "string",
   "issue_description": "string"
 }
 ```
+`lead_id` added BC-034 (self-resolved document-level item — the
+idempotency key above already required it; same gap class as BC-031's
+CreateCart/CreateReservation/CreateWaitlistEntry fix).
 
 **Response `result`:**
 ```json
@@ -1211,7 +1215,10 @@ variant rather than an outright confirmation (Runtime System, same
 section).
 
 **Tests:** Full 5-category set, with Security case emphasized (Emergency
-data is high-sensitivity). **Status: Planned.**
+data is high-sensitivity). **Status: Built (BC-034)** — Success, Duplicate,
+Failure, Security genuinely tested; Retry not forced-tested this session
+(time-scoped, structurally proven pattern). See Workflow_Registry.md
+WF-008 for full detail, real bugs found/fixed, and doc-gap resolutions.
 
 ## 13.9 CreateInspectionSlotBooking — WF-009
 
@@ -1226,11 +1233,13 @@ Fallback chain:   B → C → D  (Emergency Mode B, non-emergency/quote branch)
 ```json
 {
   "customer_id": "uuid",
+  "lead_id": "uuid",
   "preferred_date": "YYYY-MM-DD",
   "preferred_time": "HH:MM",
   "issue_description": "string"
 }
 ```
+`lead_id` added BC-034 (same self-resolved gap class as WF-008 above).
 
 **Write behavior (PARALLEL, not sequential — same Phase 5C pattern as
 CreateAppointment §13.3, Change Request applied BC-013):** writes to BOTH
@@ -1250,9 +1259,12 @@ identical to CreateAppointment §13.3.
 ```
 
 **Tests:** Full 5-category set, plus the same client-calendar-write-failure
-case as CreateAppointment §13.3. **Status: Planned — depends on the same
-calendar-infrastructure-availability confirmation flagged as an open
-architect-review item in the Runtime doc (Appendix C gap 15).**
+case as CreateAppointment §13.3. **Status: Built (BC-034)** — Success (via
+`our_db_fallback`, no roster client has a connected calendar — same
+external limitation as CreateAppointment), Duplicate, Failure, Security
+genuinely tested. `client_calendar` success leg coded/wired, not
+live-exercised (disclosed gap, matches CreateAppointment). See
+Workflow_Registry.md WF-009.
 
 ## 13.10 CreateScoredBooking — WF-010
 
@@ -1268,12 +1280,14 @@ Fallback chain:   A → B → D  (fires only after Score Gate passes, per
 ```json
 {
   "customer_id": "uuid",
+  "lead_id": "uuid",
   "lead_score": 0,
   "service_type": "string",
   "preferred_date": "YYYY-MM-DD",
   "preferred_time": "HH:MM"
 }
 ```
+`lead_id` added BC-034 (same self-resolved gap class as WF-008/WF-009).
 
 **Write behavior (PARALLEL, not sequential — same Phase 5C pattern as
 CreateAppointment §13.3, Change Request applied BC-013):** writes to BOTH
@@ -1298,7 +1312,11 @@ fallback behavior identical to CreateAppointment §13.3.
 CONSULTATION SCORE GATE pattern — reference only, re-verify the exact
 threshold against current Runtime doc config before building), plus the
 same client-calendar-write-failure case as CreateAppointment §13.3.
-**Status: Planned.**
+**Status: Built (BC-034)** — threshold verified live against
+`Agent_Runtime_System_v1.md` Module 3 §3 (hard gate: score ≥ 50, matches
+this doc exactly, no conflict). Success, Duplicate, Score Gate rejection,
+Security genuinely tested against a new roster client (`client_test_004`,
+consultation — none existed before). See Workflow_Registry.md WF-010.
 
 ## 13.11 CreateRegistration — WF-011
 
@@ -1332,9 +1350,13 @@ default) → `"pending_review"`, and the agent uses the
 submitted-pending-confirmation wording variant. Donate registrations are
 never capacity-gated and always return `"confirmed"`.
 
-**Tests:** Full 5-category set. **Status: Planned — resolved for v1 via
-`engagement_capacity_check_mode` (Part 7.3); the live capacity data feed
-itself remains deferred to v2, not a v1 blocker.**
+**Tests:** Full 5-category set. **Status: Built (BC-034)** — resolved for
+v1 via `engagement_capacity_check_mode` (Part 7.3); the live capacity data
+feed itself remains deferred to v2, not a v1 blocker. Success/Duplicate
+(donate, always confirmed), volunteer (config-gated, correctly
+pending_review on v1-safe default), Failure, Security genuinely tested
+against a new roster client (`client_test_005`, engagement — none existed
+before). See Workflow_Registry.md WF-011.
 
 ## 13.12 RecordConversion — WF-012
 
@@ -1360,7 +1382,10 @@ Fallback chain:   B → D
 { "conversion_id": "uuid", "status": "confirmed" }
 ```
 
-**Tests:** Full 5-category set. **Status: Planned.**
+**Tests:** Full 5-category set. **Status: Built (BC-034)** — Success,
+Duplicate, Failure, Unknown-client genuinely tested. Real `conversions.
+lead_id` UNIQUE-constraint bug found and fixed live (see
+Workflow_Registry.md WF-012 for detail).
 
 ## 13.13 CancelAppointment — WF-013
 
