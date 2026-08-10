@@ -10,18 +10,22 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-10 — by /execute — BC-036 complete: WF-018 SendRecoveryMessage
-built, tested genuinely live end-to-end (real Gmail send confirmed),
-and published. Phase 9 (Recovery Engine) kicked off — 1/1 planned Tool
-done; INT-006/007/008 + SCH-001 (queue processing, stop/resume, cron)
-remain as follow-up Build Cards, not started.
+2026-08-10 — by /execute — BC-037 complete: INT-006 + SCH-001 (Process
+Recovery Queue) built, published, and live-verified — a real scheduled
+cron tick dispatched 4 real due rows across 3 clients through WF-018
+with zero crashes, and a new `human_ownership_flag` filter (a real gap
+WF-018 itself didn't cover) was confirmed excluding a human-owned row
+both by direct RPC call and in the live sweep. Recovery cadence now
+fires on its own — WF-018 is no longer direct-call-only. INT-007/008
+(stop/resume) remain as the next follow-up Build Card (BC-038).
 
 ## Current Phase
 Phase 8 — Conversion Engine (11 Tools) — COMPLETE (11/11 built and
 live-tested)
-Phase 9 — Recovery Engine — IN PROGRESS (WF-018 SendRecoveryMessage
-built + live-tested, email channel only per explicit scope cut;
-INT-006/007/008 + SCH-001 not started)
+Phase 9 — Recovery Engine — IN PROGRESS (WF-018 SendRecoveryMessage +
+INT-006/SCH-001 Process Recovery Queue built, published, live-verified;
+cadence now fires automatically, email channel only per explicit scope
+cut; INT-007/008 stop/resume not started)
 
 ## Standing Gate
 None open.
@@ -50,9 +54,10 @@ Core Agent ............ ✅ working — Wiki: (none needed, stable)
 Growth Agent ........... ✅ working
 Conversion Engine ...... ✅ working — all 11/11 Tools built and live-tested (BC-034)
 Dashboard (5B/5C/Int) .. ✅ working — Wiki/infra/ for deployment
-Recovery Engine ........ 🟡 partial — WF-018 SendRecoveryMessage live-
-                          tested (email only); queue-processing/stop/
-                          resume/cron (INT-006/007/008, SCH-001) not built
+Recovery Engine ........ 🟡 partial — WF-018 SendRecoveryMessage +
+                          INT-006/SCH-001 Process Recovery Queue live-
+                          tested, cadence fires automatically (email
+                          only); stop/resume (INT-007/008) not built
 Credentials Platform ... ✅ working — Wiki/credentials/
 Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
 ```
@@ -94,65 +99,84 @@ Client E: e5f6a7b8-0001-4c1d-9e2a-000000000005 — engagement — client_test_00
 ```
 
 ## Next Build Card
-None issued yet. Strong candidate given dependency ordering: BC-037 —
-INT-006 (Process Recovery Queue internals) + SCH-001 (cron trigger),
-since the spec explicitly orders these right after SendRecoveryMessage
-exists (which it now does). Also open: INT-007/008 (Stop/Resume
-Recovery), Phase 5A (Inventory dashboard) / 5D (Onboarding dashboard),
-Phase 10 (Email Manager), SCH-007, ADP-001 doc/reality investigation.
-(`appointments` doc diff intentionally NOT in this list — see Active
-Blockers, deferred.)
+None issued yet. Strong candidate given dependency ordering: BC-038 —
+INT-007/008 (Stop/Resume Recovery), the last piece of the Recovery
+Engine's internal workflow set (Part 7.7), now that both SendRecoveryMessage
+(WF-018, BC-036) and the cron dispatcher (INT-006/SCH-001, BC-037) are
+live. Also open: Phase 5A (Inventory dashboard) / 5D (Onboarding
+dashboard), Phase 10 (Email Manager), SCH-007, ADP-001 doc/reality
+investigation. (`appointments` doc diff intentionally NOT in this list
+— see Active Blockers, deferred.)
 
 ## Handoff Note (for next session)
 
 **Where things stand:** Phase 8 (Conversion Engine, all 11 Tools) is
-fully done. Phase 9 (Recovery Engine) is kicked off — WF-018
-SendRecoveryMessage built, live-tested end-to-end (real email sent),
-published. Nothing is mid-flight; the next session starts clean.
+fully done. Phase 9 (Recovery Engine) now has 2/4 internal workflows
+live: WF-018 SendRecoveryMessage (BC-036) and INT-006/SCH-001 Process
+Recovery Queue (BC-037, this session) — the cadence now fires on its
+own via a 5-minute cron sweep. Nothing is mid-flight; the next session
+starts clean.
 
-**What just happened (BC-036, this session):**
-- Built WF-018 SendRecoveryMessage — email channel only, per explicit
-  user scope cut (sms/whatsapp cleanly rejected as validation errors,
-  not built out).
-- Added 2 new RPCs: `get_client_recovery_context`,
-  `advance_client_recovery_step` (the latter IS the idempotency guard —
-  atomic `UPDATE ... WHERE current_step = $2`, no separate dedupe table,
-  per Integration Contract Part 11.4).
-- Caught and fixed 2 real bugs live via `test_workflow`/`execute_workflow`
-  before publishing: (1) all 8 IF nodes had `rightValue: ''` on
-  boolean/exists operators — a documented n8n platform quirk
-  (`Wiki/platform-quirks/n8n-node-behaviors.md` §3) that throws
-  `NodeOperationError`; (2) a genuinely new bug — `Time Window Check`
-  read `$json` from its immediate predecessor (an Execute Workflow
-  node whose output replaces `$json` entirely), silently losing the
-  eligibility context and making `Build Message` fall back to generic
-  filler text. Both fixed and re-verified before publish.
-- **Live-tested for real, not just pinned:** discovered Client A
-  (`client_test_002_acme_commerce_test`) has a genuinely connected
-  Gmail (`control.client_connections`, category `email`, `connected`) —
-  used it to send a real test email end-to-end (Gmail message ID
-  confirmed, `labelIds: ["SENT"]`). All 6 planned test cases covered:
-  5 live (success, suppressed, not-found, invalid-input, duplicate/
-  stale-step), 1 (time-window hold) by code inspection + live hour
-  computation.
-- **New disclosed limitation, not a blocker:** no per-client timezone
-  column exists anywhere in the schema — Time Window Check uses UTC as
-  an honest placeholder for "local" 8am–8pm. Flagged in the workflow
-  itself (sticky note) and in Workflow_Registry.md; revisit whenever
-  timezone data is added to the platform.
+**What just happened (BC-037, this session):**
+- Built INT-006 + SCH-001 as one workflow (`Zenny Recovery Engine -
+  Process Recovery Queue`, n8n ID `crncPUwCbAQn5WgW`) — a 5-minute
+  Schedule Trigger sweep that reads `control.clients`, finds due rows
+  per client via a new `get_due_recovery_queue` RPC, and dispatches
+  each to WF-018's production webhook. Pure dispatcher — no state
+  ownership, no changes to WF-018 itself.
+- Added 1 new RPC: `get_due_recovery_queue(p_schema, p_limit)`,
+  SECURITY DEFINER, same dynamic-SQL convention as BC-036's 2 RPCs.
+  Filters `status='active' AND human_ownership_flag=false AND
+  next_follow_up<=now()` — the `human_ownership_flag` check is a real
+  gap WF-018 itself never covered (Recovery_Engine_Flow.md §1.H), now
+  closed at the sweep level.
+- **Real architectural finding, resolved without asking (Document
+  Resolution Authority — logged in Wiki/log.md):** `control.clients.
+  status` is not used as a gate anywhere else in the built system
+  (UTIL-001 doesn't check it either), and every roster client is
+  permanently `onboarding` as a test-fixture status, not a real
+  in-progress state. Gating the sweep on client status would have
+  silently excluded 100% of the real roster and introduced a filter no
+  other real workflow uses — so the sweep reads all clients, no status
+  filter.
+- **Live-tested for real, not just pinned:** a real scheduled tick
+  (execution 550) fired 5 minutes after publish, unprompted, and
+  processed 4 real due rows across 3 real clients with zero crashes —
+  1 routed through WF-018's own Pattern D handoff (no Gmail
+  connection), 2 correctly held on the time-window check, 1 correctly
+  suppressed. A synthetic `human_ownership_flag=true` row was inserted
+  specifically to test the new filter, confirmed excluded both by
+  direct RPC call and by absence from the live sweep's dispatched
+  rows, then deleted after verification (along with one other
+  synthetic test row) to stop it re-firing every 5 minutes.
+- **Not separately exercised this session:** a real `"sent"` pass-
+  through and WF-018's own duplicate/stale-step short-circuit — every
+  live tick this session landed outside the real UTC 8am–8pm window,
+  so eligible sends held instead of completing. Both paths were
+  already live-verified end-to-end in BC-036 and are unchanged by this
+  card (WF-018 itself was not modified) — this session only verified
+  the new dispatch/filter logic sitting in front of them.
+- **A permission classifier denial mid-session, handled per the
+  Permission Denials standing rule:** a manual `execute_workflow` call
+  (to force a live tick) was blocked. Rather than force it, waited for
+  the workflow's own real 5-minute schedule to fire it instead —
+  achieved the same live verification without overriding the denial.
 
 **What's genuinely open, in priority order:**
-1. Recovery Engine is NOT complete — INT-006 (queue processing),
-   INT-007/008 (stop/resume), and SCH-001 (the actual cron that calls
-   WF-018 on a schedule) are all still unbuilt. WF-018 only fires when
-   called directly; nothing dispatches it automatically yet.
+1. Recovery Engine is close but not complete — INT-007/008 (stop on
+   opt-out/reply/escalation, resume from pause) are the last unbuilt
+   pieces, candidate BC-038.
 2. No roster client (old or new) has a real connected calendar/
    ecommerce store — still true, unchanged. (Email/Gmail is the one
-   exception now confirmed working, for Client A only.)
+   exception, Client A only.)
 3. `appointments` doc diff — deferred, see Active Blockers. Low
    urgency but real; pick up opportunistically.
 4. Everything else is a genuine next-phase choice — see the Next Build
    Card candidates above.
 
 **Nothing requires human acknowledgment before proceeding** — no open
-Standing Gate, no unresolved document-level conflict.
+Standing Gate, no unresolved document-level conflict. The `control.
+clients.status` finding above was self-resolved per the Document
+Resolution Authority rule and is logged in Wiki/log.md, but per that
+same rule, no further Build Card work should begin until this specific
+resolution is acknowledged.

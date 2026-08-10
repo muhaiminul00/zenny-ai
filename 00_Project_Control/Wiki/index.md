@@ -37,6 +37,7 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 - [platform-quirks/postgrest-schema-exposure.md](platform-quirks/postgrest-schema-exposure.md) — client schemas are never exposed to PostgREST directly (PGRST106), the SECURITY DEFINER RPC-wrapper fix pattern, the `control` schema USAGE-grant gap, and the PGRST203 overload-ambiguity trap.
 - [platform-quirks/security-definer-rls.md](platform-quirks/security-definer-rls.md) — a SECURITY DEFINER view without `security_invoker` set silently bypasses the underlying table's RLS — a real cross-tenant exposure this project hit once already.
 - [platform-quirks/supabase-auth-quirks.md](platform-quirks/supabase-auth-quirks.md) — GoTrue's NULL-vs-empty-string expectations on direct `auth.users` inserts, and why direct auth.users writes are correctly permission-blocked.
+- [platform-quirks/recovery-queue-sweep-design.md](platform-quirks/recovery-queue-sweep-design.md) — why INT-006's client sweep doesn't filter on `control.clients.status` (unused as a gate anywhere else), and the `human_ownership_flag` check WF-018 itself never covers.
 
 ## Open Decisions
 
