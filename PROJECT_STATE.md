@@ -10,15 +10,18 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-10 — by /commander — added a Handoff Note for the next session
-and re-marked the `appointments` doc diff as explicitly DEFERRED (not
-scheduled, not blocking) in Active Blockers. No new build work. BC-034
-(Phase 8b, 11/11 Conversion Engine Tools) and BC-035 (ADP-002 allow-
-list) both complete this session — see below.
+2026-08-10 — by /execute — BC-036 complete: WF-018 SendRecoveryMessage
+built, tested genuinely live end-to-end (real Gmail send confirmed),
+and published. Phase 9 (Recovery Engine) kicked off — 1/1 planned Tool
+done; INT-006/007/008 + SCH-001 (queue processing, stop/resume, cron)
+remain as follow-up Build Cards, not started.
 
 ## Current Phase
 Phase 8 — Conversion Engine (11 Tools) — COMPLETE (11/11 built and
 live-tested)
+Phase 9 — Recovery Engine — IN PROGRESS (WF-018 SendRecoveryMessage
+built + live-tested, email channel only per explicit scope cut;
+INT-006/007/008 + SCH-001 not started)
 
 ## Standing Gate
 None open.
@@ -34,7 +37,7 @@ Phase 5  — 4 New Dashboard Systems ............... IN PROGRESS (5B, 5C-read-on
 Phase 6  — Core Agent ............................ COMPLETE
 Phase 7  — Growth Agent .......................... COMPLETE
 Phase 8  — Conversion Engine (11 Tools) .......... COMPLETE
-Phase 9  — Recovery Engine ....................... NOT STARTED
+Phase 9  — Recovery Engine ....................... IN PROGRESS (WF-018 done; INT-006/007/008, SCH-001 not started)
 Phase 10 — Email Manager ......................... NOT STARTED
 Phase 11 — Scheduled Workflows ................... IN PROGRESS (SCH-006 live; SCH-007 logged, not built)
 Phase 12 — Node-by-Node Outlines ................. NOT STARTED (cross-cutting)
@@ -47,6 +50,9 @@ Core Agent ............ ✅ working — Wiki: (none needed, stable)
 Growth Agent ........... ✅ working
 Conversion Engine ...... ✅ working — all 11/11 Tools built and live-tested (BC-034)
 Dashboard (5B/5C/Int) .. ✅ working — Wiki/infra/ for deployment
+Recovery Engine ........ 🟡 partial — WF-018 SendRecoveryMessage live-
+                          tested (email only); queue-processing/stop/
+                          resume/cron (INT-006/007/008, SCH-001) not built
 Credentials Platform ... ✅ working — Wiki/credentials/
 Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
 ```
@@ -88,39 +94,65 @@ Client E: e5f6a7b8-0001-4c1d-9e2a-000000000005 — engagement — client_test_00
 ```
 
 ## Next Build Card
-None issued yet. Candidates for the next Commander session: Phase 5A
-(Inventory dashboard) / 5D (Onboarding dashboard), Phase 9 (Recovery
-Engine), Phase 10 (Email Manager), SCH-007, ADP-001 doc/reality
-investigation. (`appointments` doc diff intentionally NOT in this
-list — see Active Blockers, deferred.)
+None issued yet. Strong candidate given dependency ordering: BC-037 —
+INT-006 (Process Recovery Queue internals) + SCH-001 (cron trigger),
+since the spec explicitly orders these right after SendRecoveryMessage
+exists (which it now does). Also open: INT-007/008 (Stop/Resume
+Recovery), Phase 5A (Inventory dashboard) / 5D (Onboarding dashboard),
+Phase 10 (Email Manager), SCH-007, ADP-001 doc/reality investigation.
+(`appointments` doc diff intentionally NOT in this list — see Active
+Blockers, deferred.)
 
 ## Handoff Note (for next session)
 
 **Where things stand:** Phase 8 (Conversion Engine, all 11 Tools) is
-fully done — built, live-tested, and wired into ADP-002's forwarding
-path. Nothing is mid-flight; the next session starts clean, picking a
-new thread from scratch.
+fully done. Phase 9 (Recovery Engine) is kicked off — WF-018
+SendRecoveryMessage built, live-tested end-to-end (real email sent),
+published. Nothing is mid-flight; the next session starts clean.
 
-**What just happened (BC-034 + BC-035, this session):**
-- Built the last 5 Conversion Engine Tools (WF-008–WF-012), completing
-  the module. Found and fixed 3 real infra bugs along the way (a
-  client-onboarding function bug, a UNIQUE-constraint dedup bug, a
-  response-field bug) — see `Wiki/log.md` BC-034 entry for full detail.
-- Extended ADP-002's tool-forwarding allow-list to include those 5
-  Tools (BC-035) — Convocore can now actually reach all 11.
-- 2 new roster test clients created (consultation, engagement).
+**What just happened (BC-036, this session):**
+- Built WF-018 SendRecoveryMessage — email channel only, per explicit
+  user scope cut (sms/whatsapp cleanly rejected as validation errors,
+  not built out).
+- Added 2 new RPCs: `get_client_recovery_context`,
+  `advance_client_recovery_step` (the latter IS the idempotency guard —
+  atomic `UPDATE ... WHERE current_step = $2`, no separate dedupe table,
+  per Integration Contract Part 11.4).
+- Caught and fixed 2 real bugs live via `test_workflow`/`execute_workflow`
+  before publishing: (1) all 8 IF nodes had `rightValue: ''` on
+  boolean/exists operators — a documented n8n platform quirk
+  (`Wiki/platform-quirks/n8n-node-behaviors.md` §3) that throws
+  `NodeOperationError`; (2) a genuinely new bug — `Time Window Check`
+  read `$json` from its immediate predecessor (an Execute Workflow
+  node whose output replaces `$json` entirely), silently losing the
+  eligibility context and making `Build Message` fall back to generic
+  filler text. Both fixed and re-verified before publish.
+- **Live-tested for real, not just pinned:** discovered Client A
+  (`client_test_002_acme_commerce_test`) has a genuinely connected
+  Gmail (`control.client_connections`, category `email`, `connected`) —
+  used it to send a real test email end-to-end (Gmail message ID
+  confirmed, `labelIds: ["SENT"]`). All 6 planned test cases covered:
+  5 live (success, suppressed, not-found, invalid-input, duplicate/
+  stale-step), 1 (time-window hold) by code inspection + live hour
+  computation.
+- **New disclosed limitation, not a blocker:** no per-client timezone
+  column exists anywhere in the schema — Time Window Check uses UTC as
+  an honest placeholder for "local" 8am–8pm. Flagged in the workflow
+  itself (sticky note) and in Workflow_Registry.md; revisit whenever
+  timezone data is added to the platform.
 
 **What's genuinely open, in priority order:**
-1. No roster client (old or new) has a real connected calendar/
-   ecommerce store — every "success" path for calendar-integrated
-   Tools has only ever been proven via `our_db_fallback`, never the
-   live-provider leg. Real external blocker, not a code gap — worth
-   raising with the human if a real test connection becomes available.
-2. `appointments` doc diff — deferred, see Active Blockers. Low
+1. Recovery Engine is NOT complete — INT-006 (queue processing),
+   INT-007/008 (stop/resume), and SCH-001 (the actual cron that calls
+   WF-018 on a schedule) are all still unbuilt. WF-018 only fires when
+   called directly; nothing dispatches it automatically yet.
+2. No roster client (old or new) has a real connected calendar/
+   ecommerce store — still true, unchanged. (Email/Gmail is the one
+   exception now confirmed working, for Client A only.)
+3. `appointments` doc diff — deferred, see Active Blockers. Low
    urgency but real; pick up opportunistically.
-3. Everything else is a genuine next-phase choice, not a follow-up —
-   see the Next Build Card candidates above. No dependency ordering
-   forces one before another.
+4. Everything else is a genuine next-phase choice — see the Next Build
+   Card candidates above.
 
 **Nothing requires human acknowledgment before proceeding** — no open
 Standing Gate, no unresolved document-level conflict.

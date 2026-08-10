@@ -800,6 +800,40 @@ own entry below.
 
 ---
 
+## Recovery Engine — Tools (Part 13, Phase 9 kickoff — BC-036)
+
+### WF-018 — Zenny Recovery Engine - SendRecoveryMessage (WF-018)
+**n8n ID:** `wdRY4sD6Z8JZ06zr` · **published**, active
+
+**PURPOSE:** Sends one recovery-cadence step message to a lead. **Scope cut (BC-036, explicit user instruction):** email channel only — `sms`/`whatsapp` are rejected as a clean `VALIDATION_ERROR`, not built out. Gates on: UTIL-005 Stop Checker (suppression, mandatory per spec Part 6.5), `recovery_queue.status = 'active'`, and `recovery_queue.current_step` matching the requested `step_number` — this step-match check IS the idempotency guard (Integration Contract Part 11.4's "database is the final guarantee" philosophy — no separate dedupe table). Holds (does not send, does not advance state) outside the 8am–8pm window before building the message and reaching Gmail — Emergency archetype step 1 is exempt, matching Recovery_Engine_Flow.md §3.1.
+
+**KNOWN LIMITATION, disclosed not hidden:** no per-client timezone column exists anywhere in the schema yet (checked live + against `Database_Structure_v4_FINAL.md`) — `Time Window Check` uses UTC as an honest placeholder for "local." Revisit when timezone data is added to the platform.
+
+**TRIGGER:** Webhook, `POST /send-recovery-message`.
+
+**INPUT:** `{ client_id, payload: { lead_id, step_number, channel } }` — `channel` must be `"email"`.
+
+**OUTPUT / END STATE:**
+- Success: 200 `{ result: { recovery_send_id, status: "sent" } }` (`recovery_send_id` is `recovery_queue.recovery_id` — no dedicated per-send log table exists, disclosed scope decision, not a gap to silently paper over).
+- Ineligible (recovery not active / stale step): 200 `{ result: { status: "not_sent" }, reason }`.
+- Suppressed: 200 `{ result: { status: "not_sent" }, reason: "suppressed_or_opted_out" }`.
+- Held (outside window): 200 `{ result: { status: "held" }, reason: "outside_time_window" }`.
+- Unknown lead: 404 `RECOVERY_RECORD_NOT_FOUND`.
+- Invalid input (missing fields, unsupported channel): 400 `VALIDATION_ERROR`.
+- Supabase/Gmail failure after Pattern B retry: Pattern D, real `escalations` row via WF-017.
+
+**REAL DEPENDENCIES:** UTIL-001 (schema resolution), UTIL-005 (Stop Checker, mandatory), UTIL-006 (Credential Resolver, `category: 'email'` — resolves the client's live Google OAuth token, same mechanism as Calendar), WF-017 (direct HTTP POST to its production webhook, matching the WF-013/WF-016/WF-012 pattern — not an Execute Workflow node). Sends via the Gmail API directly (`gmail.googleapis.com/gmail/v1/users/me/messages/send`) using the bearer token UTIL-006 resolves — no native n8n Gmail credential involved, consistent with the platform's per-client multi-tenant OAuth design (one shared Zeromanual Google app, per-client tokens in Vault).
+
+**REAL NEW DB OBJECTS:** `public.get_client_recovery_context` RPC (joins `recovery_queue`+`leads`+`customers`+`growth_handoff_payload`, SECURITY DEFINER, `SET search_path TO ''`, matches the `get_client_appointment_with_customer` pattern exactly). `public.advance_client_recovery_step` RPC (atomic `UPDATE ... WHERE current_step = $2 AND status = 'active' RETURNING ...` — the idempotency guard itself; returns `duplicate: true` without re-advancing when the step no longer matches, mirroring `insert_client_conversion_record`'s duplicate-flag style).
+
+**FIXED LIVE (real bug, caught by `test_workflow`, not by inspection):** `Time Window Check`'s `const ctx = $json` read the immediate predecessor's output — but the immediate predecessor is `Check Suppression (UTIL-005)`, an Execute Workflow node whose output REPLACES `$json` with its own `{proceed, reason}` shape rather than merging upstream fields. This silently dropped `conversation_summary`/`selected_solution`/`contact_method`/`archetype`, and `Build Message` fell back to generic filler text as a result. Fixed by reading `$('Evaluate Eligibility').item.json` explicitly — documented as a fresh instance of the SDK's known "$json in branchy/sub-workflow-downstream workflows" pitfall.
+
+**ALSO FIXED LIVE:** all 8 IF nodes originally carried `rightValue: ''` on boolean-`true`/string-`exists` operators, copied from a bad template — this throws a real `NodeOperationError` (`Wrong type: '' is a string but was expecting a boolean`), caught immediately by `test_workflow`. This is the exact quirk already on record in `Wiki/platform-quirks/n8n-node-behaviors.md` §3 — omit `rightValue` entirely for these operators; the fix here reused the documented pattern rather than rediscovering it.
+
+**LAST VERIFIED:** BC-036, 2026-08-10 — genuinely live end-to-end, not `test_workflow`-pinned: Success (real Gmail send to a real inbox, `labelIds: ["SENT"]`, against `client_test_002_acme_commerce_test`, whose Client A connection is real and `connected` — confirmed via `control.client_connections`), Suppressed (real `suppression_records` row), Not Found (real `null` RPC response), Validation (missing `step_number` + unsupported `channel: 'sms'`), Duplicate/stale-step (re-called the already-advanced lead, correctly short-circuited with **no second email sent** — confirmed by absence of a `Send Gmail Message` run in that execution's data). Held/time-window logic verified by code inspection plus a live, correctly-computed `hour_utc` in every real run above; not separately exercised against an out-of-window clock this session.
+
+---
+
 ## Referenced In Docs But Not Found As A Real Built Workflow
 
 **ADP-001 Voiceflow Adapter** — n8n_Workflow_Specification_v1.md Part 17 lists this as status "Production," but a full `search_workflows` audit (BC-027, 2026-08-07) found no n8n workflow matching this name or purpose anywhere in the live instance. This is a real doc/reality mismatch, not resolved or investigated further this session (BC-027 is a documentation card) — flagged here for whoever picks up Voiceflow-adapter work next.
