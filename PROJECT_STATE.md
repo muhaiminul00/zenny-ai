@@ -10,11 +10,11 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-10 — by /execute — BC-034 complete: Phase 8b, the final 5
-Conversion Engine Tools (WF-008–WF-012), all 11 Tools now built and
-live-tested. 2 new roster clients created (consultation, engagement).
-3 real infra bugs found and fixed; 5 self-resolved document-level gaps
-logged. Implementation Report ready for Commander review.
+2026-08-10 — by /execute — BC-035 complete: ADP-002's tool-forwarding
+allow-list extended to all 17 built Tools (was missing the 5 built in
+BC-034). Real curl tests confirmed forwarding + no regression + clean
+echo fallback for still-unbuilt tools. BC-034 (Phase 8b, 11/11
+Conversion Engine Tools) also complete this session — see below.
 
 ## Current Phase
 Phase 8 — Conversion Engine (11 Tools) — COMPLETE (11/11 built and
@@ -73,11 +73,6 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
   — see Wiki/decisions/ (calendar-category-sharing,
   disconnect-provider-revocation, dashboard-auth-mapping,
   verification-tier-redesign).
-- ADP-002's tool-forwarding allow-list (built BC-032) needs updating to
-  include the 5 new WF-008–012 webhooks — not done this session (BC-034
-  scope was the Tools themselves), flagged for the next Convocore-facing
-  card.
-
 ## Test-Client Roster
 ```
 Client A: baa673b5-c51a-4a7b-91f5-a37027f8dca4 — commerce_ecom — client_test_002_acme_commerce_test
@@ -90,6 +85,6 @@ Client E: e5f6a7b8-0001-4c1d-9e2a-000000000005 — engagement — client_test_00
 ## Next Build Card
 None issued yet. Candidates for the next Commander session: Phase 5A
 (Inventory dashboard) / 5D (Onboarding dashboard), Phase 9 (Recovery
-Engine), Phase 10 (Email Manager), SCH-007, ADP-002 tool-forwarding
-allow-list update (5 new Tools), ADP-001 doc/reality investigation, or
-the Database_Structure_v4_FINAL.md `appointments` doc diff.
+Engine), Phase 10 (Email Manager), SCH-007, ADP-001 doc/reality
+investigation, or the Database_Structure_v4_FINAL.md `appointments`
+doc diff.

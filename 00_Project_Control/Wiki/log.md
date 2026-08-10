@@ -7,8 +7,15 @@
 #
 # This file was seeded by migrating the full prior PROJECT_STATE.md
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
+---
 
-## [2026-08-07] session-BC-032 | Current Phase — Self-resolved document-level item (BC-032, Shopify Client Credentials Grant pivot)
+## [2026-08-10] session-BC-035 | ADP-002 tool-forwarding allow-list extended to 17
+
+**BC-035 (/execute):** Extended ADP-002's `Resolve Tool Webhook Path` hardcoded `builtTools` allow-list from 12 to 17 entries, adding the 5 Conversion Engine Tools built in BC-034 (create-callback-queue-entry, create-inspection-slot-booking, create-scored-booking, create-registration, record-conversion). Live-verified the current array via `get_workflow_details` before editing (12 entries confirmed, matching expectation). Real curl tests against the live production webhook (test agent `bc028-test-agent-clientA`): `RecordConversion` and `CreateRegistration` both forward correctly (the latter also proved WF-011's own Pattern D resilience against a wrong-archetype client -- real escalation created, no crash); `CreateLead` re-confirmed no regression on the original 12; a genuinely still-unbuilt tool (`SendRecoveryMessage`) correctly still falls to the clean echo fallback. Published. Full detail: Workflow_Registry.md ADP-002 entry.
+
+---
+
+## [2026-08-07] session-BC-032 | Self-resolved document-level item (BC-032, Shopify Client Credentials Grant pivot)
 
 **Self-resolved document-level item (BC-032):** Client_Integration_and_Credential_Platform_v1.md Part 8.2 already documented Shopify's Custom App static-token model as discontinued in favor of the shared-app Authorization Code Grant, and explicitly said not to use Client Credentials Grant for that shared-app case. This Build Card's Step 2 nonetheless asked for a Custom App static-token form (the exact mechanism Part 8.2 already said was gone) — live verification (WebSearch) confirmed Shopify removed the ability to generate new static Custom App tokens entirely as of Jan 1, 2026. Per Mandatory MCP Verification, did not build the requested dead functionality; stopped and asked the human via AskUserQuestion instead of silently building or silently skipping the step. The human's own answer directed a pivot to Shopify's **Client Credentials Grant** (a genuinely different, still-live mechanism: per-client Client ID + Client Secret, Zenny auto-requests a short-lived token on each call) — verified live (WebSearch/WebFetch) that this mechanism is real and current (`POST https://{shop}.myshopify.com/admin/oauth/access_token`, form-urlencoded `client_id`/`client_secret`/`grant_type=client_credentials`, returns `{access_token, scope, expires_in: 86399}`). This is architecturally distinct from the shared-app case Part 8.2 rejected Client Credentials Grant for (this is a genuine per-client alternative fallback, matching Part 8.5.1's general API-key-fallback principle), so it does not contradict Part 8.2 — it fills a different, real gap. Built accordingly. **Per the standing gate, this session stops here for Commander acknowledgment of this resolution before Phase 8b or any other new Build Card begins** — routine documentation/commit work below this point is not new build scope.
 
