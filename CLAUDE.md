@@ -78,16 +78,31 @@ real, not just described in context.
 
 ### Commander → Execute auto-handoff
 
-Once a Build Card is issued, Commander proceeds directly into Execute
-in the same turn — no re-typed `/execute` required as ceremony. The
-printed Build Card itself remains the checkpoint: the human can
-interrupt before or during execution. This is a workflow-speed change,
-not a removal of the review point.
+Once a Build Card is issued and approved, Commander proceeds directly
+into Execute — no human has to type `/execute` as ceremony. Concretely,
+this means Commander invokes the `execute` Skill itself (with a brief
+1-2 line pointer to what to build), which is what actually writes
+`.claude/hooks/state/mode.json` to `"execute"` — the same real state
+change a human-typed `/execute` produces. **No infra-touching or live
+n8n/Supabase/VPS/DNS action — not even a read — happens until that
+mode-state write has actually landed.** Commander's own "read-only,
+single-file, non-destructive, no credential/infra impact" direct-execute
+allowance never extends to live n8n/Supabase/VPS/DNS state, reads
+included; the moment a Build Card needs to touch any of that, the next
+action is invoking the `execute` Skill, not the touch itself. (This
+line exists because that exact mistake happened once, 2026-08-12 —
+Commander ran live read-only Supabase queries while `mode.json` still
+read `"commander"`, reasoning from this section's *intent* instead of
+its literal mechanism. Corrected same session — see `Wiki/log.md`.)
 
-Execute may auto-handoff back to Commander for the next card, but the
-chain is bounded, not indefinite. It stops for a human pulse-check (one
-line: "N cards done, all verified, continue?" — not a full review)
-after either:
+Execute, once its Build Card is genuinely complete (mandatory writes
+landed — see below), invokes the `commander` Skill itself the same
+way, with a brief 1-2 line summary, to hand back — again a real
+mode-state write, not just a description of intent to hand back.
+
+This self-chaining is bounded, not indefinite. It stops for a human
+pulse-check (one line: "N cards done, all verified, continue?" — not a
+full review) after either:
 - 3 consecutive Build Cards completed unattended, or
 - any single card that wrote to live n8n/Supabase/DNS/VPS state.
 
@@ -95,13 +110,22 @@ This sits on top of, and never replaces, the existing stop conditions:
 Credential Gate, an unresolved document-level conflict, an explicit
 "DECISION NEEDED" flag, or anything that would shape (change or add to)
 the system. Those always stop the loop outright, unbounded-card-count
-or not.
+or not — "stop" means end the turn and wait for the human, never
+self-invoke the next mode instead.
 
-Any `/compact` at the end of an Execute pass may only run **after**
-that session's mandatory writes are confirmed on disk — PROJECT_STATE.md,
-relevant Wiki page(s), `Wiki/log.md` entry, `Workflow_Registry.md` entry
-if an n8n workflow was touched, and the real git commit/push. Compacting
-before those writes land is a protocol violation, not a shortcut.
+**`/clear` and `/compact` cannot be self-invoked — no tool exists for
+either, unlike `/commander`/`/execute`/`/advisor`, which are real
+project Skills.** Until a real mechanism exists: at the point this
+section previously said "any `/compact` at the end of an Execute pass
+may only run after mandatory writes are confirmed on disk," read that
+as Execute *telling the human* `/compact` is recommended now (session
+mandatory writes are done — PROJECT_STATE.md, relevant Wiki page(s),
+`Wiki/log.md` entry, `Workflow_Registry.md` entry if an n8n workflow
+was touched, real git commit/push) and then proceeding to hand back to
+Commander regardless — never blocking the loop on an action neither
+mode can actually trigger. Same for Commander noticing a session
+running long: flag it and recommend `/clear`, don't attempt to invoke
+it. Full detail: `Wiki/platform-quirks/mode-self-invocation-limits.md`.
 
 **Verification is not optional inside the loop.** No Build Card is
 marked done on the strength of `validate_workflow` or similar checks

@@ -9,6 +9,14 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-12] session-BC-040-followup | Commander self-invocation mistake, root-caused and corrected
+
+**Commander (/commander):** Live-verified BC-037/038's completion (both real, per n8n execution history) before starting new work, per user request. While preparing BC-041 (per-client active-hours), ran two live read-only Supabase queries (`execute_sql`, `list_tables`) while `.claude/hooks/state/mode.json` still read `"commander"` — a real violation of Commander's own stated boundary ("anything touching live n8n/Supabase hands off to /execute"), caused by reasoning from BC-040's auto-handoff *intent* ("Commander proceeds directly into Execute in the same turn") rather than its literal mechanism. No live write occurred; user caught it and asked for root cause.
+
+**Root cause:** BC-040's auto-handoff wording never specified that "proceeding into Execute" means actually invoking the `execute` Skill (a real `mode.json` write) before any infra-touching action — it read as a description of conversational flow, not a state-transition requirement.
+
+**Resolution, with user confirming the intended design:** Commander and Execute self-invoke each other via the Skill tool (`commander`/`execute`/`advisor` are real project Skills, confirmed by checking `.claude/commands/*.md` — this genuinely works). `/clear` and `/compact` are NOT self-invocable — confirmed no tool exists for either in this environment; both modes now recommend them to the human instead of attempting to trigger them. Tightened wording in CLAUDE.md's auto-handoff section and all three `.claude/commands/*.md` files to make the mode-Skill-call-as-real-checkpoint mechanism explicit. New page: `Wiki/platform-quirks/mode-self-invocation-limits.md`.
+
 ## [2026-08-10] session-BC-037-followup | Commander re-verification of the control.clients.status resolution, before acknowledgment
 
 **Commander (/commander):** Before acknowledging BC-037's self-resolved item, user asked to re-verify whether any document expects `client_status_enum` to gate production behavior anywhere, not just in currently-built n8n workflows. Confirmed again that no built workflow (UTIL-001, ADP-002, WF-018) checks it. But found one real documented precedent missed the first pass: `Template_Migration_Process.md` filters `status NOT IN ('offboarded')` for template syncs, reasoning an offboarded client's schema may not exist and acting on it serves no purpose — the same reasoning applies to recovery sends. **Action required, assigned to BC-038:** exclude `offboarded` clients from INT-006's roster query. `paused` has no documented precedent anywhere and stays open — not resolved, flagged as a genuine product decision. Full detail: `Wiki/platform-quirks/recovery-queue-sweep-design.md` (revised).

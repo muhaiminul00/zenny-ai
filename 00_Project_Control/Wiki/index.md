@@ -38,6 +38,7 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 - [platform-quirks/security-definer-rls.md](platform-quirks/security-definer-rls.md) — a SECURITY DEFINER view without `security_invoker` set silently bypasses the underlying table's RLS — a real cross-tenant exposure this project hit once already.
 - [platform-quirks/supabase-auth-quirks.md](platform-quirks/supabase-auth-quirks.md) — GoTrue's NULL-vs-empty-string expectations on direct `auth.users` inserts, and why direct auth.users writes are correctly permission-blocked.
 - [platform-quirks/recovery-queue-sweep-design.md](platform-quirks/recovery-queue-sweep-design.md) — why INT-006's client sweep doesn't filter on `control.clients.status` (unused as a gate anywhere else), and the `human_ownership_flag` check WF-018 itself never covers.
+- [platform-quirks/mode-self-invocation-limits.md](platform-quirks/mode-self-invocation-limits.md) — `/commander`/`/execute`/`/advisor` are real self-invocable Skills (they write `mode.json` for real); `/clear`/`/compact` are not — no tool exists for either, so they're recommended to the human, never self-triggered.
 
 ## Open Decisions
 
