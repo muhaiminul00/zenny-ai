@@ -10,19 +10,19 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-12 — by /commander — BC-037/038 live re-verified (both real:
-n8n execution history + Wiki log trail confirmed, nothing to fix).
-BC-041 (per-client active-hours, replacing WF-018's hardcoded UTC 8-20
-window) issued but NOT started — Commander self-invoked into infra
-verification prematurely (live Supabase reads while mode.json still
-said "commander"), caught by user, root-caused, corrected: CLAUDE.md +
-all 3 `.claude/commands/*.md` now make the mode-Skill-call itself the
-real checkpoint, not just described intent. New Wiki page:
-platform-quirks/mode-self-invocation-limits.md (`/clear`/`/compact`
-cannot be self-invoked, no tool exists — flagged to human, never
-attempted). Full detail: Wiki/log.md 2026-08-12 session-BC-040-followup.
-Recovery Engine status (Phase 9) unchanged since 2026-08-10 — see
-Current Phase / Module Status / Handoff Note below, still accurate.
+2026-08-12 — by /execute — BC-041 complete: WF-018's hardcoded UTC
+8am-8pm `Time Window Check` replaced with real per-client
+`control.clients.active_hours_start_utc/active_hours_end_utc`
+(default 8/20 = zero behavior change, confirmed live across all 5
+roster clients). New `Get Client Active Hours` node, defensive
+fallback to 8/20 on fetch failure. Published; live-verified via
+`test_workflow` pinned-data executions 4379 (fallback parity) and
+4384 (override genuinely changes outcome) — no real client data or
+email touched. `Workflow_Registry.md` + `Wiki/platform-quirks/
+recovery-queue-sweep-design.md` updated. Self-invoked by Commander
+per the corrected mode-Skill mechanism (see 2026-08-12
+session-BC-040-followup in Wiki/log.md for that correction's detail).
+Recovery Engine (Phase 9) still has INT-007/008 not started.
 **BC-039 (INT-007/008 stop/resume) remains BLOCKED, not started** — see
 Handoff Note: no real trigger mechanism exists yet for either workflow
 (no reply-detection pipeline, no suppression-record writer, RecordConversion
@@ -68,7 +68,8 @@ Dashboard (5B/5C/Int) .. ✅ working — Wiki/infra/ for deployment
 Recovery Engine ........ 🟡 partial — WF-018 SendRecoveryMessage +
                           INT-006/SCH-001 Process Recovery Queue live-
                           tested, cadence fires automatically (email
-                          only); stop/resume (INT-007/008) not built
+                          only), per-client active-hours window
+                          (BC-041); stop/resume (INT-007/008) not built
 Credentials Platform ... ✅ working — Wiki/credentials/
 Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
 ```
@@ -128,14 +129,6 @@ This isn't a mechanical/verification-level gap with one obvious answer
 separate event-triggered INT-007/008 workflows vs. wiring existing
 Tools like RecordConversion to call them) that needs a human decision
 before scope is set. Full detail in the Handoff Note below.
-
-**BC-041 (per-client active-hours window) is issued, approved, not yet
-started** — replaces WF-018's hardcoded UTC 8am-8pm placeholder with
-real per-client `control.clients` columns (`active_hours_start_utc`,
-`active_hours_end_utc`, defaults 8/20 = zero behavior change for
-current roster). MCP Verification not yet done on
-`get_client_recovery_context`'s return shape — do that first. Full
-card text: this session's transcript / Wiki/log.md.
 
 Also open once BC-039 is unblocked or reprioritized: Phase 5A
 (Inventory dashboard) / 5D (Onboarding dashboard), Phase 10 (Email

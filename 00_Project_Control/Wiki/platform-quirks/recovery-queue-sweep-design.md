@@ -55,3 +55,20 @@ excluded both by a direct `get_due_recovery_queue` call and by the real
 
 See [[Workflow_Registry INT-006 + SCH-001 entry]] for the full live-test
 detail and 06_Infrastructure/n8n/Workflow_Registry.md for WF-018's own entry.
+
+## Per-client active hours replace the hardcoded UTC 8am–8pm window (BC-041)
+
+WF-018's `Time Window Check` previously hardcoded `hourUtc >= 8 && hourUtc < 20`.
+BC-041 (2026-08-11) replaced that with two new `control.clients` columns —
+`active_hours_start_utc`/`active_hours_end_utc` (smallint, default `8`/`20`) —
+fetched by a new `Get Client Active Hours` node and read defensively (falls
+back to `8`/`20` on any fetch failure, so the failure mode is identical to
+pre-BC-041 behavior). `start=0, end=24` means always-on. Verified via
+`test_workflow` with pinned data (executions 4379/4384) — see
+`Workflow_Registry.md`'s WF-018 entry for the exact scenarios.
+
+**Still not solved:** true per-client *timezone*. This is UTC-hour
+configurability only, not timezone-awareness — the "local" framing in
+`Recovery_Engine_Flow.md` §3.1 remains an honest placeholder, just a
+configurable one now instead of a fixed one. A real timezone column/system
+is a separate, larger future problem.
