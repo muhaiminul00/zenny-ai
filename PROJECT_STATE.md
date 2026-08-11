@@ -111,24 +111,23 @@ Client E: e5f6a7b8-0001-4c1d-9e2a-000000000005 — engagement — client_test_00
 ```
 
 ## Next Build Card
-**BC-039 is BLOCKED pending a human scope decision — do not just start
-building it.** INT-007/008 (Stop/Resume Recovery) were issued as the
-next card, but Mandatory MCP Verification found no real trigger
-mechanism exists for either one yet:
-- INT-007 is specced to fire on "Reply Handling" — but Phase 10 (Email
-  Manager, INT-009/010/011) is NOT STARTED, so there is no inbound-
-  reply detection pipeline anywhere in the live system to fire it.
-- Spec Section 6 says stop conditions are "checked live at every
-  scheduled send" — but confirmed live that `RecordConversion` (WF-012)
-  writes only to `conversions`, never touches `leads.status` or
-  `recovery_queue`, and nothing anywhere writes `suppression_records`.
-  A real conversion today would NOT stop an active recovery cadence.
+**BC-039 resolved by human decision (2026-08-12): split, not built as
+one card.** Two real blockers existed (no reply-detection pipeline for
+INT-007's trigger; `RecordConversion` never stopping an active
+cadence). Decision: fix the conversion gap now (small, no dependency on
+unbuilt systems), defer the reply-based half until Phase 10 (Email
+Manager) actually exists.
 
-This isn't a mechanical/verification-level gap with one obvious answer
-— it's a real design choice (inline live-checks inside WF-018 vs.
-separate event-triggered INT-007/008 workflows vs. wiring existing
-Tools like RecordConversion to call them) that needs a human decision
-before scope is set. Full detail in the Handoff Note below.
+**BC-042 (Conversion-Aware Recovery Suppression) is issued, approved,
+not yet started** — replaces BC-039's stop-half. Makes `RecordConversion`
+(WF-012) flip a converting lead's `recovery_queue.status` away from
+`'active'`, reusing WF-018's existing eligibility gate — no new column,
+no WF-018 change expected. Full card text: this session's transcript /
+Wiki/log.md.
+
+**INT-007 (reply-trigger) + INT-008 (resume) remain deferred, not
+started** — no real trigger surface exists until Phase 10 (Email
+Manager, INT-009/010/011) is built. Revisit when that phase starts.
 
 Also open once BC-039 is unblocked or reprioritized: Phase 5A
 (Inventory dashboard) / 5D (Onboarding dashboard), Phase 10 (Email
