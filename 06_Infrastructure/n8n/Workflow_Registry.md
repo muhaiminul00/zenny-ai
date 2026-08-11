@@ -796,7 +796,9 @@ own entry below.
 
 **FIXED BC-034 (real bug, see infra bugs above):** duplicate check originally scoped to `(lead_id, conversion_type)`, missing the real system-wide `UNIQUE(lead_id)` constraint on `conversions` — fixed to lead_id-only.
 
-**LAST VERIFIED:** BC-034, 2026-08-10 — Success/Duplicate (real row, same `conversion_id` returned twice against a fresh lead), Failure (missing `conversion_type`), Security/Unknown-client (bad `client_id`) all genuinely tested.
+**CONVERSION STOPS ACTIVE RECOVERY (BC-042, 2026-08-11):** closes the real gap where a converted lead could keep receiving automated recovery emails — `RecordConversion` never touched `recovery_queue` before this. `insert_client_conversion_record` now also runs `UPDATE recovery_queue SET status='completed' WHERE lead_id=$1 AND status='active'` in the same atomic function call, right after the conversion insert (only on a genuine new conversion — the existing duplicate-check early-return is unchanged, so a duplicate call never re-touches `recovery_queue`). Reuses WF-018's existing `status==='active'` eligibility gate — **no new column, no WF-018 change was needed or made.** No n8n node added to WF-012 either; the RPC itself is where the fix lives.
+
+**LAST VERIFIED:** BC-034, 2026-08-10 — Success/Duplicate (real row, same `conversion_id` returned twice against a fresh lead), Failure (missing `conversion_type`), Security/Unknown-client (bad `client_id`) all genuinely tested. **BC-042, 2026-08-11** — real RPC call against a pre-existing real `active` `recovery_queue` row (`client_test_002_acme_commerce_test`, lead `b1c2d3e4-...-098`): conversion inserted (`duplicate:false`), `recovery_queue.status` confirmed flipped `active → completed` immediately after. Test data reverted afterward (conversion row deleted, `recovery_queue.status` restored to `active`) — no permanent change to pre-existing test fixtures.
 
 ---
 

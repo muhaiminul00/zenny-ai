@@ -10,25 +10,24 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-12 — by /execute — BC-041 complete: WF-018's hardcoded UTC
-8am-8pm `Time Window Check` replaced with real per-client
+2026-08-12 — by /execute — BC-042 complete: `RecordConversion`'s RPC
+(`insert_client_conversion_record`) now atomically flips a converting
+lead's `recovery_queue.status` from `active` to `completed`, reusing
+WF-018's existing eligibility gate — closes the real gap where a
+converted lead could keep receiving recovery emails. No new column, no
+WF-018 change. Verified with a real RPC call against a pre-existing
+active test row, confirmed the flip, reverted the test data afterward.
+`Workflow_Registry.md` WF-012 entry updated. This replaces BC-039's
+stop-half per your 2026-08-12 decision (see Wiki/log.md
+session-BC-039-decision) — the reply-trigger half (INT-007/INT-008)
+stays deferred until Phase 10 (Email Manager) exists, no real trigger
+surface without it.
+
+BC-041 (2026-08-11, prior card this session) also complete: WF-018's
+hardcoded UTC 8am-8pm window replaced with real per-client
 `control.clients.active_hours_start_utc/active_hours_end_utc`
-(default 8/20 = zero behavior change, confirmed live across all 5
-roster clients). New `Get Client Active Hours` node, defensive
-fallback to 8/20 on fetch failure. Published; live-verified via
-`test_workflow` pinned-data executions 4379 (fallback parity) and
-4384 (override genuinely changes outcome) — no real client data or
-email touched. `Workflow_Registry.md` + `Wiki/platform-quirks/
-recovery-queue-sweep-design.md` updated. Self-invoked by Commander
-per the corrected mode-Skill mechanism (see 2026-08-12
-session-BC-040-followup in Wiki/log.md for that correction's detail).
-Recovery Engine (Phase 9) still has INT-007/008 not started.
-**BC-039 (INT-007/008 stop/resume) remains BLOCKED, not started** — see
-Handoff Note: no real trigger mechanism exists yet for either workflow
-(no reply-detection pipeline, no suppression-record writer, RecordConversion
-never touches `recovery_queue`/`leads.status`), a genuine scope gap
-surfaced during Mandatory MCP Verification, not something to silently
-build around.
+(default 8/20 = zero behavior change), live-verified via `test_workflow`
+pinned-data executions 4379/4384. Full detail: Wiki/log.md.
 
 ## Current Phase
 Phase 8 — Conversion Engine (11 Tools) — COMPLETE (11/11 built and
@@ -111,100 +110,39 @@ Client E: e5f6a7b8-0001-4c1d-9e2a-000000000005 — engagement — client_test_00
 ```
 
 ## Next Build Card
-**BC-039 resolved by human decision (2026-08-12): split, not built as
-one card.** Two real blockers existed (no reply-detection pipeline for
-INT-007's trigger; `RecordConversion` never stopping an active
-cadence). Decision: fix the conversion gap now (small, no dependency on
-unbuilt systems), defer the reply-based half until Phase 10 (Email
-Manager) actually exists.
+**BC-039 resolved (2026-08-12): split, not built as one card.**
+Conversion-side gap closed by BC-042 (done, see Last Updated). Reply-
+trigger side (INT-007/INT-008) stays **deferred, not started** — no
+real trigger surface exists until Phase 10 (Email Manager,
+INT-009/010/011) is built. Revisit when that phase starts.
 
-**BC-042 (Conversion-Aware Recovery Suppression) is issued, approved,
-not yet started** — replaces BC-039's stop-half. Makes `RecordConversion`
-(WF-012) flip a converting lead's `recovery_queue.status` away from
-`'active'`, reusing WF-018's existing eligibility gate — no new column,
-no WF-018 change expected. Full card text: this session's transcript /
-Wiki/log.md.
-
-**INT-007 (reply-trigger) + INT-008 (resume) remain deferred, not
-started** — no real trigger surface exists until Phase 10 (Email
-Manager, INT-009/010/011) is built. Revisit when that phase starts.
-
-Also open once BC-039 is unblocked or reprioritized: Phase 5A
-(Inventory dashboard) / 5D (Onboarding dashboard), Phase 10 (Email
-Manager — note this would also unblock INT-007's real trigger), SCH-007,
-ADP-001 doc/reality investigation. (`appointments` doc diff intentionally
-NOT in this list — see Active Blockers, deferred.)
+No Build Card currently issued and un-actioned. Candidates for the
+next session: Phase 5A (Inventory dashboard) / 5D (Onboarding
+dashboard), Phase 10 (Email Manager — would also unblock INT-007's
+real trigger), SCH-007, ADP-001 doc/reality investigation.
+(`appointments` doc diff intentionally NOT in this list — see Active
+Blockers, deferred.)
 
 ## Handoff Note (for next session)
 
-**Where things stand:** Phase 8 (Conversion Engine, all 11 Tools) is
-fully done. Phase 9 (Recovery Engine) has 2/4 internal workflows live
-and working: WF-018 SendRecoveryMessage (BC-036) and INT-006/SCH-001
-Process Recovery Queue (BC-037+BC-038, this session) — the cadence
-fires on its own via a 5-minute cron sweep, now correctly excluding
-offboarded clients too. INT-007/008 are blocked on a real scope
-decision, not started. Nothing is mid-flight otherwise; the next
-session starts clean.
-
-**What just happened (BC-037 + BC-038, this session):**
-- Built INT-006 + SCH-001 as one workflow (`Zenny Recovery Engine -
-  Process Recovery Queue`, n8n ID `crncPUwCbAQn5WgW`) — a 5-minute
-  Schedule Trigger sweep that reads `control.clients`, finds due rows
-  per client via a new `get_due_recovery_queue` RPC, and dispatches
-  each to WF-018's production webhook. Pure dispatcher — no state
-  ownership, no changes to WF-018 itself.
-- Added `get_due_recovery_queue(p_schema, p_limit)` RPC, filtering
-  `status='active' AND human_ownership_flag=false AND next_follow_up<=
-  now()` — the `human_ownership_flag` check is a real gap WF-018 itself
-  never covered (Recovery_Engine_Flow.md §1.H), now closed at the
-  sweep level.
-- **Live-tested for real (execution 550):** 4 real due rows across 3
-  real clients processed with zero crashes — Pattern D handoff, 2
-  time-window holds, 1 suppression. A synthetic `human_ownership_flag=
-  true` row was confirmed excluded, then deleted.
-- **Commander re-verification (BC-038) caught a real second gap:**
-  `control.clients.status` isn't used as a gate anywhere in the system
-  — true — but `Template_Migration_Process.md` already sets a real
-  precedent for excluding `offboarded` clients specifically. Patched
-  `Get Active Clients` to add `status=neq.offboarded`. `paused` stays
-  unfiltered — genuinely undefined anywhere, not resolved.
-- **Real execution mistake, caught by live re-verification, not
-  inspection:** the BC-038 `update_workflow` edit was applied but
-  `publish_workflow` was forgotten — the live version kept running the
-  old query for one full cron cycle (execution 598 still showed the
-  synthetic offboarded test client) before it was caught and fixed.
-  Re-verified clean on execution 609.
-- **A permission classifier denial, twice this session, handled per
-  the Permission Denials standing rule both times:** manual
-  `execute_workflow` calls were blocked. Rather than force either,
-  waited for the workflow's own real 5-minute schedule to fire instead
-  — same verification outcome, no override.
-- **Not separately exercised this session:** a real `"sent"` pass-
-  through and WF-018's own duplicate/stale-step short-circuit — every
-  live tick landed outside the real UTC 8am–8pm window. Both already
-  live-verified in BC-036, unchanged here.
+**Where things stand:** Phase 8 (Conversion Engine, all 11 Tools) done.
+Phase 9 (Recovery Engine) has 3/4 internal workflows live and working:
+WF-018 SendRecoveryMessage (BC-036, now with per-client active-hours,
+BC-041), INT-006/SCH-001 Process Recovery Queue (BC-037/038, 5-minute
+cron sweep, excludes offboarded clients), and conversion-aware
+suppression (BC-042, converting stops an active cadence automatically).
+INT-007/INT-008 (reply-based stop/resume) deliberately deferred until
+Phase 10 (Email Manager) exists — no real trigger surface without it.
+Nothing is mid-flight; the next session starts clean. Full narrative
+of how each piece was built/verified: Wiki/log.md (search by BC number).
 
 **What's genuinely open, in priority order:**
-1. **BC-039 scope decision needed** — see Next Build Card above. Real
-   options to put in front of the human: (a) add inline live-checks to
-   WF-018's `Evaluate Eligibility` for `leads.status`/suppression per
-   spec's literal wording, narrowing INT-007/008's real scope; (b)
-   build INT-007/008 as standalone workflows AND wire RecordConversion
-   (and whatever eventually writes suppression) to call them —
-   materially larger scope than one Build Card; (c) defer INT-007/008
-   until Phase 10 (Email Manager) exists, since reply-handling has no
-   real trigger surface without it anyway.
-2. No roster client (old or new) has a real connected calendar/
-   ecommerce store — still true, unchanged. (Email/Gmail is the one
-   exception, Client A only.)
-3. `appointments` doc diff — deferred, see Active Blockers.
-4. Everything else is a genuine next-phase choice — see Next Build
+1. No roster client (old or new) has a real connected calendar/
+   ecommerce store. (Email/Gmail is the one exception, Client A only.)
+2. `appointments` doc diff — deferred, see Active Blockers.
+3. Everything else is a genuine next-phase choice — see Next Build
    Card candidates above.
 
-**Nothing requires human acknowledgment before proceeding on BC-037/
-BC-038 work** — both self-resolved document-level items from this
-session (`control.clients.status` unfiltered; `offboarded` excluded)
-are logged in Wiki/log.md and Wiki/platform-quirks/recovery-queue-
-sweep-design.md. **BC-039 itself is the open item** — it needs a real
-scope decision, not just an acknowledgment, before any Build Card for
-INT-007/008 is issued.
+Nothing requires human acknowledgment before proceeding — all
+self-resolved document-level items from recent sessions are logged in
+Wiki/log.md and their relevant Wiki/platform-quirks/ pages.

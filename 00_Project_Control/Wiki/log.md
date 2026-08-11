@@ -9,6 +9,10 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-11/12] session-BC-042 | Conversion-aware recovery suppression built, live-verified, reverted test data
+
+**Execute (/execute), self-invoked by Commander:** Built BC-042 — `insert_client_conversion_record` RPC extended to atomically flip a converting lead's `recovery_queue.status` from `'active'` to `'completed'` right after the conversion insert (skipped on the existing duplicate-check early-return, so re-calls are safe). Reuses WF-018's existing `status==='active'` eligibility gate — confirmed no new column and no WF-018 change were needed. MCP Verification first: confirmed `recovery_status_enum` values (`active`/`paused`/`completed`/`stopped`) and RecordConversion's RPC-based lead-identification live before writing the migration. Verified with a real RPC call against a pre-existing real `active` recovery_queue row (`client_test_002_acme_commerce_test`, lead `b1c2d3e4-...-098`) — status confirmed flipped, then reverted (conversion row deleted, status restored to `active`) to leave pre-existing test fixtures unchanged. `Workflow_Registry.md` WF-012 entry updated.
+
 ## [2026-08-12] session-BC-039-decision | BC-039 split by human decision: fix conversion gap now, defer reply-trigger
 
 **Commander (/commander):** Presented BC-039's two real blockers plainly (no reply-detection pipeline for INT-007's trigger; `RecordConversion` never stopping an active cadence on a real conversion) with a recommendation to split rather than treat as one card. **Human decision:** agreed with both — fix the conversion gap now via BC-042 (small, no dependency on unbuilt systems, reuses WF-018's existing `status==='active'` eligibility gate instead of adding new mechanism), defer the reply-based stop/resume half (INT-007/INT-008) until Phase 10 (Email Manager) actually exists, since it has no real trigger surface without it. BC-042 issued. PROJECT_STATE.md's Next Build Card section rewritten to reflect the split.
