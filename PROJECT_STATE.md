@@ -10,16 +10,15 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-10 — by /execute — BC-037 + BC-038 complete: INT-006 + SCH-001
-(Process Recovery Queue) built, published, live-verified — a real
-scheduled cron tick dispatched 4 real due rows across 3 clients through
-WF-018 with zero crashes, and the new `human_ownership_flag` filter (a
-real gap WF-018 itself didn't cover) was confirmed excluding a
-human-owned row. BC-038 then patched the sweep to exclude `offboarded`
-clients (real precedent found in Template_Migration_Process.md),
-live-verified across two ticks after catching a real forgot-to-publish
-mistake mid-verification. Recovery cadence now fires on its own.
-**BC-039 (INT-007/008 stop/resume) is BLOCKED, not started** — see
+2026-08-12 — by /execute — BC-040 complete: CLAUDE.md v3.0 → v3.1,
+Modes section amended with bounded Commander↔Execute auto-handoff loop
+(pulse-check every 3 cards or any live-infra write), persist-before-
+compact rule, explicit "verification always required" and "no over-
+engineering" rules, and Commander's scoping-must-trace-to-goal
+responsibility added to Build Card System. Doc-only, no infra touched.
+Recovery Engine status (Phase 9) unchanged since 2026-08-10 — see
+Current Phase / Module Status / Handoff Note below, still accurate.
+**BC-039 (INT-007/008 stop/resume) remains BLOCKED, not started** — see
 Handoff Note: no real trigger mechanism exists yet for either workflow
 (no reply-detection pipeline, no suppression-record writer, RecordConversion
 never touches `recovery_queue`/`leads.status`), a genuine scope gap

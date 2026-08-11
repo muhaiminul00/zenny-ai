@@ -1,10 +1,9 @@
 # Zenny AI Workforce — Claude Code Instructions
 
-```
+
 Project:   Zenny (by ZeroManual)
-Role:      Executor — Claude Build Command Protocol v2
-Document:  CLAUDE.md v2.0 — BUILD PHASE
-```
+Document:  CLAUDE.md v3.1 — single-tool, three-mode operating model
+
 
 ---
 
@@ -22,217 +21,329 @@ Real stack:
 - **Supabase** ("zenny-vault" project) — database: `control` schema
   (cross-client) + one schema per client, cloned from an archetype
   `tpl_*` template
-- **Client-facing dashboard** — Directus-based (planned, Phase 5), not yet built
-
-This project deliberately front-loaded architecture before building —
-every major decision is documented before implementation starts, so
-building never requires inventing architecture mid-session.
+- **Dashboard** — React/Vite/TS, deployed at dashboard.zeromanuals.com
 
 ---
 
-## Where To Look
+## Session Start — read in this exact order, nothing else by default
 
-- **`Planning_to_Build_Transition_v1.md`** — the live phase-by-phase build
-  plan and decision record. Read Part 4 before starting any phase to know
-  what's next and why.
-- **`Claude_Build_Command_Protocol_v2.md`** — the operating model this
-  file restates the standing rules from. Read in full before your first
-  Build Card.
-- **`PROJECT_STATE.md`** — real, current build state (see mandatory
-  protocol below). Not a plan — a status snapshot.
+1. **PROJECT_STATE.md** — current phase, module status, active blockers.
+   Read in full every session. Kept under ~150 lines on purpose.
+2. **Wiki/index.md** — catalog of durable facts/decisions. Read the
+   index only; drill into a specific `Wiki/*/*.md` page only when the
+   current task actually touches that topic.
+3. **This file (CLAUDE.md)** — you're reading it now.
+4. The specific frozen architecture document a Build Card names, if any
+   — not the full document set by default.
+
+**Never read by default, ever** — only on an explicit historical/audit
+request ("when did we decide X"):
+- `Wiki/log.md`
+- `00_Project_Control/Session_Log_Archive.md`
+- `_archive_planning_phase/`, `Completed_Task_Archive/`
 
 ---
 
-## Commander / Executor Model
+## Modes — /commander, /execute, /advisor
 
-This chat (Claude, claude.ai) is the **Commander** — issues Build Cards,
-reviews Implementation Reports, owns architecture decisions. **Claude
-Code (you) is the Executor** — takes a Build Card and executes it fully:
-builds workflows, configures nodes, writes migrations, tests, reports
-back. You have **orchestration authority within a Build Card's scope** —
-sequence your own sub-steps, make small implementation-detail judgment
-calls, and — per the Document Resolution Authority standing rule below —
-resolve genuine document-level conflicts or gaps yourself once you've
-actually searched for the answer. A genuinely novel product/design
-decision that no document resolves is still a Change Request back to the
-Commander, not something to invent. Full detail: `Claude_Build_Command_Protocol_v2.md`.
+This project runs on ONE tool (Claude Code) in three modes, switched via
+slash-command. Mode persists across sessions via
+`.claude/hooks/state/mode.json` until explicitly changed. A fresh
+session with no prior state defaults to `/advisor`.
+
+Full role definitions live in `Claude_Build_Command_Protocol_v2.md`
+(v2.4) — this section is the short version:
+
+- **`/commander`** — plan, generate Build Cards, review Implementation
+  Reports. May execute directly ONLY if the action is read-only,
+  single-file, non-destructive, and has no credential/infra impact.
+  Anything touching live n8n/Supabase/VPS/DNS/git-write hands off to
+  `/execute`. Will NOT generate a new Build Card while an unresolved,
+  unacknowledged document-level conflict is flagged.
+- **`/execute`** — full build authority, self-orchestrates within a
+  Build Card's scope, live-verifies via MCP before assuming anything
+  (see Mandatory MCP Verification below).
+- **`/advisor`** — default mode. Low-effort Q&A only. Never generates a
+  Build Card, never executes, never commits a decision to any file.
+
+Invoking a mode with no other text: confirm the switch in one line and
+stop. Do not read files or start a task.
+
+**Known limitation, stated plainly:** the mode-state file controls which
+role/instructions you follow and persists that choice across sessions.
+It does NOT and cannot force real effort-level or permission-mode
+settings — those require the actual CLI mechanism (`/model`, or this
+environment's real permission-mode command) if you want them set for
+real, not just described in context.
+
+### Commander → Execute auto-handoff
+
+Once a Build Card is issued, Commander proceeds directly into Execute
+in the same turn — no re-typed `/execute` required as ceremony. The
+printed Build Card itself remains the checkpoint: the human can
+interrupt before or during execution. This is a workflow-speed change,
+not a removal of the review point.
+
+Execute may auto-handoff back to Commander for the next card, but the
+chain is bounded, not indefinite. It stops for a human pulse-check (one
+line: "N cards done, all verified, continue?" — not a full review)
+after either:
+- 3 consecutive Build Cards completed unattended, or
+- any single card that wrote to live n8n/Supabase/DNS/VPS state.
+
+This sits on top of, and never replaces, the existing stop conditions:
+Credential Gate, an unresolved document-level conflict, an explicit
+"DECISION NEEDED" flag, or anything that would shape (change or add to)
+the system. Those always stop the loop outright, unbounded-card-count
+or not.
+
+Any `/compact` at the end of an Execute pass may only run **after**
+that session's mandatory writes are confirmed on disk — PROJECT_STATE.md,
+relevant Wiki page(s), `Wiki/log.md` entry, `Workflow_Registry.md` entry
+if an n8n workflow was touched, and the real git commit/push. Compacting
+before those writes land is a protocol violation, not a shortcut.
+
+**Verification is not optional inside the loop.** No Build Card is
+marked done on the strength of `validate_workflow` or similar checks
+alone — live verification via MCP (Mandatory MCP Verification below) is
+required before Definition of Done is claimed, every time, auto-loop or
+not.
+
+**Neither mode over-engineers.** Both modes build the smallest correct
+thing that satisfies the Build Card's Acceptance Criteria — no
+speculative abstraction, no extra config surface, no "while I'm in here"
+scope creep. If Execute hits a genuine blocker (missing capability,
+ambiguous field, tool gap), it looks for the smallest correct
+alternative already available (existing RPC, existing node type,
+existing Wiki precedent) before stopping — the same "search broadly
+first" discipline the Document Resolution Authority already applies to
+doc conflicts, applied here to build blockers.
+
+---
+## Build Card System
+**Every Build Card Contains:**
+
+- Build Card ID
+- Target (workflow name / migration / dashboard piece / Edge Function)
+- Runtime Module or system area --> Architectural constraints
+- Objective -->
+--  Purpose 
+--  Inputs
+--  Outputs
+- Dependencies / Required utilities
+- Shared Utilities involved / Folder/location placement
+- Acceptance Criteria
+- Test Cases / Testing instructions
+- Definition of Done / Expected outputs
+- Open Verification Items resolved by this card, if any.
+
+**Commander's scoping responsibility:** a Build Card's scope must trace
+to the system's actual working method and stated goal (Project
+Summary), not just be technically achievable. Before issuing a card,
+Commander checks it against PROJECT_STATE.md and the relevant Wiki
+page — a card that's correct in isolation but drifts from what the
+platform is actually for gets rejected before it's issued, not caught
+after Execute builds it.
+
+---
+
+## Tool Routing Table
+
+Check this before manual grep/bash/ad-hoc search. Route to the bundle;
+let Claude pick the right skill within a single-domain bundle.
+
+| Task category | Tool |
+|---|---|
+| Find code/call chains in Dashboard | codebase-memory-mcp MCP (search_graph, trace_path, get_architecture) |
+| Search architecture docs/specs | cowork-semantic-search MCP (hybrid mode) |
+| Convert a large, stable reference doc into a loadable structure | book-to-skill (CLI, via `.zenny-py-venv`) — one-time, not for fast-changing files |
+| Anything n8n | n8n-skills bundle + n8n MCP |
+| Anything Hostinger (VPS/DNS/domains/hosting/billing) | hostinger-agent-skills bundle + Hostinger MCP |
+| Anything Supabase (schema/RLS/queries/migrations) | supabase + postgres-best-practices bundles + Supabase MCP |
+| Live browser verification (OAuth, dashboard UI) | Playwright MCP |
+| Frontend/component structure | frontend-design |
+| Debugging with unclear root cause | superpowers:systematic-debugging |
+| Before claiming a fix is done/verified | superpowers:verification-before-completion — mandatory gate, always |
+| Isolated risky change | superpowers:using-git-worktrees |
+| Writing a plan, then executing | superpowers:writing-plans → superpowers:executing-plans |
+| Code/diff review pass | superpowers:requesting-code-review / receiving-code-review, mattpocock-skills:code-review, simplify |
+| TDD | mattpocock-skills:tdd |
+| Diagnosing a bug | mattpocock-skills:diagnosing-bugs (overlaps systematic-debugging — pick one, don't run both) |
+| Architecture/codebase design review | mattpocock-skills:codebase-design |
+| Merge conflicts | mattpocock-skills:resolving-merge-conflicts |
+| New feature, unclear scope [user-only, invoke by name] | mattpocock-skills:grill-with-docs |
+| End of session [user-only] | mattpocock-skills:handoff |
+| Deep architecture improvement pass [user-only] | mattpocock-skills:improve-codebase-architecture |
+| Discussion → spec/tickets [user-only] | mattpocock-skills:to-spec / to-tickets |
+| Dashboard aesthetic judgment | taste-skill:taste-skill |
+| Dashboard brand consistency | taste-skill:brandkit |
+| Dashboard minimal-direction check | taste-skill:minimalist-skill |
+| General dashboard polish | impeccable |
+
+---
+
+## Standing Rule — Python Installs
+
+All Python packages install into the project venv (`.zenny-py-venv`)
+only. Never global/system Python. Enforced via a `PreToolUse` soft-gate
+(`pip-guard.ps1`) — if you determine a package genuinely cannot work in
+the local venv, or forcing it there would cost more tokens than it's
+worth, you may proceed with a global install, but you MUST log a 1-2
+line reason both in your response summary and as a new entry in
+`Wiki/log.md` (`## [date] pip-global | package | reason`).
 
 ---
 
 ## Standing Rule — Mandatory MCP Verification
 
-Before executing any Build Card, verify the specific node, capability, or
-field it depends on directly against the live n8n MCP / Supabase MCP
-connection — not recited from a frozen architecture document. Frozen
-documents describe architecture and intent, never current platform
-capability. Scoped to the one capability the current Build Card needs —
-not a full platform audit every time. Full detail: Protocol v2 Section 6.1.
+Before executing any Build Card, verify the specific node, capability,
+or field it depends on directly against the live n8n MCP / Supabase MCP
+connection — not recited from a frozen architecture document. Scoped to
+the one capability the current Build Card needs, not a full platform
+audit every session. Full detail: `Claude_Build_Command_Protocol_v2.md`
+Section 6.1.
+
+---
 
 ## Standing Rule — Credential Testing Approach
 
-When a workflow needs a real third-party credential and full
-production Vault-based storage isn't ready yet: use n8n's **HTTP Request
-node with a Generic Header Auth credential**, holding a real test-account
-token. **Never** n8n's native OAuth-specific nodes (e.g. the built-in
-Google Calendar node) — the architecture requires dynamic, per-client
-credential injection via a header, not a pre-configured native-node
-credential. Building on the native node now means rebuilding later, not
-swapping a credential. Applies to every provider integration, every
-future phase. Full detail: `Planning_to_Build_Transition_v1.md` Part 2.8.
+When a workflow needs a real third-party credential and full production
+Vault-based storage isn't ready: use n8n's HTTP Request node with a
+Generic Header Auth credential holding a real test-account token. Never
+n8n's native OAuth-specific nodes for this. Applies to every provider
+integration.
 
-## Standing Rule — Use Available Tools (added BC-028)
+---
 
-Actively check and use whatever MCP tools, plugins, and skills are
-available for a given task rather than defaulting to manual/verbose
-approaches when a better-fit tool exists. This includes tools added
-mid-project (like `claude-remember`) — check what's actually available
-before reaching for a slower manual path. **But never trust a new or
-unfamiliar tool's behavior from its name or README alone** — verify it
-with a genuine test call first, per this project's existing discipline
-of confirming everything live rather than assumed (Mandatory MCP
-Verification, above). If a tool turns out not to actually work as
-advertised, say so plainly rather than quietly working around it or
-overstating what it does.
+## Standing Rule — Credential Gate
 
-**Specific tool priority (added BC-032):** Use `codebase-memory-mcp` as
-the FIRST stop for any project memory, documentation, or code-location
-search/read/fetch within this repo (proven useful and fast per BC-022)
-— before falling back to manual grep/file reads. For n8n or Supabase-
-specific process questions (node configuration, RLS patterns, migration
-mechanics), consult the n8n-skills and Supabase skill plugins if loaded
-and relevant, rather than reasoning from memory alone.
+Never create or invent a credential. If a Build Card needs one: build
+every non-secret field, leave the credential empty or use the agreed
+placeholder pattern, stop and report exactly what's required. Human
+adds it, you resume. Full detail: Protocol v2 Section 8.
 
-**MCP connectivity check (added BC-032, human instruction):** At the
-start of every session, before starting that session's build work,
-check whether the MCP servers the work will actually need (per
-`.mcp.json` — `codebase-memory-mcp`, the `hostinger-*` servers, etc.)
-are genuinely connected this session — some are intermittent. If a
-needed server isn't connected, say so plainly and ask the human to
-reconnect/restart before proceeding on the steps that depend on it,
-rather than silently working around it or declaring that step
-blocked without first checking.
+---
 
 ## Standing Rule — Document Resolution Authority
 
 When you hit a conflict, gap, or apparent error in a system document
-mid-session — a stale line contradicted by a newer document, a field
-whose exact value isn't yet in the file you're looking at, a naming or
-structural question — you may resolve it yourself and keep working in
-the same session, instead of stopping to ask. This authority is
-conditional on the discipline below being followed exactly, every time.
+mid-session, you may resolve it yourself and keep working — conditional
+on the discipline below, every time:
 
-**The governing constraint: system documents are the source of truth,
-always searched before anything is decided.**
-1. Search the relevant system documents first — broadly, not just the
-   one file you happened to open. Cross-reference; the answer is often
-   in a different document than the one that raised the question.
-2. If a document has the answer, that answer wins — even if an older or
-   more narrowly-scoped document says something else. Cite which
-   document resolved it and why it takes precedence (e.g. more recent,
-   more authoritative, more specific to the case at hand).
-3. If a real, thorough search finds no answer anywhere:
-   - Resolve it yourself only if it's a verification-level fact (confirm
-     it live against the actual system, don't guess) or a mechanical/
-     structural decision with one answer that's obviously correct given
-     everything else already established in the architecture.
-   - Otherwise — a genuinely new product or design decision with no
-     precedent anywhere in the docs — stop and ask.
-4. A document that explicitly flags something as still undecided (e.g.
-   "DECISION NEEDED") is the system telling you it was deliberately left
-   open. Treat that flag as binding unless a *different* document
-   actually resolves it — your own reasoning is never sufficient to
-   override an explicit open-decision flag on its own.
-5. Never invent a plausible-sounding answer to fill a gap. An honest
-   stop is always better than a guess dressed up as a resolution.
+1. Search the relevant system documents first, broadly — the answer is
+   often in a different document than the one that raised the question.
+2. If a document has the answer, that answer wins, even over an older
+   or narrower document. Cite which document resolved it and why.
+3. If a real search finds no answer: resolve it yourself only if it's a
+   verification-level fact or a mechanical/structural decision with one
+   obviously correct answer given everything already established.
+   Otherwise — stop and ask.
+4. A document explicitly flagged "DECISION NEEDED" stays open unless a
+   *different* document actually resolves it. Your own reasoning never
+   overrides an explicit open-decision flag alone.
+5. Never invent a plausible-sounding answer to fill a gap.
 
-**This does not change ordinary bug-catching.** A structural/mechanical
-mistake with one obviously correct fix (a wrong primary key, a malformed
-parameter, a duplicated credential) has always been yours to catch and
-fix without asking — that's unaffected by this rule either way.
+**Logging, never skipped:** log any self-resolved document-level item as
+a new/updated page in the relevant `Wiki/*/` folder (not PROJECT_STATE.md
+— that's a pure dashboard now) AND as an entry in `Wiki/log.md`. State
+the conflict/gap, documents checked, what it resolved to, and why.
 
-**Logging and acknowledgment — never skipped:**
-- Every time you resolve a genuine *document-level* conflict, gap, or
-  correction (not a code/schema bug — an actual correction to what a
-  document says), log it as its own clearly labeled subsection in that
-  session's Implementation Report and in PROJECT_STATE.md's Session
-  Log — never folded into general prose. State what the conflict/gap
-  was, which documents you checked, what you resolved it to, and why.
-- If the resolution requires editing a system document file itself, make
-  that edit directly and commit it — don't just describe the diff and
-  wait for someone else to apply it.
-- After logging any self-resolved document-level item, stop at the end
-  of that session's scoped work. Do not start the next Build Card's
-  work — even if it's already been issued — until the Commander has
-  explicitly acknowledged that specific resolution in a follow-up
-  message.
-- If a session has zero self-resolved document-level items — only
-  ordinary code/schema work against an already-clear card — none of the
-  logging/stopping requirements apply. Proceed normally.
+**After logging, stop.** Do not begin the next Build Card's work — even
+if already issued — until the human has explicitly acknowledged that
+specific resolution in a follow-up message. A session with zero
+self-resolved document-level items is not subject to this gate.
 
-## Standing Rule — Per-Workflow Documentation (added BC-027)
+---
 
-Every workflow is documented immediately with real information — not
-summarized after the fact from memory. Any Build Card that creates or
-meaningfully modifies an n8n workflow must add/update that workflow's
-entry in `06_Infrastructure/n8n/Workflow_Registry.md` **before that
-session's own Definition of Done is considered met** — not deferred to
-a later documentation pass. Each entry is written from a live
-`get_workflow_details` read of the actual built workflow, not
-reconstructed from PROJECT_STATE.md's session prose (which is a
-session-history log, not a current-state reference, and may drift from
-the real built shape). Minimum entry contents: workflow ID + real n8n
-name, PURPOSE, TRIGGER (the real trigger node's real config), INPUT,
-OUTPUT/END STATE (concrete success state + failure state, not just
-"returns 200"), REAL DEPENDENCIES, LAST VERIFIED (date + Build Card
-ID of the most recent real execution test). Full detail and the
-existing registry: `06_Infrastructure/n8n/Workflow_Registry.md`.
+## Standing Rule — Per-Workflow Documentation
 
-## Standing Rule — Credential Gate
+Any session that creates or meaningfully modifies an n8n workflow must
+add/update that workflow's entry in
+`06_Infrastructure/n8n/Workflow_Registry.md` before that session's
+Definition of Done is considered met — written from a live
+`get_workflow_details` read, never reconstructed from memory or from
+PROJECT_STATE.md prose.
 
-AI never creates or invents credentials. If a Build Card needs one:
-create nodes/config with every non-secret field set, leave the credential
-empty or use the agreed placeholder pattern, stop and report exactly what
-credential is required. Human adds it; you resume. Full detail: Protocol
-v2 Section 8.
+---
+
+## Standing Rule — Permission Denials (n8n / Supabase / git)
+
+Governed by the `PermissionDenied` hook (`permission-fallback.ps1`).
+When a permission is denied:
+
+1. Check for an easy, equivalent alternative. If one works, use it —
+   then note the substitution in the relevant Wiki page AND `Wiki/log.md`
+   ("use X, not Y, going forward") so future sessions don't hit the
+   same wall.
+2. If no alternative exists, judge whether the denied action is
+   ESSENTIAL to completing the current task:
+   - Essential → stop, explain what's blocked and why, ask the human to
+     grant/allowlist it.
+   - Not essential (e.g. a routine git commit that doesn't block the
+     actual task) → do NOT stop. Continue the task, flag the pending
+     action at the END of your response summary instead.
+
+---
+
+## Standing Rule — The Wiki (`00_Project_Control/Wiki/`)
+
+Three-layer memory model, replacing the old single-file Session Log:
+
+- **PROJECT_STATE.md** — current truth only, overwritten each session.
+  If a line describes something that *happened* rather than something
+  that *is currently true*, it does not belong here.
+- **`Wiki/*/*.md`** — durable facts and decisions, organized by topic
+  (`credentials/`, `infra/`, `platform-quirks/`, `decisions/`), edited
+  in place as understanding changes, never just appended to. `Wiki/
+  index.md` is the catalog — read it, then drill into specific pages.
+- **`Wiki/log.md`** — append-only chronological record. Cold storage,
+  read only for historical/audit purposes.
+
+**Promotion rule**, applied at the end of every session:
+- Learned a durable fact or made a decision? → Wiki page (create or
+  edit in place), cross-referenced in `index.md`.
+- Just completed a task with no new durable fact? → one-line
+  PROJECT_STATE.md status update.
+- Full narrative of *how* something happened (exact commands, exact
+  errors)? → `Wiki/log.md`. Never in PROJECT_STATE.md.
+
+**Confidence rule:** if the Wiki has no page or only weak/tangential
+matches for a query, say so explicitly. Never synthesize an answer from
+unrelated pages, and never file a low-confidence synthesis back into the
+Wiki as if it were established fact.
+
+**Lint operation:** roughly every 5 sessions, in `/commander` mode,
+run a Wiki health-check — contradictions, orphan pages, stale claims,
+missing cross-references. Fix what you find, log the correction in
+`Wiki/log.md` the same as any other resolution.
 
 ---
 
 ## PROJECT_STATE.md — Mandatory Session Protocol
 
 At the START of every session: read PROJECT_STATE.md in full before
-touching any code. This is the real, current state of the build — not
-the plan (that's Planning_to_Build_Transition_v1.md). **(BC-030)**
-PROJECT_STATE.md's Session Log retains only the most recent ~8-10
-sessions — older entries are moved verbatim (never summarized) to
-`00_Project_Control/Session_Log_Archive.md` as the file grows. Check
-the archive only if a session needs context older than what
-PROJECT_STATE.md's own trimmed Session Log covers — its current-state
-STATUS sections remain the primary, sufficient source for "what's true
-right now" regardless of archive status.
+touching any code — see Session Start order above.
 
 At the END of every session, before ending:
-1. Update every status section in PROJECT_STATE.md to reflect real,
-   current state — overwrite, don't append, for the status sections.
-2. Add a new entry at the TOP of the Session Log — never delete or edit
-   a prior session's log entry.
-3. Commit the full repo via git (add, commit, push to zenny-sync) —
-   use real git commands directly, not GitHub MCP, for this routine
-   commit/push action.
-4. Confirm in your final output that PROJECT_STATE.md was updated and
-   pushed — this is part of Definition of Done for every session, not
-   optional cleanup.
+1. Apply the promotion rule above — update PROJECT_STATE.md's status
+   sections (overwrite, don't append) and/or the relevant Wiki page(s).
+2. Commit the full repo via real git commands (not any MCP git tool),
+   add/commit/push to zenny-sync.
+3. Confirm in your final output that PROJECT_STATE.md/Wiki were updated
+   and pushed — part of Definition of Done, not optional cleanup.
 
 ---
 
 ## Repo Notes
 
-- `_archive_planning_phase/` — superseded/historical documents, archived
-  Phase 0 (2026-08-05). Reference only, not part of the active read set.
+- `_archive_planning_phase/`, `Completed_Task_Archive/` — reference
+  only, never part of the active read set, never scanned by default.
 - `.mcp.json` holds a live Convocore `WORKSPACE_SECRET` in plaintext —
-  never commit real secrets in `.mcp.json`/`.mcp.json.docker-backup-*` or
-  any credential `.txt` file at root; `.gitignore` now excludes these,
-  but check before every commit that nothing secret is staged.
+  never commit real secrets in `.mcp.json`/backups/any credential
+  `.txt` file at root; `.gitignore` excludes these — check before every
+  commit that nothing secret is staged.
+- Full governance model (Build Cards, Compliance Checklist, Change
+  Requests, Definition of Done): `Claude_Build_Command_Protocol_v2.md`.
+---
+#### ZeroManual · Zenny AI Workforce · CLAUDE.md v3.1 · BUILD PHASE
 
-```
-ZeroManual · Zenny AI Workforce · CLAUDE.md v2.0 · BUILD PHASE
-```
