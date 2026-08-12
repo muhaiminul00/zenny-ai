@@ -10,7 +10,25 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-12 — by /execute — BC-042 complete: `RecordConversion`'s RPC
+2026-08-12 — by /execute — BC-043 complete: WF-019 SendEmailReply built
+and published (Phase 10, Email Manager — first workflow in this phase).
+Generic transactional email-send Tool, exclusive owner of `send-*`
+email tools. Real idempotency guard (`get_email_record` RPC, short-
+circuits an already-sent `email_id`), Stop Checker suppression,
+UTIL-006-resolved Gmail send, Pattern B->D fallback to WF-017 human
+handoff — mirrors WF-018's proven design. 2 new public RPCs
+(`get_email_record`, `update_email_send_result`), both safely no-op
+when no `emails` row exists yet (expected until INT-009/010/011 are
+built). Live-verified end-to-end against Client A (real Gmail send,
+real RPC calls, execution 7511) plus 6 `test_workflow`-pinned scenarios
+(success, validation error, idempotent short-circuit, suppressed,
+credential-unavailable, send-failure) — all passed.
+`Workflow_Registry.md` WF-019 entry added. Next in Phase 10: INT-009
+Sync Inbox, INT-010 Categorize Email, INT-011 Draft Email, SCH-003 —
+each its own Build Card per the bounded auto-handoff rule (this card
+touched live n8n/Supabase, so the loop stops here for a pulse-check).
+
+2026-08-12 (prior card this session) — BC-042 complete: `RecordConversion`'s RPC
 (`insert_client_conversion_record`) now atomically flips a converting
 lead's `recovery_queue.status` from `active` to `completed`, reusing
 WF-018's existing eligibility gate — closes the real gap where a
@@ -35,7 +53,11 @@ live-tested)
 Phase 9 — Recovery Engine — IN PROGRESS (WF-018 SendRecoveryMessage +
 INT-006/SCH-001 Process Recovery Queue built, published, live-verified;
 cadence now fires automatically, email channel only per explicit scope
-cut; INT-007/008 stop/resume not started)
+cut; INT-007/008 stop/resume not started, still deferred pending
+Phase 10's reply-trigger surface)
+Phase 10 — Email Manager — IN PROGRESS (WF-019 SendEmailReply built,
+published, live-verified — BC-043; INT-009/010/011, SCH-003 not
+started)
 
 ## Standing Gate
 None open.
@@ -52,7 +74,7 @@ Phase 6  — Core Agent ............................ COMPLETE
 Phase 7  — Growth Agent .......................... COMPLETE
 Phase 8  — Conversion Engine (11 Tools) .......... COMPLETE
 Phase 9  — Recovery Engine ....................... IN PROGRESS (WF-018 done; INT-006/007/008, SCH-001 not started)
-Phase 10 — Email Manager ......................... NOT STARTED
+Phase 10 — Email Manager ......................... IN PROGRESS (WF-019 live; INT-009/010/011, SCH-003 not started)
 Phase 11 — Scheduled Workflows ................... IN PROGRESS (SCH-006 live; SCH-007 logged, not built)
 Phase 12 — Node-by-Node Outlines ................. NOT STARTED (cross-cutting)
 Phase 13 — Template Dashboard .................... DEFERRED
@@ -69,6 +91,9 @@ Recovery Engine ........ 🟡 partial — WF-018 SendRecoveryMessage +
                           tested, cadence fires automatically (email
                           only), per-client active-hours window
                           (BC-041); stop/resume (INT-007/008) not built
+Email Manager .......... 🟡 partial — WF-019 SendEmailReply live-
+                          tested (BC-043); INT-009/010/011 (inbound
+                          pipeline), SCH-003 not built
 Credentials Platform ... ✅ working — Wiki/credentials/
 Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
 ```
@@ -111,15 +136,22 @@ Client E: e5f6a7b8-0001-4c1d-9e2a-000000000005 — engagement — client_test_00
 
 ## Next Build Card
 **BC-039 resolved (2026-08-12): split, not built as one card.**
-Conversion-side gap closed by BC-042 (done, see Last Updated). Reply-
-trigger side (INT-007/INT-008) stays **deferred, not started** — no
-real trigger surface exists until Phase 10 (Email Manager,
-INT-009/010/011) is built. Revisit when that phase starts.
+Conversion-side gap closed by BC-042 (done). Reply-trigger side
+(INT-007/INT-008) stays **deferred, not started** — real trigger
+surface needs INT-009/INT-010 (Phase 10) to exist first; INT-009 is
+next in the queue below.
+
+**BC-043 complete (2026-08-12): WF-019 SendEmailReply built, published,
+live-verified.** Per the bounded auto-handoff rule, the loop stopped
+here (this card wrote to live n8n/Supabase) for a human pulse-check
+before continuing Phase 10.
 
 No Build Card currently issued and un-actioned. Candidates for the
-next session: Phase 5A (Inventory dashboard) / 5D (Onboarding
-dashboard), Phase 10 (Email Manager — would also unblock INT-007's
-real trigger), SCH-007, ADP-001 doc/reality investigation.
+next session, in dependency order for Phase 10: INT-009 Sync Inbox →
+INT-010 Categorize Email → INT-011 Draft Email → SCH-003 Sync Inbox
+Trigger (each depends on the previous). Other candidates: Phase 5A
+(Inventory dashboard) / 5D (Onboarding dashboard), SCH-007, ADP-001
+doc/reality investigation.
 (`appointments` doc diff intentionally NOT in this list — see Active
 Blockers, deferred.)
 
@@ -132,15 +164,23 @@ BC-041), INT-006/SCH-001 Process Recovery Queue (BC-037/038, 5-minute
 cron sweep, excludes offboarded clients), and conversion-aware
 suppression (BC-042, converting stops an active cadence automatically).
 INT-007/INT-008 (reply-based stop/resume) deliberately deferred until
-Phase 10 (Email Manager) exists — no real trigger surface without it.
-Nothing is mid-flight; the next session starts clean. Full narrative
-of how each piece was built/verified: Wiki/log.md (search by BC number).
+Phase 10 gets far enough to give them a real trigger surface. Phase 10
+(Email Manager) itself has started: WF-019 SendEmailReply live (BC-043,
+this session) — the generic send Tool the rest of the phase's internal
+workflows will hand drafts/replies to. Nothing is mid-flight; the next
+session starts clean. Full narrative of how each piece was built/
+verified: Wiki/log.md (search by BC number).
 
 **What's genuinely open, in priority order:**
 1. No roster client (old or new) has a real connected calendar/
    ecommerce store. (Email/Gmail is the one exception, Client A only.)
 2. `appointments` doc diff — deferred, see Active Blockers.
-3. Everything else is a genuine next-phase choice — see Next Build
+3. Phase 10 continuation: INT-009 Sync Inbox is the next real piece —
+   it needs a real inbound-email pull mechanism (Gmail `messages.list`/
+   `history.list` via the same UTIL-006 token pattern WF-019 uses) and
+   feeds INT-010's categorization. Scope that Build Card narrowly (Sync
+   Inbox only, not the full categorization pipeline in one card).
+4. Everything else is a genuine next-phase choice — see Next Build
    Card candidates above.
 
 Nothing requires human acknowledgment before proceeding — all

@@ -840,6 +840,36 @@ own entry below.
 
 ---
 
+## Email Manager — Tools (Part 13, Phase 10 kickoff — BC-043)
+
+### WF-019 — Zenny Email Manager - SendEmailReply (WF-019)
+**n8n ID:** `oi3a2qmyh1Q8K4PI` · **published**, active
+
+**PURPOSE:** Generic, transactional email-send Tool — exclusive owner of `send-*` email tools per the Tool Naming Convention (`n8n_Execution_Architecture_v1.md` §7.5). Every module's outbound email (Conversion Engine confirmations, Recovery Engine cadence via WF-018 in future, this module's own future Draft Email sends) is meant to route through this one workflow rather than a direct provider call. No business decision lives here — categorization/autonomy-level logic belongs to INT-010/INT-011 (not yet built).
+
+**IDEMPOTENCY:** Checks the client's `emails` row for `email_id` first (`get_email_record` RPC); if `email_status = 'sent'` already, short-circuits to the same success response without resending or touching Gmail. Real dedupe guard, not just documentation — matches the spec's stated idempotency key (`send-email-reply_{client_id}_{email_id}`) with an actual mechanism, mirroring WF-018's "database is the final guarantee" philosophy. Currently a near-always-no-op in practice (no `emails` rows exist yet until INT-009/010/011 are built) but is the correct real guard for when they do.
+
+**TRIGGER:** Webhook, `POST /send-email-reply`.
+
+**INPUT:** `{ client_id, payload: { email_id, recipient_email, subject, body } }`.
+
+**OUTPUT / END STATE:**
+- Success (including idempotent already-sent): 200 `{ result: { email_id, status: "sent" } }`.
+- Suppressed: 200 `{ result: { email_id: null, status: "not_sent" }, reason: "suppressed_or_opted_out" }`.
+- Invalid input (missing field / malformed `recipient_email`): 400 `VALIDATION_ERROR`.
+- Unknown client: 400 `UNKNOWN_CLIENT`.
+- Credential unavailable / Gmail send failure after Pattern B retry: Pattern D, real `escalations` row via WF-017 (direct HTTP POST to its production webhook, same pattern WF-018 uses).
+
+**REAL DEPENDENCIES:** UTIL-001 (schema resolution), UTIL-005 (Stop Checker, mandatory per spec Part 6.9), UTIL-006 (Credential Resolver, `category: 'email'`), WF-017 (direct HTTP POST, not Execute Workflow). Sends via the Gmail API directly (`gmail.googleapis.com/gmail/v1/users/me/messages/send`) using the UTIL-006-resolved bearer token — no native n8n Gmail credential involved, same design as WF-018.
+
+**REAL NEW DB OBJECTS:** `public.get_email_record(p_schema, p_email_id)` RPC (SECURITY DEFINER, `SET search_path TO ''`, returns `{found:false}` when no row exists). `public.update_email_send_result(p_schema, p_email_id, p_email_status, p_sent_content)` RPC (best-effort `UPDATE ... WHERE email_id = $3`, no-ops safely — `{email_id, updated:false}` — when no row exists yet; never flips the caller-facing response to an error, mirroring `advance_client_recovery_step`'s style). Both follow the same dynamic-SQL-per-schema convention as WF-018's RPCs.
+
+**KNOWN GAP, disclosed not hidden:** bounce/delivery-status handling (Flow diagram's `BounceCheck` node) is NOT built here — Gmail's synchronous send response carries no bounce signal; real bounce detection needs an inbound event pipeline (INT-009 Sync Inbox), which doesn't exist yet. Flagged in-workflow via sticky note, not silently skipped.
+
+**LAST VERIFIED:** BC-043, 2026-08-12 — `test_workflow`-pinned coverage: success (real UTIL-001/005/006 calls against Client A, `client_test_002_acme_commerce_test`, Gmail send pinned), validation error (missing `recipient_email`), idempotent already-sent short-circuit (confirmed `Send Gmail Message` never ran), suppressed (real temporary `suppression_records` row inserted/verified/reverted), credential-unavailable → Pattern D (real call against Client B, `client_test_001_acme_emergency_test`, no real connection), send-failure → Pattern D (pinned Gmail error). **Genuinely live, not pinned:** execution 7511 — real `get_email_record` RPC call (200, `found:false`), real Gmail send to Client A's connected account (`quaantummedia.zeromanual@gmail.com`, self-addressed test send, real message id `19ff6a3fbebe543b`, `labelIds: ["SENT"]`), real `update_email_send_result` RPC call (200, `updated:false` — correct no-op, no `emails` row exists yet). Confirms both RPC credential bindings and the Gmail send path work end-to-end against live infrastructure.
+
+---
+
 ### INT-006 + SCH-001 — Zenny Recovery Engine - Process Recovery Queue (INT-006 + SCH-001)
 **n8n ID:** `crncPUwCbAQn5WgW` · **published**, active
 
