@@ -840,7 +840,7 @@ own entry below.
 
 ---
 
-## Email Manager — Tools & Internal Workflows (Part 13, Phase 10 — BC-043, BC-044)
+## Email Manager — Tools & Internal Workflows (Part 13, Phase 10 — BC-043, BC-044, BC-045)
 
 ### WF-019 — Zenny Email Manager - SendEmailReply (WF-019)
 **n8n ID:** `oi3a2qmyh1Q8K4PI` · **published**, active
@@ -895,6 +895,39 @@ own entry below.
 **REAL BUG FOUND AND FIXED DURING BUILD:** `splitInBatches` does not fire its `onDone` branch at all when it receives 0 input items — contradicts the n8n Workflow SDK reference's own documented `batch_processing` pattern. The zero-new-messages case originally stalled silently at `Split Message IDs` and never wrote a `sync_log` row (caught live via `test_workflow` execution 7642). Fixed by adding an explicit `Has New Messages?` IF gate before the loop, routing the empty case directly to `Aggregate Normalized Emails` (now defensively try/catches its `$('Normalize Email').all()` lookup since that node never runs in the empty path). Full detail: `Wiki/platform-quirks/n8n-node-behaviors.md` §3b.
 
 **LAST VERIFIED:** BC-044, 2026-08-12 — 5 `test_workflow`-pinned scenarios, all passed: success with 1 new message (real UTIL-001/006 calls against Client A, `client_test_002_acme_commerce_test`, real Gmail bearer token resolved, Gmail list/get pinned, body correctly base64-decoded), zero-new-messages (post-fix, confirmed reaches `Build Final Result (Success)` with `count: 0`), unknown client (real UTIL-001 call against a garbage `client_id`, confirmed `resolved:false`), credential unavailable (real UTIL-006 call against Client B, `client_test_001_acme_emergency_test`, confirmed `available:false` — no Gmail connected), Gmail list error (pinned error shape). No genuinely live (unpinned) execution was possible for this card: `execute_workflow` only supports Schedule/Webhook/Form/Chat/Manual trigger types, and this workflow intentionally uses `executeWorkflowTrigger` (per the "child workflows never expose webhooks" convention) — real end-to-end Gmail/Supabase HTTP verification will happen naturally once SCH-003 or INT-010 calls this workflow for real. The UTIL-001/UTIL-006 sub-workflow calls, which matter most architecturally, ran genuinely live in every scenario above (Execute Workflow sub-calls always run for real regardless of pinning).
+
+---
+
+### INT-010 — Zenny Email Manager - CategorizeEmail (INT-010)
+**n8n ID:** `pk4YXHCwI3fNixb7` · **published**, active (no production trigger — see Trigger)
+
+**PURPOSE:** Closes INT-009's disclosed gap. Invoked per-email (one call per normalized email, caller loops), resolves/creates the customer via `channel_identity_links`, classifies the email into the client's real `email_categories` taxonomy via a direct OpenRouter LLM call, and writes the first real `emails` row this pipeline produces.
+
+**TRIGGER:** `executeWorkflowTrigger` only — same convention as INT-009, not yet wired as INT-009's actual caller (that wiring is a small follow-up, not part of this card's scope).
+
+**INPUT:** `{ client_id, email: { sender, subject, body, gmail_thread_id, gmail_message_id, received_date } }` — matches INT-009's per-email normalized shape exactly, so INT-009 can call this directly once wired.
+
+**OUTPUT / END STATE (no HTTP response — Execute Workflow return value):**
+- Success: `{ email_id, customer_id, category_id, category_name, category_scope, deduped, created }`.
+- Unknown client: `{ client_id, error: { code: "UNKNOWN_CLIENT", message } }`.
+- LLM category didn't match any real category for this client: `{ client_id, error: { code: "CATEGORY_UNMATCHED", message } }`.
+- `upsert_client_email` DB write failed: `{ client_id, error: { code: "DB_WRITE_FAILED", message, detail } }`.
+
+**IDENTITY RESOLUTION:** `find_client_customer_by_channel` (channel_type `'email'`, channel_value = the sender's bare email address parsed out of the raw `From` header). Found → reuse that `customer_id`. Not found → `insert_client_customer` + `insert_client_channel_identity_link` (`match_confidence: 'verified'` — the email address itself is a confirmed identifier per Agent_Runtime_System_v1.md §2.7, no merge ambiguity).
+
+**CATEGORIZATION:** direct OpenRouter LLM call (`@n8n/n8n-nodes-langchain.chainLlm` + `lmChatOpenRouter` + structured output parser, credential `openrouter-zm`, model `anthropic/claude-sonnet-4.6`, temperature 0.1) against a prompt built from the client's live `email_categories` rows (via `list_client_email_categories`) merged with the canonical category *definitions* from Agent_Runtime_System_v1.md §5 (the DB only stores name/scope/routing_rule, not the semantic definition the LLM needs — kept in-code in `Build Classification Prompt`). The LLM's returned category name is matched back against the live DB rows by exact name — never trusted for a raw `category_id`. First LLM-classification node in this project's n8n layer (n8n was execution-only until now); see `Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
+
+**DATA MODEL DECISION:** `emails` is one row **per thread**, not per message — inferred mechanically from the table's own shape (one `thread_lifecycle`/`draft_content`/`sent_content` per row) plus Agent_Runtime_System_v1.md §2.3's explicit "one thread can simultaneously have Email Status = Sent and Thread Lifecycle = Waiting-Customer" language. `upsert_client_email` inserts only for a genuinely new `gmail_thread_id`; a reply on an existing thread updates that row in place; replaying the same `gmail_message_id` against an existing thread is a no-op (`deduped: true`).
+
+**REPLY_STYLE PLACEHOLDER:** `emails.reply_style` is `NOT NULL` but no per-category config source exists yet (checked `templates`/`client_config`/`email_categories` — none carry it) to decide scripted vs. generative per §3.2. Defaults to `'scripted'`, disclosed via sticky note and here — INT-011 is where reply style is actually decided.
+
+**REAL DEPENDENCIES:** UTIL-001 (schema resolution). No UTIL-006 — `openrouter-zm` is a fixed platform-level native n8n credential (`openRouterApi` type), not a per-client resolved connection, so this card has no "credential unavailable" branch the way INT-009's Gmail credential does.
+
+**REAL NEW DB OBJECTS (BC-045):** `public.find_client_customer_by_channel(p_schema, p_channel_type, p_channel_value)`, `public.insert_client_channel_identity_link(p_schema, p_customer_id, p_channel_type, p_channel_value, p_match_confidence)`, `public.list_client_email_categories(p_schema)`, `public.upsert_client_email(p_schema, p_customer_id, p_lead_id, p_gmail_thread_id, p_gmail_message_id, p_category_id, p_thread_lifecycle, p_email_status, p_reply_style, p_received_date)` — all SECURITY DEFINER / `SET search_path TO ''`, same dynamic-SQL-per-schema convention as every other client-schema RPC wrapper in this project.
+
+**REAL DATA GAP FOUND AND FIXED DURING BUILD:** `control.email_categories` had never been seeded with the real 15-category taxonomy (Agent_Runtime_System_v1.md §5) — only one legacy `"General Inquiry"` placeholder row existed, and all 5 roster client schemas' local `email_categories` tables were empty (onboarding-time sync only runs once, before this seed existed). Seeded the 15 canonical rows into `control.email_categories` and backfilled all 5 roster clients' local tables using the exact merge logic `Client_Onboarding_Sequence_Spec.md` documents (`DISTINCT ON (category_name) ... ORDER BY category_name, client_id NULLS LAST`). Mechanical fill from a fully-specified doc — Document Resolution Authority tier 3, logged to `Wiki/log.md`.
+
+**LAST VERIFIED:** BC-045, 2026-08-12 — 5 `test_workflow`-pinned scenarios, all passed with the LLM node genuinely live (unpinned, real OpenRouter calls): new-sender success (real `Create Customer`/`Link Channel Identity` pin path, LLM correctly classified a real order-status email as "Support", real category_id matched), known-sender/dedup success (`Customer Found?` true path skips create/link, LLM correctly classified an angry refund-demand email as "Refund"), unmatched category (categories list pinned empty, LLM returned "Uncategorized" as expected, correctly routed to `CATEGORY_UNMATCHED`), DB write failure (`Upsert Email` pinned to a PostgREST-shaped error lacking `email_id`, correctly routed to `DB_WRITE_FAILED`), unknown client (real UTIL-001 call against a garbage `client_id`, confirmed `resolved:false`). **Additionally, all 4 new RPCs were verified genuinely live via direct SQL** (not just through pinned workflow branches): `list_client_email_categories` returned the real 16-row taxonomy; `find_client_customer_by_channel` correctly returned `{found:false}` then, after a real `insert_client_customer`+`insert_client_channel_identity_link`, correctly found the new customer; `upsert_client_email` correctly inserted a new thread row, updated it in place on a second message in the same thread, and correctly no-op'd (`deduped:true`) on a replayed `gmail_message_id` — all test rows cleaned up afterward against `client_test_002_acme_commerce_test`.
 
 ---
 

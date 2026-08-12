@@ -10,7 +10,37 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-12 — by /execute — BC-044 complete: INT-009 Sync Inbox built and
+2026-08-12 — by /execute — BC-045 complete: INT-010 Categorize Email built
+and published (Phase 10, Email Manager — third workflow in this phase),
+closing INT-009's disclosed gap. Invoked per-email, resolves/creates the
+customer via `channel_identity_links` (verified match on the sender email
+address), classifies into the real `email_categories` taxonomy via a
+direct OpenRouter LLM call (`chainLlm`+`lmChatOpenRouter`+structured
+output, credential `openrouter-zm`, temperature 0.1) — the first n8n
+workflow in this project to make an AI judgment call directly (decided by
+the human, not self-resolved, since n8n was execution-only until now;
+logged to `Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`) —
+and writes the first real `emails` row, one row per THREAD (mechanical
+inference from the table's own shape + Agent_Runtime_System_v1.md §2.3,
+not per message; upsert-in-place on a reply, idempotent no-op on a
+replayed message). Real DATA gap found and fixed during build:
+`control.email_categories` had never been seeded with the real 15-category
+taxonomy (only one legacy "General Inquiry" placeholder existed) — seeded
++ backfilled into all 5 roster client schemas (mechanical, Document
+Resolution Authority tier 3). 4 new RPCs (`find_client_customer_by_channel`,
+`insert_client_channel_identity_link`, `list_client_email_categories`,
+`upsert_client_email`), all verified genuinely live via direct SQL (not
+just pinned test scenarios) since this workflow's `executeWorkflowTrigger`
+means `execute_workflow` can't reach it either (same disclosed limitation
+as INT-009). 5 `test_workflow`-pinned scenarios passed, 3 of them with the
+LLM node genuinely UNPINNED (real OpenRouter classification calls, all
+correct). `reply_style` defaults to `'scripted'` as a disclosed placeholder
+— INT-011's job to actually decide. `Workflow_Registry.md` INT-010 entry
+added. Next in Phase 10: INT-011 Draft Email, SCH-003, plus wiring INT-009
+to actually call INT-010 — each its own Build Card (this card touched live
+n8n/Supabase, loop stops here for a pulse-check).
+
+2026-08-12 (prior card this session) — BC-044 complete: INT-009 Sync Inbox built and
 published (Phase 10, Email Manager — second workflow in this phase).
 Internal (non-Tool) workflow, pulls new inbound Gmail messages since the
 last successful `control.sync_log` watermark, normalizes them, always
@@ -79,8 +109,9 @@ cadence now fires automatically, email channel only per explicit scope
 cut; INT-007/008 stop/resume not started, still deferred pending
 Phase 10's reply-trigger surface)
 Phase 10 — Email Manager — IN PROGRESS (WF-019 SendEmailReply, BC-043;
-INT-009 Sync Inbox, BC-044; both built/published/verified. INT-010/011,
-SCH-003 not started)
+INT-009 Sync Inbox, BC-044; INT-010 Categorize Email, BC-045; all three
+built/published/verified. INT-011, SCH-003 not started; INT-009 does not
+yet call INT-010 — small wiring follow-up)
 
 ## Standing Gate
 None open.
@@ -97,7 +128,7 @@ Phase 6  — Core Agent ............................ COMPLETE
 Phase 7  — Growth Agent .......................... COMPLETE
 Phase 8  — Conversion Engine (11 Tools) .......... COMPLETE
 Phase 9  — Recovery Engine ....................... IN PROGRESS (WF-018 done; INT-006/007/008, SCH-001 not started)
-Phase 10 — Email Manager ......................... IN PROGRESS (WF-019, INT-009 live; INT-010/011, SCH-003 not started)
+Phase 10 — Email Manager ......................... IN PROGRESS (WF-019, INT-009, INT-010 live; INT-011, SCH-003 not started)
 Phase 11 — Scheduled Workflows ................... IN PROGRESS (SCH-006 live; SCH-007 logged, not built)
 Phase 12 — Node-by-Node Outlines ................. NOT STARTED (cross-cutting)
 Phase 13 — Template Dashboard .................... DEFERRED
@@ -115,10 +146,11 @@ Recovery Engine ........ 🟡 partial — WF-018 SendRecoveryMessage +
                           only), per-client active-hours window
                           (BC-041); stop/resume (INT-007/008) not built
 Email Manager .......... 🟡 partial — WF-019 SendEmailReply (BC-043) +
-                          INT-009 Sync Inbox (BC-044) live-tested;
-                          INT-010/011 (categorize/draft), SCH-003 not
-                          built; INT-009 doesn't write `emails` yet
-                          (disclosed gap, closes when INT-010 exists)
+                          INT-009 Sync Inbox (BC-044) + INT-010
+                          Categorize Email (BC-045) live-tested; INT-011
+                          (draft), SCH-003 not built; INT-010 writes real
+                          `emails` rows now, but INT-009 doesn't call it
+                          yet (small wiring follow-up, not a scope gap)
 Credentials Platform ... ✅ working — Wiki/credentials/
 Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
 ```
@@ -174,17 +206,23 @@ verified (5 pinned scenarios, all 4 branch scenarios made real UTIL-001/
 UTIL-006 sub-workflow calls; no unpinned live execution possible for an
 `executeWorkflowTrigger`-based internal workflow — disclosed, not a
 shortcut).** Real `splitInBatches`-onDone-on-empty-input bug found and
-fixed during build (Wiki/platform-quirks/n8n-node-behaviors.md §3b). Per
+fixed during build (Wiki/platform-quirks/n8n-node-behaviors.md §3b).
+
+**BC-045 complete (2026-08-12): INT-010 Categorize Email built, published,
+verified (5 pinned scenarios + 4 RPCs verified genuinely live via direct
+SQL; first n8n-direct AI judgment call in this project, per human
+decision).** Real data gap found and fixed: `control.email_categories`
+taxonomy had never been seeded, backfilled into all 5 roster clients. Per
 the bounded auto-handoff rule, the loop stopped here (this card wrote to
 live n8n/Supabase) for a human pulse-check before continuing Phase 10.
 
 No Build Card currently issued and un-actioned. Candidates for the
-next session, in dependency order for Phase 10: INT-010 Categorize
-Email (next — this is the one that will finally write real `emails`
-rows, closing INT-009's disclosed gap) → INT-011 Draft Email → SCH-003
-Sync Inbox Trigger (each depends on the previous). Other candidates:
-Phase 5A (Inventory dashboard) / 5D (Onboarding dashboard), SCH-007,
-ADP-001 doc/reality investigation.
+next session, in dependency order for Phase 10: INT-011 Draft Email
+(next) → SCH-003 Sync Inbox Trigger, plus a small standalone follow-up
+(wire INT-009 to actually call INT-010 per-email — not done yet, each
+was built and verified independently). Other candidates: Phase 5A
+(Inventory dashboard) / 5D (Onboarding dashboard), SCH-007, ADP-001
+doc/reality investigation.
 (`appointments` doc diff intentionally NOT in this list — see Active
 Blockers, deferred.)
 
@@ -198,10 +236,13 @@ cron sweep, excludes offboarded clients), and conversion-aware
 suppression (BC-042, converting stops an active cadence automatically).
 INT-007/INT-008 (reply-based stop/resume) deliberately deferred until
 Phase 10 gets far enough to give them a real trigger surface. Phase 10
-(Email Manager) now has 2 workflows live: WF-019 SendEmailReply (BC-043)
-— the generic send Tool — and INT-009 Sync Inbox (BC-044) — pulls +
-normalizes new inbound Gmail messages, logs the sync outcome, but does
-NOT yet write `emails` rows (disclosed gap, closes with INT-010).
+(Email Manager) now has 3 workflows live: WF-019 SendEmailReply (BC-043)
+— the generic send Tool — INT-009 Sync Inbox (BC-044) — pulls + normalizes
+new inbound Gmail messages, logs the sync outcome — and INT-010
+Categorize Email (BC-045) — resolves/creates the customer, classifies via
+a direct OpenRouter LLM call, writes the first real `emails` row.
+INT-009 and INT-010 are each built/verified independently but INT-009
+doesn't call INT-010 yet (small wiring follow-up).
 Nothing is mid-flight; the next session starts clean. Full narrative of
 how each piece was built/verified: Wiki/log.md (search by BC number).
 
@@ -209,12 +250,12 @@ how each piece was built/verified: Wiki/log.md (search by BC number).
 1. No roster client (old or new) has a real connected calendar/
    ecommerce store. (Email/Gmail is the one exception, Client A only.)
 2. `appointments` doc diff — deferred, see Active Blockers.
-3. Phase 10 continuation: INT-010 Categorize Email is the next real
-   piece — it applies the 8-category taxonomy to each email INT-009
-   normalizes, resolves `category_id`/`customer_id`, and is the first
-   workflow in this phase that actually writes an `emails` row. Scope
-   narrowly (categorization + the `emails` insert only, not autonomy-
-   level reply logic — that's INT-011/the 5-Condition Gate, later).
+3. Phase 10 continuation: INT-011 Draft Email is the next real piece —
+   generates the actual reply per the client's configured autonomy level
+   (Level 1/2/3, §3/§4 5-Condition Gate), closing the `reply_style:
+   'scripted'` placeholder INT-010 left. Then SCH-003 (real cron trigger),
+   plus wiring INT-009 → INT-010 for real (each was built/verified
+   independently this phase, not yet connected).
 4. Everything else is a genuine next-phase choice — see Next Build
    Card candidates above.
 
