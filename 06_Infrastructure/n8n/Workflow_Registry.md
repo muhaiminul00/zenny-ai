@@ -840,7 +840,7 @@ own entry below.
 
 ---
 
-## Email Manager — Tools (Part 13, Phase 10 kickoff — BC-043)
+## Email Manager — Tools & Internal Workflows (Part 13, Phase 10 — BC-043, BC-044)
 
 ### WF-019 — Zenny Email Manager - SendEmailReply (WF-019)
 **n8n ID:** `oi3a2qmyh1Q8K4PI` · **published**, active
@@ -867,6 +867,34 @@ own entry below.
 **KNOWN GAP, disclosed not hidden:** bounce/delivery-status handling (Flow diagram's `BounceCheck` node) is NOT built here — Gmail's synchronous send response carries no bounce signal; real bounce detection needs an inbound event pipeline (INT-009 Sync Inbox), which doesn't exist yet. Flagged in-workflow via sticky note, not silently skipped.
 
 **LAST VERIFIED:** BC-043, 2026-08-12 — `test_workflow`-pinned coverage: success (real UTIL-001/005/006 calls against Client A, `client_test_002_acme_commerce_test`, Gmail send pinned), validation error (missing `recipient_email`), idempotent already-sent short-circuit (confirmed `Send Gmail Message` never ran), suppressed (real temporary `suppression_records` row inserted/verified/reverted), credential-unavailable → Pattern D (real call against Client B, `client_test_001_acme_emergency_test`, no real connection), send-failure → Pattern D (pinned Gmail error). **Genuinely live, not pinned:** execution 7511 — real `get_email_record` RPC call (200, `found:false`), real Gmail send to Client A's connected account (`quaantummedia.zeromanual@gmail.com`, self-addressed test send, real message id `19ff6a3fbebe543b`, `labelIds: ["SENT"]`), real `update_email_send_result` RPC call (200, `updated:false` — correct no-op, no `emails` row exists yet). Confirms both RPC credential bindings and the Gmail send path work end-to-end against live infrastructure.
+
+---
+
+### INT-009 — Zenny Email Manager - SyncInbox (INT-009)
+**n8n ID:** `PAGsoD5bbl5iru8d` · **published**, active (no production trigger — see Trigger)
+
+**PURPOSE:** Internal (non-Tool) workflow per `n8n_Workflow_Specification_v1.md` Part 7.6 — pulls new inbound Gmail messages for a client since the last successful sync, normalizes them (sender/subject/body/thread-id/received-date). The intake step the rest of Email Manager (INT-010 Categorize Email onward) will consume. Never exposes a webhook, per the "child workflows never expose webhooks" convention.
+
+**TRIGGER:** `executeWorkflowTrigger` only this card — no production trigger exists yet. SCH-003 (Sync Inbox Trigger, cron) is a separate later Build Card that will wire the real cadence; until then this workflow is only reachable via a manual Execute Workflow call or MCP `execute_workflow`/`test_workflow` (the latter only with pinned, not live, data — see Last Verified).
+
+**INPUT:** `{ client_id }` (Execute Workflow call convention, matches WF-018/INT-006).
+
+**OUTPUT / END STATE (no HTTP response — Execute Workflow return value):**
+- Success (incl. zero-new-messages): `{ client_id, emails: [...], count, sync_status: "success" }`.
+- Unknown client: `{ client_id, error: { code: "UNKNOWN_CLIENT", message } }`.
+- Credential unavailable: `{ client_id, error: { code: "CREDENTIAL_UNAVAILABLE", message } }`.
+- Gmail `messages.list` failed after retry: `{ client_id, error: { code: "UPSTREAM_ERROR", message } }`.
+- Every path writes a `control.sync_log` row (`table_synced: 'emails'`, `status: 'success'|'failed'`, `triggered_by: 'manual_edit'` until SCH-003 exists to set `'schedule'`), including on zero-new-messages — the real "always log the outcome" guarantee.
+
+**REAL DEPENDENCIES:** UTIL-001 (schema resolution), UTIL-006 (Credential Resolver, `category: 'email'`, `tool_name: 'SyncInbox'`). Gmail `messages.list`/`messages.get` via HTTP Request using the UTIL-006-resolved bearer token — no native Gmail node, same convention as WF-019/WF-018.
+
+**KNOWN GAP, disclosed not hidden (per session-BC-044-scoping, Wiki/log.md):** does NOT write to the `emails` table this card. `emails.customer_id`/`category_id` are both `NOT NULL`, and per `Email_Manager_Flow.md`'s documented pipeline, categorization (INT-010) and identity resolution happen downstream of Sync Inbox — INT-009 has nothing to resolve those with yet. Normalized emails are returned to the caller only; INT-010 (next card) is the one that will actually persist `emails` rows once it exists to receive this handoff.
+
+**KNOWN LIMITATION:** a single message whose `messages.get` fetch fails after retry is dropped from that run (not retried individually) — the sync watermark advances on overall run success, not per-message. Accepted given `retryOnFail` already absorbs transient failures; flagged in-workflow via sticky note.
+
+**REAL BUG FOUND AND FIXED DURING BUILD:** `splitInBatches` does not fire its `onDone` branch at all when it receives 0 input items — contradicts the n8n Workflow SDK reference's own documented `batch_processing` pattern. The zero-new-messages case originally stalled silently at `Split Message IDs` and never wrote a `sync_log` row (caught live via `test_workflow` execution 7642). Fixed by adding an explicit `Has New Messages?` IF gate before the loop, routing the empty case directly to `Aggregate Normalized Emails` (now defensively try/catches its `$('Normalize Email').all()` lookup since that node never runs in the empty path). Full detail: `Wiki/platform-quirks/n8n-node-behaviors.md` §3b.
+
+**LAST VERIFIED:** BC-044, 2026-08-12 — 5 `test_workflow`-pinned scenarios, all passed: success with 1 new message (real UTIL-001/006 calls against Client A, `client_test_002_acme_commerce_test`, real Gmail bearer token resolved, Gmail list/get pinned, body correctly base64-decoded), zero-new-messages (post-fix, confirmed reaches `Build Final Result (Success)` with `count: 0`), unknown client (real UTIL-001 call against a garbage `client_id`, confirmed `resolved:false`), credential unavailable (real UTIL-006 call against Client B, `client_test_001_acme_emergency_test`, confirmed `available:false` — no Gmail connected), Gmail list error (pinned error shape). No genuinely live (unpinned) execution was possible for this card: `execute_workflow` only supports Schedule/Webhook/Form/Chat/Manual trigger types, and this workflow intentionally uses `executeWorkflowTrigger` (per the "child workflows never expose webhooks" convention) — real end-to-end Gmail/Supabase HTTP verification will happen naturally once SCH-003 or INT-010 calls this workflow for real. The UTIL-001/UTIL-006 sub-workflow calls, which matter most architecturally, ran genuinely live in every scenario above (Execute Workflow sub-calls always run for real regardless of pinning).
 
 ---
 
