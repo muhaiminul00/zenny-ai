@@ -931,6 +931,64 @@ own entry below.
 
 ---
 
+### INT-012 — Zenny Email Manager - SyncNotionKB (INT-012)
+**n8n ID:** `yrz1YZcWmUlIZQOx` · **published**, active (no production trigger — see Trigger)
+
+**PURPOSE:** BC-047. KB ingest side of the Notion+Pinecone pivot that replaces the Convocore-KB plan (blocked — see `Wiki/log.md` and `Wiki/platform-quirks/notion-pinecone-kb-pattern.md`). Invoked per-client, syncs that client's Notion KB root page's child pages into Pinecone (index `zenny-email-kb`, namespace = `client_id`) for INT-011 to query at draft time.
+
+**TRIGGER:** `executeWorkflowTrigger` only — no production cadence yet (a future SCH-004 cron card, not built this session; today it's manual/on-demand only).
+
+**INPUT:** `{ client_id }`.
+
+**OUTPUT / END STATE (no HTTP response — Execute Workflow return value):**
+- Success: `{ client_id, last_synced_at, sync_status: "success" }`.
+- No KB source configured: `{ client_id, error: { code: "NO_KB_SOURCE", message } }`.
+
+**PIPELINE:** `get_client_kb_source` (control-schema RPC) resolves the client's `notion_page_id` → native Notion node (`block.getAll`, credential `zenny-notion-api`) lists child pages → filtered to `type: child_page` → looped (`splitInBatches`, batch size 1) → native Notion node (`page.getMarkdown`) fetches each page's clean Markdown content → Code node chunks it (~700 chars, paragraph-packed, no over-engineering for a v1 flow) → HTTP call to OpenRouter's `/embeddings` endpoint (`text-embedding-3-small`, reuses the existing `openrouter-zm` credential — **no new credential needed for this leg**, OpenRouter added embeddings support since the last live-test-doc pass) → HTTP upsert to Pinecone's data-plane REST (`POST /vectors/upsert`, deterministic vector ID = `notion_block_id + chunk_index` so re-syncing the same page updates in place, never duplicates) → on loop completion, `update_client_kb_last_synced` (control-schema RPC).
+
+**REAL DEPENDENCIES:** `zenny-notion-api` (native Notion credential, `notionApi` type — explicitly pinned via `setNodeCredential`, auto-assignment picked an unrelated "Notion account" credential and had to be corrected). `openrouter-zm` (existing, reused). **Pinecone credential is a real, disclosed gap** — see Credential Gate below.
+
+**REAL NEW DB OBJECTS:** `control.client_kb_source (client_id, notion_page_id, last_synced_at)` — pointer-only table, mirrors `convocore_agent_map`'s convention exactly, no document content ever touches Postgres. `public.get_client_kb_source(p_client_id)`, `public.update_client_kb_last_synced(p_client_id)` — both SECURITY DEFINER, control-schema, `p_client_id`-keyed (not `p_schema` — this table isn't per-client-schema).
+
+**REAL INFRASTRUCTURE STOOD UP THIS CARD:** Pinecone index `zenny-email-kb` (serverless, AWS `us-east-1`, 1536-dim cosine, matching `text-embedding-3-small`) created and verified live via direct REST (control-plane) — confirmed `Ready` state. Notion structure: one root "Zenny Client Knowledge Bases" page + one child KB page per roster client, all created directly via the `zenny-notion-api` integration's own token (so the integration has automatic access — no manual "share with integration" step needed), with 2 real seed articles (Shipping & Returns Policy, Order Status & Support) under Client A (`client_test_002_acme_commerce_test`) for live KB-content testing.
+
+**CREDENTIAL GATE, still open:** the `n8n MCP` cannot create credentials. `Upsert To Pinecone`'s node references an HTTP Header Auth credential named "Pinecone API Key" that does not exist yet in the live n8n instance — flagged in-workflow via sticky note and here. **Human action needed:** Credentials → New → Header Auth → Name: `Api-Key`, Value: the Pinecone key supplied this session → open this node (and INT-011's `Query Pinecone`) and select it. Until then, the real end-to-end Notion→Pinecone round trip cannot be live-verified (structural/pinned testing is complete and passing).
+
+**KNOWN GAP, disclosed not hidden:** deleting a page from Notion does not delete its vectors from Pinecone — a v1.1 follow-up, not this card's scope.
+
+**LAST VERIFIED:** BC-047, 2026-08-13 — 2 `test_workflow`-pinned scenarios passed: success (2-page loop confirmed correctly iterating via `Sync Pages Loop`'s `onDone`/`onEachBatch` wiring, reaching `Build Final Result (Success)` with the right shape), no-KB-source failure (correctly routed to `Build Failure (No KB Source)`). All 4 real dependencies (Pinecone index creation, Notion root+child page creation, `get_client_kb_source`/`update_client_kb_last_synced` RPCs) verified genuinely live via direct REST/SQL calls, not just pinned branches. Full Notion→embed→Pinecone-upsert round trip is pinned/structural only pending the Pinecone credential (see Credential Gate).
+
+---
+
+### INT-011 — Zenny Email Manager - DraftEmail (INT-011)
+**n8n ID:** `fmBjtfi7vqdszs78` · **published**, active (no production trigger — see Trigger)
+
+**PURPOSE:** BC-047, absorbing the scope originally planned as BC-046 (that card stalled on Convocore's KB API hitting a real account-plan/billing gate — see `Wiki/log.md`). Invoked per-email once categorized (INT-010), generates a human-approval draft reply grounded in the client's Notion/Pinecone KB. **Level 2 only** (draft + human-approval queue) — Level 3 autonomous auto-send is out of scope; no per-client autonomy-level config exists anywhere in the platform yet, and building the full 5-Condition Gate is real, separate scope, not a "quick" add.
+
+**TRIGGER:** `executeWorkflowTrigger` only — same convention as INT-009/INT-010, not yet wired as INT-010's actual caller (small follow-up, not this card's scope).
+
+**INPUT:** `{ client_id, email_id, email: { sender, subject, body } }` — **note the raw email object is passed directly**, not re-fetched from Gmail by `email_id` alone. Real gap surfaced during this build: `emails` has no `subject`/`body` columns (only category/lifecycle/status/thread fields) — nothing to re-read from Postgres, and INT-010 never persists the raw content either. Matches INT-010's own input shape exactly; once INT-010 is wired to call this workflow directly, it already has the content in hand.
+
+**OUTPUT / END STATE (no HTTP response — Execute Workflow return value):**
+- Drafted: `{ email_id, email_status: "draft_ready", category_name, drafted: true }`.
+- Escalated (Complaint/Refund): `{ email_id, email_status: "human_review_required", category_name, drafted: false }`.
+- Unknown client: `{ client_id, error: { code: "UNKNOWN_CLIENT", message } }`.
+- Email not found: `{ client_id, error: { code: "EMAIL_NOT_FOUND", message } }`.
+
+**ESCALATION RULE:** Complaint and Refund categories always route to WF-017 (direct HTTP POST to its production webhook, same pattern as every other Fallback-D caller in this project) and are never drafted, regardless of reply style — Agent_Runtime_System_v1.md §3.2/§4 Conditions 3-4. `update_client_email_draft` is still called on this path (`p_draft_content: null`, `p_email_status: 'human_review_required'`) so the `emails` row reflects the real outcome.
+
+**KB GROUNDING:** embeds the subject+body via OpenRouter's `/embeddings` endpoint (reuses `openrouter-zm`) → queries Pinecone (`namespace = client_id`, topK 4) → if any matches, grounds the draft in their `metadata.text`; if the namespace is empty (client hasn't run INT-012 yet, or has no KB), falls back to `get_client_kb_fallback_context` (`control.client_config.archetype_settings`) with an explicit "don't invent specifics" instruction baked into the fallback prompt text. Draft itself: `chainLlm` + `lmChatOpenRouter` (`anthropic/claude-sonnet-4.6`, temperature 0.4 — higher than INT-010's classification 0.1, appropriate for natural-sounding prose), same architectural pattern as INT-010's classification call, credential explicitly pinned to `openrouter-zm` (auto-assignment again picked an unrelated "OpenRouter account" credential and had to be corrected via `setNodeCredential`).
+
+**REPLY_STYLE DECIDED:** always `'generative'` — corrects INT-010's `'scripted'` placeholder. No scripted-template content exists anywhere in the DB for email replies (`templates.template_type_enum` has no email-reply type; checked and confirmed empty at BC-045 time already). Mechanical, one-obviously-correct-answer resolution — Document Resolution Authority tier 3, logged to `Wiki/log.md`.
+
+**REAL NEW DB OBJECTS:** `public.get_client_email_for_draft(p_schema, p_email_id)` — joins `emails`+`email_categories`, returns category/customer/thread context for the escalate check and the draft prompt. `public.get_client_kb_fallback_context(p_client_id)` — control-schema, returns `archetype_settings`. `public.update_client_email_draft(p_schema, p_email_id, p_draft_content, p_reply_style, p_email_status)` — same safe-no-op dynamic-SQL convention as `update_email_send_result`. All verified genuinely live via direct SQL against a real test `emails` row (created, verified, cleaned up).
+
+**REAL DEPENDENCIES:** UTIL-001 (schema resolution), WF-017 (direct HTTP POST, not Execute Workflow — matches WF-013/016/018/019's convention), `openrouter-zm`. **Pinecone credential gap same as INT-012** — `Query Pinecone` references the same not-yet-created "Pinecone API Key" credential; create it once and both workflows pick it up.
+
+**LAST VERIFIED:** BC-047, 2026-08-13 — 3 `test_workflow`-pinned scenarios, all passed: draft-with-KB-match (Support category, real KB-context-shaped prompt confirmed built correctly, reached `Build Result (Success)`), escalate (Refund category, correctly skipped drafting and routed through `Notify Human (WF-017)` → `Write Draft (Escalated)` → `Build Result (Escalated)`), draft-with-fallback (empty Pinecone matches, correctly fell through to `Get Fallback Context`/`Build Grounding (Fallback)`, confirmed the exact fallback prompt text). All 3 new RPCs verified genuinely live via direct SQL against a real `emails` row in `client_test_002_acme_commerce_test` (created via `insert_client_customer`+`upsert_client_email`, read via `get_client_email_for_draft`, written via `update_client_email_draft`, all correct, then cleaned up). Full live LLM-generation + live Pinecone-query round trip is pinned/structural only pending the Pinecone credential (see INT-012's Credential Gate note — same blocker, one fix covers both workflows).
+
+---
+
 ### INT-006 + SCH-001 — Zenny Recovery Engine - Process Recovery Queue (INT-006 + SCH-001)
 **n8n ID:** `crncPUwCbAQn5WgW` · **published**, active
 
