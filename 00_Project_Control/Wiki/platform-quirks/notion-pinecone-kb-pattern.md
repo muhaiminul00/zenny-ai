@@ -13,9 +13,13 @@ the codebase, dormant, not deleted, in case the plan-tier blocker clears.
   Knowledge Bases"), one child page per client, containing that client's
   KB article sub-pages. Owned entirely by ZeroManual's own `zenny-notion-
   api` integration token — no per-client OAuth, no client-owned
-  credential. Pages created *by* that integration's own token are
-  automatically accessible to it; no manual "share with integration"
-  step needed unless pulling in pre-existing pages later.
+  credential. **Correction, BC-049:** pages created via the integration's
+  own token are NOT automatically accessible to it going forward — the
+  root page still needed to be explicitly added under its own Connections
+  /data-access list before the integration could read it live (see
+  "Credential gates" below; this assumption was wrong and caused a real
+  404 in BC-048). Always add the integration under a KB root page's
+  Connections explicitly, even for self-created pages.
 - **Pointer table:** `control.client_kb_source (client_id, notion_page_id,
   last_synced_at)` — mirrors `convocore_agent_map`'s exact convention.
   Content never touches Postgres.
@@ -82,40 +86,56 @@ Calendar scopes) risks triggering Google's sensitive-scope re-
 verification process. Notion's internal-integration token model sidesteps
 that entirely — no OAuth consent flow, no scope review, single API key.
 
-## Credential gates (BC-048 update)
+## Credential gates — both closed, BC-049
 
-**Pinecone — resolved.** The human-created `zenny-pinecone-api` credential
-turned out to be a native `pineconeApi`-typed credential, not the
-`httpHeaderAuth` type BC-047 assumed (the MCP can't create credentials, so
-it never got to verify the type live until BC-048). Both `Query Pinecone`
-(INT-011) and `Upsert To Pinecone` (INT-012) switched from
-`genericCredentialType`/`httpHeaderAuth` to `predefinedCredentialType`/
-`pineconeApi` — live-verified working (see below).
+**Pinecone — resolved BC-048.** The human-created `zenny-pinecone-api`
+credential turned out to be a native `pineconeApi`-typed credential, not
+the `httpHeaderAuth` type BC-047 assumed (the MCP can't create
+credentials, so it never got to verify the type live until BC-048). Both
+`Query Pinecone` (INT-011) and `Upsert To Pinecone` (INT-012) switched
+from `genericCredentialType`/`httpHeaderAuth` to
+`predefinedCredentialType`/`pineconeApi` — live-verified working.
 
-**Notion — newly found broken, still open.** Live-testing INT-012 hit a
-real 404: `List Child Pages` (credential `zenny-notion-api`) cannot see
-the client's own KB root page. Direct `curl` verification against
-`api.notion.com` using the exact token supplied in chat confirms that
-token *does* belong to the "n8n" bot integration that owns and can see
-the page — meaning the n8n credential's stored secret does not actually
-match the token that was supplied (a credential-store mismatch, not a
-sharing/permissions problem). The MCP cannot read or fix a stored
-credential secret. **Human action:** open the `zenny-notion-api`
-credential in the n8n UI and re-paste the exact Internal Integration
-Secret, then INT-012's Notion→Pinecone round trip can be genuinely
-live-verified for the first time.
+**Notion — resolved BC-049, real root cause was page-sharing, not a
+secret mismatch.** BC-048 diagnosed the live 404 on `List Child Pages`
+as the n8n credential's stored secret not matching the token supplied in
+chat (based on a direct `curl` against `api.notion.com` succeeding with
+that same token). **That diagnosis was wrong.** The human traced the
+actual cause: the "Zenny Client Knowledge Bases" root page had never
+been added to the "n8n" integration's Connections/data-access list inside
+Notion itself — the credential secret was fine all along; the `curl`
+success was misleading because a token can authenticate successfully
+while still lacking a specific page's Connections grant, which is a
+separate, page-level permission layer on top of raw API auth. Fixed by
+adding the integration under the page's own Connections menu. No n8n
+credential was ever touched or needed re-pasting. **Lesson for next
+time:** a working `curl`/API-auth check proves the *token* is valid, not
+that the *integration* has been connected to the specific page/database
+in question — check page-level Connections first for a 404 that isn't a
+plain auth failure.
 
-## BC-048 live verification (Pinecone leg only)
+## BC-049 live verification (both legs, full round trip)
+
+Triggered INT-012 for real (via a temporary harness, deleted after)
+against Client A, unpinned: `List Child Pages` returned both real child
+pages ("Shipping & Returns Policy", "Order Status & Support"), each
+fetched as Markdown, chunked, embedded via OpenRouter, and upserted to
+Pinecone (`upsertedCount: 1` per chunk, confirmed in the real Pinecone
+REST response), `last_synced_at` genuinely advanced. First fully-live
+proof of the complete Notion→Pinecone pipeline, both legs, in one run.
+Also built and live-verified SCH-003/SCH-004 (cron cadences for
+INT-009/INT-012) this same card — see `Workflow_Registry.md`.
+
+## BC-048 live verification (Pinecone leg only, prior to the fix above)
 
 Triggered INT-010 for real (via a temporary harness, deleted after) with
 a genuine test email against Client A. Full chain ran live: customer
 resolution → categorization → `emails` row write → INT-010's new call
 into INT-011 → real embed → real Pinecone query (0 matches, namespace
-still empty since INT-012 can't sync yet) → correct fallback grounding →
-real LLM draft → real `update_client_email_draft` write, confirmed via
-direct SQL. This is the first genuinely-live proof the Pinecone leg
-authenticates and works end-to-end; only the Notion-sourced KB-match
-branch remains unverified, blocked on the credential above.
+still empty since INT-012 hadn't synced yet) → correct fallback grounding
+→ real LLM draft → real `update_client_email_draft` write, confirmed via
+direct SQL. First genuinely-live proof the Pinecone leg authenticates and
+works end-to-end.
 
 While chasing this, also found and fixed a real, pre-existing bug in
 INT-010 (BC-045, not this pattern's own code) that was silently causing
