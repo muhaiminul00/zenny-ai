@@ -31,6 +31,7 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 - [infra/supabase-tier-limits.md](infra/supabase-tier-limits.md) — the Supabase org is still on the free tier; the branded-domain need was solved by a VPS-side proxy instead of a Pro upgrade.
 - [infra/platform-limitations.md](infra/platform-limitations.md) — Hostinger's Compose API has no `build:` key support, and the restart-vs-recreate container trap it leads to.
 - [infra/dashboard-auth-mapping.md](infra/dashboard-auth-mapping.md) — `control.dashboard_users`, the real mapping table (BC-051) that replaced the `app_metadata` stopgap; the new `dashboard_provision_user` RPC for creating dashboard users going forward.
+- [infra/connection-lifecycle-actions.md](infra/connection-lifecycle-actions.md) — the `connection-lifecycle` Edge Function (BC-052): real per-provider Revoke (Google/Calendly) + honest local-only disclosure (Shopify/WooCommerce), plus Reconnect/Refresh dashboard actions.
 
 ## Platform Quirks
 
@@ -42,10 +43,11 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 - [platform-quirks/mode-self-invocation-limits.md](platform-quirks/mode-self-invocation-limits.md) — `/commander`/`/execute`/`/advisor` are real self-invocable Skills (they write `mode.json` for real); `/clear`/`/compact` are not — no tool exists for either, so they're recommended to the human, never self-triggered.
 - [platform-quirks/n8n-openrouter-direct-llm-pattern.md](platform-quirks/n8n-openrouter-direct-llm-pattern.md) — the `chainLlm`+`lmChatOpenRouter`+structured-output pattern for the first direct AI judgment call made from n8n itself (INT-010), and why it was a human decision, not self-resolved.
 - [platform-quirks/notion-pinecone-kb-pattern.md](platform-quirks/notion-pinecone-kb-pattern.md) — Email Manager's Notion+Pinecone multi-tenant KB design (INT-011/INT-012), why Convocore's KB API was dropped, and both credential gates now closed (Pinecone credential-type fix BC-048; Notion's real root cause was a missing page-level Connections grant, not a secret mismatch — corrected BC-049).
+- [platform-quirks/anon-grant-exposure-bc052.md](platform-quirks/anon-grant-exposure-bc052.md) — CRITICAL, fixed: ~40 internal RPCs (read_credential_secret, etc.) were live-exploitable via the public anon key, found + fixed during BC-052. A smaller residual gap (Edge Functions trust client_id from body) is disclosed and still open.
 
 ## Open Decisions
 
 - [decisions/calendar-category-sharing.md](decisions/calendar-category-sharing.md) — DECIDED 2026-08-14: one calendar provider at a time, no schema change. Closed.
-- [decisions/disconnect-provider-revocation.md](decisions/disconnect-provider-revocation.md) — DECIDED 2026-08-14: build real per-provider revocation + Revoke/Reconnect/Refresh actions. Scoped as BC-052, still open until that card ships.
+- [decisions/disconnect-provider-revocation.md](decisions/disconnect-provider-revocation.md) — DECIDED + BUILT (BC-052): real per-provider revoke (Google/Calendly) + honest local-only disclosure (Shopify/WooCommerce) + Reconnect/Refresh. See [[infra/connection-lifecycle-actions]]. Closed.
 - [decisions/dashboard-auth-mapping.md](decisions/dashboard-auth-mapping.md) — DECIDED + BUILT (BC-051): `control.dashboard_users` mapping table live. See [[infra/dashboard-auth-mapping]]. Closed.
 - [decisions/verification-tier-redesign.md](decisions/verification-tier-redesign.md) — DECIDED 2026-08-14: build the third, queued-human-approval verification tier. Scoped as BC-053, still open until that card ships.

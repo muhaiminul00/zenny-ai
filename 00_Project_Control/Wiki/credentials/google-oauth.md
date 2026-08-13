@@ -2,6 +2,15 @@
 
 **Status:** current as of 2026-08-07 (BC-033)
 
+## Revoke + on-demand refresh (BC-052)
+
+Both real: `oauth2.googleapis.com/revoke` (live-verified) and
+`oauth2.googleapis.com/token` refresh (live-verified non-destructively
+against Client A's real Gmail connection — refreshing rotates the
+access token without invalidating the refresh_token). Available from
+the dashboard via the `connection-lifecycle` Edge Function's
+Revoke/Refresh buttons. See [[../infra/connection-lifecycle-actions]].
+
 ## What's true now
 
 Google is one shared, Zenny-owned OAuth app (`control.oauth_apps` row,

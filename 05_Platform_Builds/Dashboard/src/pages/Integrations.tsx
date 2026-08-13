@@ -445,14 +445,55 @@ export function Integrations() {
     load();
   };
 
-  const handleDisconnect = async (connectionId: string) => {
-    setBusyProvider(connectionId);
-    const { error } = await supabase.rpc('dashboard_disconnect_connection', {
-      p_connection_id: connectionId,
+  // BC-052: Disconnect now calls the connection-lifecycle Edge Function's
+  // 'revoke' action instead of the old local-only dashboard_disconnect_
+  // connection RPC — it attempts a real provider-side revoke first
+  // (Google, Calendly both have real revoke endpoints, live-verified)
+  // and always falls through to the same local status flip either way.
+  // Shopify/WooCommerce have no app-initiated revoke API at all (real
+  // provider fact, not a gap) — those report provider_revoked: false
+  // with an honest reason, same disclosed-local-only pattern the old
+  // copy already used, just now correct per-provider instead of
+  // universal.
+  const callLifecycleAction = async (
+    category: string,
+    action: 'revoke' | 'refresh',
+    busyKey: string,
+  ): Promise<{ ok: boolean; message?: string }> => {
+    if (!client) return { ok: false };
+    setBusyProvider(busyKey);
+    const { data, error } = await supabase.functions.invoke('connection-lifecycle', {
+      body: { client_id: client.client_id, category, action },
     });
     setBusyProvider(null);
-    if (error) {
-      setError(error.message);
+    if (error || data?.error) {
+      return { ok: false, message: await extractFunctionError(data, error) };
+    }
+    return { ok: true, message: data?.result?.reason as string | undefined };
+  };
+
+  const handleDisconnect = async (connectionId: string, category: string) => {
+    const result = await callLifecycleAction(category, 'revoke', connectionId);
+    if (!result.ok) {
+      setError(result.message ?? 'Disconnect failed.');
+    } else {
+      setPopupNote(
+        result.message ? { kind: 'info', text: result.message } : null,
+      );
+      load();
+    }
+  };
+
+  // Refresh: on-demand token refresh, only offered for providers where
+  // it's actually implemented (Google, Shopify — same real scope SCH-006/
+  // UTIL-007 already cover; Calendly/Cal.com/WooCommerce correctly
+  // rejected server-side rather than silently no-op'd).
+  const REFRESH_SUPPORTED_PROVIDERS = new Set(['google', 'shopify']);
+
+  const handleRefresh = async (connectionId: string, category: string) => {
+    const result = await callLifecycleAction(category, 'refresh', connectionId);
+    if (!result.ok) {
+      setError(result.message ?? 'Refresh failed.');
     } else {
       load();
     }
@@ -534,10 +575,44 @@ export function Integrations() {
                     <span className={`status-pill status-${statusKey(existing)}`}>
                       {statusLabel(existing)}
                     </span>
+                    {REFRESH_SUPPORTED_PROVIDERS.has(existing.provider) && (
+                      <button
+                        className="secondary"
+                        disabled={busyProvider === existing.connection_id}
+                        onClick={() => handleRefresh(existing.connection_id, category)}
+                        title="Force a token refresh now, without disconnecting."
+                      >
+                        Refresh
+                      </button>
+                    )}
+                    {statusKey(existing) !== 'connected' && (
+                      <button
+                        className="secondary"
+                        disabled={busyProvider === existing.provider}
+                        onClick={() => {
+                          const opt = (CATEGORY_PROVIDERS[category] ?? []).find(
+                            (o) => o.provider === existing.provider,
+                          );
+                          if (opt?.kind === 'api_key') {
+                            if (existing.provider === 'woocommerce') {
+                              openWooForm(category);
+                            } else {
+                              openShopifyClientCredentialsForm(category);
+                            }
+                          } else {
+                            handleConnect(existing.provider, category);
+                          }
+                        }}
+                        title="Reconnect this provider — needed when the token has expired or errored."
+                      >
+                        Reconnect
+                      </button>
+                    )}
                     <button
                       className="reject-button"
                       disabled={busyProvider === existing.connection_id}
-                      onClick={() => handleDisconnect(existing.connection_id)}
+                      onClick={() => handleDisconnect(existing.connection_id, category)}
+                      title="Revokes access at the provider where possible (Google, Calendly), then disconnects locally."
                     >
                       Disconnect
                     </button>
@@ -678,9 +753,10 @@ export function Integrations() {
       </div>
 
       <p className="note" style={{ marginTop: 20 }}>
-        Disconnect clears Zenny's own record of the connection. It does not currently revoke
-        access on the provider's side (e.g. Google's own connected-apps list) — that's a
-        separate step you'd take there if you want to fully cut access.
+        Disconnect revokes access at the provider first where that's possible (Google, Calendly),
+        then clears Zenny's own record. Shopify and WooCommerce don't offer a way for Zenny to
+        revoke access itself — for those, also remove the key/app on the provider's side (your
+        store's admin panel) if you want to fully cut access.
       </p>
     </div>
   );

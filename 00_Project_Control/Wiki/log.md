@@ -9,6 +9,74 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-14] session-BC-052 | Connection Lifecycle Actions built + a critical live security exposure found and fixed mid-card
+
+**Execute (/execute):** Mandatory MCP Verification first — read
+`dashboard_disconnect_connection`, `control.client_connections` (4 real
+rows, all Client A), `control.connection_snapshots` (confirmed real,
+historical, references-only — human's "saved snapshot of real
+credentials" was this table), `control.oauth_apps` (Calendly/Cal.com/
+Shopify/Google real registration state), Vault secret existence for
+Client A's live connections, and `get_connections_due_for_refresh` +
+the existing `UTIL-007` (Refresh Connection Token) n8n sub-workflow to
+understand what refresh already covers (Google, Shopify) vs. what's a
+disclosed pre-existing gap (Calendly/Cal.com synchronous refresh).
+
+**Critical finding, mid-verification:** ~40 SECURITY DEFINER RPCs
+(`read_credential_secret`, `store_credential_secret`,
+`update_connection_status`/`tokens`, `create_client_schema_from_template`,
+every `insert_client_*`/`upsert_client_*`) were granted `EXECUTE` to
+`anon` with zero internal caller-identity checks — live-exploitable via
+the public anon key to read any client's decrypted Vault secrets,
+overwrite any connection, or forge data in any client schema. Stopped
+BC-052 build work, reported to the human directly with full context
+(what's exploitable, why it's safe to fix — n8n's real `supabaseApi`
+credential uses service_role, not anon, confirmed no legitimate anon
+dependency exists). **Human: "yes, fix this & continue."** Applied
+`revoke_anon_execute_on_internal_rpcs` (pg_proc + aclexplode-based, so
+overloaded functions revoke correctly), live-verified: 0 remaining anon
+grants, `anon` role now correctly denied, `postgres`/service_role
+unaffected. Full writeup: `Wiki/platform-quirks/anon-grant-exposure-
+bc052.md` — includes a disclosed smaller residual gap (Edge Functions
+trust `client_id` from the request body, pre-existing project-wide
+convention, not fixed this card).
+
+**BC-052 itself:** real per-provider facts confirmed before building —
+Google and Calendly both have real OAuth revoke endpoints; Shopify
+(Client Credentials Grant) and WooCommerce (static REST keys) have
+**no app-initiated revoke API at all** (verified, not assumed — this
+reshaped the card's real scope for those 2 providers from "build revoke"
+to "honestly disclose no revoke is possible"). Built new Edge Function
+`connection-lifecycle` (revoke + refresh actions), matching the existing
+`woocommerce-connect`/`shopify-connect` convention exactly. Live-tested
+every real code path: Google revoke (real 400 from a synthetic token,
+correctly classified as "already gone"), Calendly revoke (real 200,
+synthetic connection), Google refresh (real, **non-destructive**, run
+directly against Client A's live Gmail connection — `token_expires_at`
+genuinely advanced), WooCommerce refresh-rejection (real 400,
+"unsupported"), WooCommerce revoke (local-only, honestly disclosed,
+synthetic connection). All synthetic test rows/secrets deleted after.
+Deliberately did NOT fire a real revoke against Client A's actual
+Google/WooCommerce connections — would have required redoing browser
+OAuth consent to undo, not something to spend without asking first.
+
+Updated `Integrations.tsx`: Disconnect now calls the real revoke path;
+added Refresh (Google/Shopify only) and Reconnect (reuses the existing
+Connect flow, no new backend) buttons; updated the page's disclosure
+copy to be honest per-provider instead of universal. `tsc -b` and
+`oxlint` both clean. Full browser click-through not done (no credentials
+for the one real dashboard test user — Credential Gate, not invented) —
+disclosed, not silent.
+
+Wiki: new `infra/connection-lifecycle-actions.md`,
+`platform-quirks/anon-grant-exposure-bc052.md`;
+`credentials/{google-oauth,calendly,shopify,woocommerce}.md` each got a
+Revoke/Refresh section; `decisions/disconnect-provider-revocation.md`
+closed; `Wiki/index.md` updated. No n8n workflow touched —
+`Workflow_Registry.md` not applicable. Per bounded auto-handoff (this
+card wrote to live Supabase + Edge Function state), stopping for
+pulse-check before BC-053.
+
 ## [2026-08-14] session-BC-051 | Dashboard Auth Mapping table built, published, live-verified
 
 **Execute (/execute):** Mandatory MCP Verification first — read both

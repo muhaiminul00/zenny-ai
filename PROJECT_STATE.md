@@ -10,7 +10,25 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-14 — by /execute — BC-051 complete: Dashboard Auth Mapping built.
+2026-08-14 (later) — by /execute — BC-052 complete: Connection Lifecycle
+Actions built, live-verified. **Also: a critical live security exposure
+found mid-card and fixed** — ~40 internal RPCs (read_credential_secret,
+etc.) were granted EXECUTE to `anon` with no internal caller-identity
+check, live-exploitable via the public anon key to read any client's
+Vault secrets or forge data cross-tenant. Human approved an immediate
+fix; `REVOKE ... FROM anon` applied across all affected functions,
+live-verified (anon now denied, service_role/n8n unaffected). Full
+writeup: `Wiki/platform-quirks/anon-grant-exposure-bc052.md`. New Edge
+Function `connection-lifecycle` gives the dashboard real Revoke (Google/
+Calendly have real provider endpoints, live-tested; Shopify/WooCommerce
+have no app-initiated revoke API at all — honestly disclosed, not
+faked) + Refresh (Google live-tested non-destructively; Shopify built
+but untested, no live connection exists) + Reconnect (reuses existing
+Connect flow, no new backend). `Integrations.tsx` updated, typecheck/
+lint clean; full browser click-through not done (no test-user
+credentials — disclosed). Full narrative: `Wiki/log.md`.
+
+2026-08-14 (earlier) — by /execute — BC-051 complete: Dashboard Auth Mapping built.
 New `control.dashboard_users(auth_user_id, client_id, role)` table
 replaces the `app_metadata.client_schema_name` stopgap (BC-015). Both
 existing dashboard RPCs (`dashboard_get_my_client_schema`,
@@ -117,7 +135,11 @@ Core Agent ............ ✅ working — Wiki: (none needed, stable)
 Growth Agent ........... ✅ working
 Conversion Engine ...... ✅ working — all 11/11 Tools built and live-tested (BC-034)
 Dashboard (5B/5C/Int) .. ✅ working — auth mapping now real (BC-051,
-                          control.dashboard_users); Wiki/infra/ for deployment
+                          control.dashboard_users); Integrations page has
+                          real Revoke/Reconnect/Refresh (BC-052); a
+                          critical anon-key RPC exposure was found+fixed
+                          same session (see Active Blockers for the
+                          smaller residual gap); Wiki/infra/ for deployment
 Recovery Engine ........ 🟡 partial — WF-018 SendRecoveryMessage +
                           INT-006/SCH-001 Process Recovery Queue +
                           INT-007 StopRecovery + INT-008 ResumeRecovery
@@ -181,11 +203,23 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
   missing the SCH-007 row.
 - UTIL-002 (Data Validator) has no real caller anywhere — not urgent,
   no live risk.
+- **Residual, smaller-severity security gap (found BC-052, not fixed):**
+  the connect/lifecycle Edge Functions (`oauth-callback`,
+  `shopify-connect`, `woocommerce-connect`, `connection-lifecycle`) all
+  trust `client_id` from the request body rather than verifying it
+  against the caller's own JWT (`verify_jwt: false`, a project-wide
+  convention predating BC-052, not introduced by it). Low real risk
+  today (client_id UUIDs aren't guessable, one real dashboard user
+  total), worth a small future Build Card once self-serve signup makes
+  client_id enumeration a real concern. See
+  `Wiki/platform-quirks/anon-grant-exposure-bc052.md`.
 
 (ADP-001 doc/reality mismatch dropped per human instruction, 2026-08-14
 — no longer tracked. The 4 open product/design decisions were all
-resolved 2026-08-14 — see Wiki/decisions/, 3 now building as BC-051
-[done]/BC-052/BC-053, 1 closed with no build needed.)
+resolved 2026-08-14 — see Wiki/decisions/: BC-051 done, BC-052 done,
+BC-053 queued, 1 closed with no build needed. A critical anon-grant
+RPC-exposure bug, unrelated to any of the 4 decisions, was found and
+fixed live during BC-052 — see Last Updated above.)
 ## Test-Client Roster
 ```
 Client A: baa673b5-c51a-4a7b-91f5-a37027f8dca4 — commerce_ecom — client_test_002_acme_commerce_test
@@ -218,15 +252,17 @@ wired into INT-010's live chain. INT-008 built standalone, no caller yet
 verified.** `control.dashboard_users` replaces the `app_metadata`
 stopgap. See Last Updated above and `Wiki/infra/dashboard-auth-mapping.md`.
 
-**Issued, queued next (both approved by human, not yet started):**
-- **BC-052 — Connection Lifecycle Actions:** real per-provider revoke
-  (Google/Shopify/Calendly/Cal.com/WooCommerce) + Revoke/Reconnect/Refresh
-  dashboard buttons (today only Disconnect exists, local-only). Depends
-  on BC-051 (done) for the real caller-identity check. Note:
-  `control.connection_snapshots` (BC-024) already holds real
-  testing-safety credential snapshots — human confirmed usable for live
-  test-connection restoration on this card, live-verify before assuming
-  still valid/unexpired.
+**BC-052 complete (2026-08-14): Connection Lifecycle Actions built,
+live-verified, plus an unplanned critical security fix mid-card** (see
+Last Updated above — anon-granted internal RPCs, fixed same session).
+Real revoke: Google + Calendly (real provider endpoints, live-tested);
+Shopify + WooCommerce honestly disclosed as local-only (no
+app-initiated revoke API exists for either — a real finding, not a
+build gap). Refresh: Google live-tested non-destructively; Shopify
+built but not live-tested (no live Shopify connection in the roster).
+Reconnect: no new backend, reuses the existing Connect flow.
+
+**Issued, queued next (approved by human, not yet started):**
 - **BC-053 — Verification Approval Queue:** third tier (queued human-
   approval → real auto-execute) for WF-013 CancelAppointment / WF-016
   UpdateCustomer, **opt-in per client** (new `control.clients` flag,
@@ -256,26 +292,28 @@ Email Manager's live chain, INT-008 is proven but has no caller (see
 Active Blockers). Phase 10 (Email Manager) is feature-complete: all 7
 workflows live (WF-019, INT-009/010/011/012, SCH-003/004), fully chained
 and cadenced, no open Credential Gate. KB source is Notion+Pinecone;
-Convocore stays wired-dormant. BC-051 (Dashboard Auth Mapping) just
-shipped — `control.dashboard_users` is now the real caller-identity
-mechanism. Nothing is mid-flight; the next session starts clean. Full
-narrative: `Wiki/log.md` (search by BC number).
+Convocore stays wired-dormant. BC-051 (Dashboard Auth Mapping) and
+BC-052 (Connection Lifecycle Actions) both shipped this session — real
+`control.dashboard_users` caller-identity mechanism, and real
+Revoke/Reconnect/Refresh on the Integrations page. A critical anon-key
+RPC exposure was also found and fixed live mid-BC-052 (see Last Updated
+above and `Wiki/platform-quirks/anon-grant-exposure-bc052.md`). Nothing
+is mid-flight; the next session starts clean. Full narrative:
+`Wiki/log.md` (search by BC number).
 
 **What's genuinely open, in priority order:**
-1. **BC-052 (Connection Lifecycle Actions) and BC-053 (Verification
-   Approval Queue) are issued and approved, not yet started** — pick up
-   with BC-052 first (see Next Build Card above for full scope/deps).
-   Human confirmed real credential snapshots exist in
-   `control.connection_snapshots` (BC-024) usable for BC-052's live
-   provider testing — live-verify their validity before assuming usable.
-2. `appointments` doc diff — deferred, see Active Blockers.
-3. INT-008's ownership-release caller — worth scoping together with
-   BC-053's approval-queue work rather than separately, per the Next
-   Build Card note above.
-4. The recovery max-steps enforcement gap — design direction discussed
+1. **BC-053 (Verification Approval Queue) is issued and approved, not
+   yet started** — see Next Build Card above for full scope/deps.
+   Likely spans >1 session.
+2. The residual Edge Function client_id-trust gap (BC-052 finding, low
+   severity today) — see Active Blockers.
+3. `appointments` doc diff — deferred, see Active Blockers.
+4. INT-008's ownership-release caller — worth scoping together with
+   BC-053's approval-queue work rather than separately.
+5. The recovery max-steps enforcement gap — design direction discussed
    (per-client override + archetype-default lookup table), not yet a
    Build Card.
-5. Everything else is a genuine next-phase choice — see Next Build Card
+6. Everything else is a genuine next-phase choice — see Next Build Card
    candidates above.
 
 Nothing requires human acknowledgment before proceeding — all
