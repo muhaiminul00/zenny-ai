@@ -95,3 +95,15 @@ export interface PendingVerification {
   resolved_at: string | null;
   execution_result: Record<string, unknown> | null;
 }
+
+// BC-056: INT-008's dedicated ownership-release caller. Only leads a
+// human genuinely owns (Recovery_Engine_Flow.md §7.1 Ownership Rule)
+// show up here — a paused lead a human never took ownership of doesn't.
+export interface PausedRecoveryLead {
+  lead_id: string;
+  current_step: number;
+  archetype: string;
+  conversation_summary: string;
+  contact_method: string;
+  paused_since: string | null;
+}

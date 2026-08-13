@@ -9,6 +9,54 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-14] session-commander-bc054-056 | 3 new Build Cards issued (BC-054/055/056), INT-008 caller mechanism decided
+
+**Commander (/commander):** With BC-051/052/053 all done, presented a
+build plan for the remaining Next-Build-Card candidates. Excluded item 1
+(`zenny-notification-sender` credential) from Build Card format entirely
+— pure Credential Gate, human OAuth reconnect only, nothing to design or
+code; human confirmed the reconnect done this same turn, queued for live
+verification under Execute. Issued 3 cards: **BC-054** (recovery
+max-steps enforcement — `control.archetype_recovery_defaults` +
+per-client override column, closes the gap found during BC-050),
+**BC-055** (CancelAppointment real calendar-event deletion, closes
+BC-053's disclosed gap), **BC-056** (INT-008 ownership-release caller).
+
+**Decision, BC-056:** presented 2 candidate mechanisms for INT-008's
+caller (dedicated dashboard action vs. piggybacking on BC-053's
+`/approvals` Reject action) with a recommendation for the dedicated
+action, reasoning ownership-release is a distinct decision from
+approving/rejecting a single queued item and conflating them risks an
+unintended cadence resume. Human confirmed the recommendation. Logged:
+`Wiki/decisions/int-008-ownership-release-caller.md`.
+
+Human approved all 3 cards and go-ahead to execute; self-invoking
+`execute` next per the auto-handoff mechanism.
+
+## [2026-08-14] session-BC-054-055 | Credential reconnect verified, max-steps enforcement + real calendar-delete built and live-proven end-to-end
+
+**Execute (/execute):** First, live-verified the human's `zenny-notification-sender` OAuth reconnect via the exact real failing path (WF-019 → UTIL-006 → Tool Execution Fallback → UTIL-004), not a synthetic check — real Gmail send, message id `19ffd2a904ae2bcf`. Active Blocker closed.
+
+**BC-054 (recovery max-steps enforcement):** Mandatory MCP Verification confirmed `advance_client_recovery_step`/`get_due_recovery_queue`'s live shape and `recovery_status_enum` values before writing the migration. New `control.archetype_recovery_defaults` (seeded from `Recovery_Engine_Flow.md` §3 — emergency 3, appointment 4, commerce_ecom 3, commerce_restaurant 2, consultation 5, engagement 3, the same source INT-008's own hardcoded map already used) + nullable `control.clients.max_recovery_steps` override (no roster client set, zero behavior change). `advance_client_recovery_step` now flips `status` to `'stopped'` in the same atomic UPDATE the instant a step reaches the effective max; `get_due_recovery_queue` defensively excludes rows already at/past it. Live-verified via 3 disposable Client B fixtures (advance-to-stop, sweep-exclusion, below-max regression), all cleaned up. Closes the Active Blocker from BC-050.
+
+**BC-055 (CancelAppointment real calendar-event deletion):** Mandatory MCP Verification re-checked the "no roster client has a working calendar connection" assumption rather than trusting the existing doc — found Client A's Google connection is actually `connected` with a real token, but a real WF-002 call against it returned Google's `ACCESS_TOKEN_SCOPE_INSUFFICIENT` for FreeBusy specifically, not necessarily the whole connection. Tested the actual endpoint this card needed directly: a real `GET` on a fake event id returned a genuine `404` (not `403`), proving events-scope was actually available. Extended `resolve-pending-verification` (BC-053's Edge Function) with a real Google `DELETE`/Calendly-cancellation path, reusing BC-052's `connection-lifecycle` credential pattern exactly. **Real, full end-to-end proof, not just structural:** created a real disposable Google Calendar event via the resolved token, wired a disposable `pending_verifications` row to it, called the live deployed function, got `calendar_delete: "deleted"`, then independently re-fetched the event from Google and confirmed `status: "cancelled"` on Google's own side. All DB fixtures cleaned up after. Calendly path built to the documented API but not live-tested (no roster Calendly connection) — disclosed, not faked. Closes the disclosed gap from BC-053.
+
+**Incident, caught and fixed same turn:** the `resolve-pending-verification` redeploy briefly defaulted to `verify_jwt: true` (the Supabase MCP deploy tool's own default when the parameter isn't passed) instead of the project's established `verify_jwt: false` convention for this class of function — caught immediately via the deploy tool's own returned state, corrected with an explicit redeploy before any real caller could hit it.
+
+Continuing into BC-056 (INT-008 caller) in the same session.
+
+## [2026-08-14] session-BC-056 | INT-008's real caller built — a real finding corrected the original assumption
+
+**Execute (/execute):** Mandatory MCP Verification first — read INT-008's and `resume_client_recovery`'s live definitions before assuming either implemented ownership-release. **Real finding, corrected the original framing:** neither ever touches `human_ownership_flag` at all — INT-008 only reads/acts on `recovery_queue.status`. The genuine gap wasn't "INT-008 has no caller," it was "nothing anywhere clears the flag, and INT-008 alone can't fix that." Also confirmed INT-008 had zero production triggers (`executeWorkflowTrigger` only) — no webhook existed for an outside-n8n caller to hit at all.
+
+**Built:** `dashboard_release_lead_ownership(p_lead_id)` — new RPC, same `auth.uid()`-via-`control.dashboard_users` scoping as BC-051's `dashboard_get_my_client_schema`, clears the flag scoped to the caller's own client only; fail-closed, live-verified both for a real success and a rejected unmapped user. `dashboard_list_paused_recovery_leads()` — companion read RPC, filters to `status='paused' AND human_ownership_flag=true` (the real precondition per Recovery_Engine_Flow.md §7.1). Gave INT-008 a real webhook (`POST /resume-recovery`), reusing the exact WF-018/WF-019 Webhook+Normalize Contract+Respond pattern rather than inventing a new shape — added a shared `Normalize Contract` node feeding both the new webhook and the existing internal trigger, rewired every downstream `$('Resume Recovery Trigger')` reference to it, added 3 Respond nodes for the webhook path's 3 terminal branches. Live-verified twice against a disposable fixture: first call resumed (`paused → active`), second call on the same lead correctly no-op'd (`NOT_PAUSED`).
+
+**New Edge Function `release-lead-ownership`** — deliberately deployed `verify_jwt: true`, a documented deviation from BC-052/053's `verify_jwt: false` convention: those trust a body-supplied `client_id` because their real authority is a scoped RPC keyed on unforgeable data; this action genuinely needs real caller identity (the RPC is `auth.uid()`-scoped), so the function forwards the caller's real Authorization header into its Supabase client instead. Verified the auth gate is real: missing header → gateway 401; anon-role token → reaches the RPC, correctly rejected as `Not authenticated`. **Not tested:** the full real-user happy path through this specific function — no real dashboard session/credentials exist to mint a live JWT with (Credential Gate, not invented); the RPC and the webhook it glues together are each independently proven correct, so risk is low.
+
+**Dashboard:** new `/paused-leads` page (`PausedLeads` in `Appointments.tsx`), `tsc`/`oxlint` both clean.
+
+All disposable fixtures cleaned up. Decision doc (`Wiki/decisions/int-008-ownership-release-caller.md`) and new mechanism page (`Wiki/infra/int008-ownership-release.md`) written. This closes the last of the 4 Next-Build-Card candidates issued this session (credential reconnect, BC-054, BC-055, BC-056) — no Build Card currently outstanding.
+
 ## [2026-08-14] session-BC-053 | Verification Approval Queue built, published, live-verified; last of the 3 planned Build Cards
 
 **Execute (/execute):** Mandatory MCP Verification first — read live

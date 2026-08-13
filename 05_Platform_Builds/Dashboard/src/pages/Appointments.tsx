@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import type { AppointmentDetail, AppointmentListItem, DashboardClient, PendingVerification } from '../lib/types';
+import type {
+  AppointmentDetail,
+  AppointmentListItem,
+  DashboardClient,
+  PausedRecoveryLead,
+  PendingVerification,
+} from '../lib/types';
 
 function SourcePill({ source }: { source: string }) {
   const label = source === 'client_calendar' ? 'Client calendar (live)' : 'Our DB (fallback)';
@@ -258,6 +264,93 @@ export function PendingApprovals() {
                     onClick={() => resolve(item, 'reject')}
                   >
                     Reject
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// BC-056: INT-008's dedicated dashboard caller. A lead only shows up
+// here once a human has taken ownership (an escalation) AND its
+// recovery cadence is paused — releasing ownership doesn't just flip a
+// flag, it genuinely resumes (or, if the archetype's max step was
+// already reached while paused, stops) the automated cadence via
+// INT-008. Deliberately a separate action from Pending Approvals above
+// — approving/rejecting one queued change and releasing ownership of an
+// entire lead are different decisions (see the linked Wiki decision).
+export function PausedLeads() {
+  const [leads, setLeads] = useState<PausedRecoveryLead[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    const { data, error } = await supabase.rpc('dashboard_list_paused_recovery_leads');
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setLeads((data as PausedRecoveryLead[]) ?? []);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const release = async (lead: PausedRecoveryLead) => {
+    setBusyId(lead.lead_id);
+    const { data, error } = await supabase.functions.invoke('release-lead-ownership', {
+      body: { lead_id: lead.lead_id },
+    });
+    setBusyId(null);
+    if (error || data?.error) {
+      setError(data?.error?.message ?? error?.message ?? 'Action failed.');
+      return;
+    }
+    load();
+  };
+
+  if (error) return <p className="error-text">Failed to load paused leads: {error}</p>;
+  if (leads === null) return <p>Loading paused leads…</p>;
+
+  return (
+    <div>
+      <h2>Paused Recovery Leads</h2>
+      <p className="note">
+        Leads a human has taken ownership of, with their automated recovery cadence paused
+        (Recovery_Engine_Flow.md §7.1). Releasing genuinely resumes the cadence from its next
+        scheduled step — or stops it, if the archetype's max step was already reached while
+        paused — it doesn't just clear a flag.
+      </p>
+
+      {leads.length === 0 ? (
+        <p>No paused, human-owned leads right now.</p>
+      ) : (
+        <table className="orders-table" style={{ marginTop: 16 }}>
+          <thead>
+            <tr>
+              <th>Lead</th>
+              <th>Step</th>
+              <th>Contact</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leads.map((lead) => (
+              <tr key={lead.lead_id}>
+                <td>{lead.conversation_summary}</td>
+                <td>
+                  {lead.archetype} · step {lead.current_step}
+                </td>
+                <td>{lead.contact_method}</td>
+                <td>
+                  <button disabled={busyId === lead.lead_id} onClick={() => release(lead)}>
+                    Release &amp; resume
                   </button>
                 </td>
               </tr>

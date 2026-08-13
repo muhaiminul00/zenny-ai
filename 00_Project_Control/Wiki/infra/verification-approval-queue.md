@@ -52,16 +52,52 @@ BC-052's `connection-lifecycle`: service_role, trusted body params,
   already happened" discipline WF-019 itself uses for its own bookkeeping.
 - **reject** — marks the row rejected, no execution, no email.
 
-## Known, disclosed gap
+## Calendar-event deletion — BUILT (BC-055, 2026-08-14)
 
-**CancelAppointment's real client-calendar event deletion is NOT built.**
-No existing DELETE-event pattern exists anywhere in the platform to reuse
-(WF-002 CheckAvailability's Provider Router only reads); building and
-live-testing a brand-new one against a real calendar deserves its own
-Build Card, not a rushed addition here. The DB-side cancellation is real
-and live-verified; `execution_result.calendar_delete` is honestly
-reported as `'not_implemented_this_card'` — same disclosed-limitation
-pattern BC-052 used for Shopify/WooCommerce revoke.
+`resolve-pending-verification`'s approve path now attempts a real
+client-calendar event delete after `cancel_client_appointment`, reusing
+BC-052's `connection-lifecycle` credential pattern exactly
+(`get_client_connection`/`read_credential_secret` via direct RPC, not a
+new mechanism). Google: real `DELETE
+/calendars/primary/events/{eventId}` (204/404/410 all count as "gone").
+Calendly: real `POST /scheduled_events/{uuid}/cancellation` (Calendly
+has no DELETE-event endpoint; cancellation is the documented
+equivalent) — built per Calendly's documented API but **not live-tested**
+(no roster client has a real Calendly connection), same disclosed-
+untested pattern BC-052 used for Shopify Refresh. Any other provider, or
+an appointment whose `client_calendar_event_id` was never written (an
+`our_db_fallback`-authoritative row), is honestly reported as
+`not_attempted` — never faked as deleted.
+
+**Real, full end-to-end live proof (Google), not just structural:**
+Mandatory MCP Verification first re-checked the "no roster client has a
+working calendar connection" assumption from BC-053/PROJECT_STATE rather
+than trusting it — found Client A's Google connection is actually
+`connected` with a real token, but a real WF-002 CheckAvailability call
+returned Google 403 `ACCESS_TOKEN_SCOPE_INSUFFICIENT` for **FreeBusy
+Query** specifically. Rather than concluding the whole connection lacked
+Calendar scope, tested the actual endpoint this card needed directly: a
+real `GET` on a nonexistent event id returned a genuine `404 Not Found`
+(not a 403), meaning the events resource IS in scope even though
+FreeBusy isn't (Google grants scope per-capability, not per-connection).
+Confirmed by going further — created a real disposable Google Calendar
+event via the same resolved token, wired a disposable
+`pending_verifications` row to it, called the real deployed Edge
+Function, got `calendar_delete: "deleted"` / `google delete: 204`, then
+independently re-fetched the same event from Google directly and
+confirmed `status: "cancelled"` on Google's own side. All disposable DB
+fixtures (customers/leads/conversions/appointments/pending_verifications)
+deleted after verification; the Google event itself is left in its real
+`cancelled` state (Google's own soft-delete, nothing further to clean
+up).
+
+**Real, incidental side-effect of building this:** a
+`resolve-pending-verification` redeploy briefly defaulted to
+`verify_jwt: true` (the Supabase MCP deploy tool's own default) instead
+of the project's established `verify_jwt: false` convention for this
+class of Edge Function — caught immediately via the deploy tool's own
+returned state, corrected with an explicit redeploy before any real
+caller could hit it.
 
 ## Real, unrelated finding surfaced during this card
 

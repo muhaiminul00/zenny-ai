@@ -10,7 +10,38 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-14 (latest) — by /execute — BC-053 complete: Verification
+2026-08-14 (latest) — by /execute — BC-054/055/056 complete, plus the
+`zenny-notification-sender` credential reconnect live-verified. All 3
+were Commander-issued from the Next Build Card candidates list, human
+approved, executed sequentially in one session. **BC-054** (recovery
+max-steps enforcement): `control.archetype_recovery_defaults` +
+per-client `max_recovery_steps` override; `advance_client_recovery_step`
+now stops a lead's cadence the instant it reaches its archetype's real
+max step (Recovery_Engine_Flow.md §3/§6), `get_due_recovery_queue`
+defensively excludes any row already past it. Live-verified via 3
+disposable fixtures. **BC-055** (CancelAppointment real calendar-event
+deletion): `resolve-pending-verification`'s approve path now genuinely
+deletes the client's Google Calendar event (Calendly cancellation built
+per spec, not live-tested — no roster Calendly connection). Real,
+full end-to-end proof: created a real disposable Google Calendar event,
+deleted it via the live deployed function, independently confirmed
+`status: "cancelled"` on Google's own side — better than the external
+blocker originally assumed (Mandatory MCP Verification found Client A's
+"insufficient scope" was specific to FreeBusy, not the events API).
+**BC-056** (INT-008 ownership-release caller): real finding — neither
+INT-008 nor `resume_client_recovery` ever touched
+`human_ownership_flag`; built the actual flag-clear as a new
+`auth.uid()`-scoped RPC (`dashboard_release_lead_ownership`), gave
+INT-008 a real webhook (it had none), added a `/paused-leads` dashboard
+page and a `release-lead-ownership` Edge Function (deliberately
+`verify_jwt: true`, a documented deviation from BC-052/053's
+convention, since this action genuinely needs real caller identity).
+Live-verified end to end except the Edge Function's full real-user
+happy path (no real dashboard session to test with — Credential Gate,
+not invented; the RPC and webhook it glues together are each proven
+standalone). Full narrative: `Wiki/log.md`.
+
+2026-08-14 (prior) — by /execute — BC-053 complete: Verification
 Approval Queue built, live-verified — the last of the 3 Build Cards
 approved from this session's decision round (BC-051/052/053 all done).
 Opt-in per client (`control.clients.verification_tier_enabled`, default
@@ -147,7 +178,7 @@ Phase 5  — 4 New Dashboard Systems ............... IN PROGRESS (5B, 5C-read-on
 Phase 6  — Core Agent ............................ COMPLETE
 Phase 7  — Growth Agent .......................... COMPLETE
 Phase 8  — Conversion Engine (11 Tools) .......... COMPLETE
-Phase 9  — Recovery Engine ....................... IN PROGRESS (WF-018, INT-006/007/008, SCH-001 all built; INT-008 has no caller yet)
+Phase 9  — Recovery Engine ....................... IN PROGRESS (WF-018, INT-006/007/008, SCH-001 all built; INT-008 now has a real caller, BC-056; max-steps enforced, BC-054)
 Phase 10 — Email Manager ......................... FEATURE-COMPLETE (all 7 workflows live, chained, cadenced)
 Phase 11 — Scheduled Workflows ................... IN PROGRESS (SCH-006 live; SCH-007 logged, not built)
 Phase 12 — Node-by-Node Outlines ................. NOT STARTED (cross-cutting)
@@ -164,17 +195,22 @@ Dashboard (5B/5C/Int) .. ✅ working — auth mapping now real (BC-051,
                           real Revoke/Reconnect/Refresh (BC-052);
                           Appointments dashboard gained a real write
                           action (BC-053, /approvals page, opt-in per
-                          client, off by default); a critical anon-key
-                          RPC exposure was found+fixed same session (see
-                          Active Blockers for the smaller residual gap);
-                          Wiki/infra/ for deployment
-Recovery Engine ........ 🟡 partial — WF-018 SendRecoveryMessage +
+                          client, off by default; BC-055 added real
+                          calendar-event deletion to it); new
+                          /paused-leads page (BC-056, real INT-008
+                          caller); a critical anon-key RPC exposure was
+                          found+fixed same session (see Active Blockers
+                          for the smaller residual gap); Wiki/infra/ for
+                          deployment
+Recovery Engine ........ ✅ working — WF-018 SendRecoveryMessage +
                           INT-006/SCH-001 Process Recovery Queue +
                           INT-007 StopRecovery + INT-008 ResumeRecovery
                           all live-tested, cadence fires automatically
                           (email only), per-client active-hours window
                           (BC-041); INT-007 genuinely wired into INT-010;
-                          INT-008 has no caller yet (see Active Blockers)
+                          INT-008 now has a real caller (BC-056, dashboard
+                          ownership-release action); max-steps enforced
+                          (BC-054)
 Email Manager .......... ✅ working — WF-019, INT-009, INT-010, INT-011,
                           INT-012, SCH-003, SCH-004 all live-tested
                           (BC-043 through BC-049); KB source is
@@ -186,26 +222,18 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
 ```
 
 ## Active Blockers
-- **INT-008 (Resume Recovery) has no caller:** built and live-tested
-  (BC-050) but its real trigger — `human_ownership_flag` flipping back to
-  `false` when a human closes their task without the customer replying —
-  is written nowhere in the built system (confirmed by grep). No dashboard
-  action or workflow currently clears this flag. Needs its own future
-  Build Card once the ownership-release mechanism itself is scoped (likely
-  a dashboard action on an escalation/`active_issues` row); not urgent,
-  Recovery Engine functions correctly without it (WF-018 still won't send
-  to a human-owned lead, per the existing gate — leads just stay Paused
-  indefinitely instead of auto-resuming).
-- **Recovery cadence's "max steps reached → Stopped" condition is not
-  enforced anywhere real:** discovered during BC-050. No per-archetype
-  max-step count exists in the DB (`leads.recovery_profile` is free text),
-  and neither WF-018 nor INT-006/SCH-001 check current_step against any
-  max. INT-008 reproduces `Recovery_Engine_Flow.md` §3's documented step
-  counts as a local hardcoded map for its own use, but that doesn't fix
-  the sweep — a lead could theoretically keep receiving recovery sends
-  past its archetype's documented max step count. Not fixed this card
-  (out of BC-050's scope); worth a small future Build Card (add the same
-  max-step check to `get_due_recovery_queue` or WF-018 itself).
+- ~~INT-008 (Resume Recovery) has no caller~~ **CLOSED (BC-056,
+  2026-08-14).** New dashboard `/paused-leads` action → real
+  `dashboard_release_lead_ownership` RPC (clears the flag — a real
+  finding: neither INT-008 nor `resume_client_recovery` ever touched it)
+  → INT-008's new real webhook (it had none before). Live-verified. See
+  `Wiki/infra/int008-ownership-release.md`.
+- ~~Recovery cadence's "max steps reached → Stopped" condition~~ **CLOSED
+  (BC-054, 2026-08-14).** `control.archetype_recovery_defaults` +
+  per-client `control.clients.max_recovery_steps` override now enforce
+  it in `advance_client_recovery_step` (real stop) and
+  `get_due_recovery_queue` (defensive filter). Live-verified. See
+  `Wiki/platform-quirks/recovery-queue-sweep-design.md`.
 - **External, Convocore-KB path blocked:** Convocore's REST API now
   returns 403 "requires Business plan or higher" workspace-wide (`Zenny-
   UI` workspace, same secret/agent that worked live on 2026-08-02/04) —
@@ -231,25 +259,18 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
   missing the SCH-007 row.
 - UTIL-002 (Data Validator) has no real caller anywhere — not urgent,
   no live risk.
-- **n8n's internal `zenny-notification-sender` Gmail credential has
-  expired (found BC-053):** crashes UTIL-006's Credential Resolver with
-  an uncaught error whenever a client lacks the requested credential
-  category (surfaced via WF-019 email-send inside BC-053's approval
-  flow, for a client with no email connection). Unrelated to any
-  per-client credential. Needs human OAuth reconnection in n8n — Credential
-  Gate, cannot self-resolve. Callers that hit this today (like
-  `resolve-pending-verification`) already handle the failure gracefully
-  (no crash, no false success), but the underlying UTIL-006 reliability
-  gap is real and worth fixing independently.
-- **CancelAppointment's real calendar-event deletion is not built
-  (BC-053):** approving a queued cancellation genuinely cancels in
-  Zenny's own DB (`conversions.final_state='cancelled'`) but does NOT
-  yet delete the event from the client's real Google Calendar/Calendly —
-  no existing DELETE-event pattern exists anywhere in the platform to
-  reuse (WF-002's Provider Router is read-only). Honestly disclosed via
-  `execution_result.calendar_delete: 'not_implemented_this_card'`, not
-  faked. Worth a future Build Card once wanted for real — likely mirrors
-  BC-052/053's provider-router-call pattern.
+- ~~`zenny-notification-sender` Gmail credential expired~~ **CLOSED
+  2026-08-14.** Human reconnected via n8n UI; live-reverified via the
+  exact real failing path (WF-019 → UTIL-006 → Tool Execution Fallback →
+  UTIL-004, real Gmail send, message id `19ffd2a904ae2bcf`). See WF-019's
+  `Workflow_Registry.md` entry.
+- ~~CancelAppointment's real calendar-event deletion~~ **CLOSED (BC-055,
+  2026-08-14).** `resolve-pending-verification`'s approve path now
+  deletes the real Google Calendar event (Calendly cancellation built,
+  not live-tested — no roster Calendly connection). Real end-to-end
+  proof: created a real disposable Google event, deleted it via the live
+  deployed Edge Function, independently confirmed `status: "cancelled"`
+  on Google's side. See `Wiki/infra/verification-approval-queue.md`.
 - **Residual, smaller-severity security gap (found BC-052, not fixed):**
   the connect/lifecycle Edge Functions (`oauth-callback`,
   `shopify-connect`, `woocommerce-connect`, `connection-lifecycle`) all
@@ -311,25 +332,30 @@ Reconnect: no new backend, reuses the existing Connect flow.
 
 **BC-053 complete (2026-08-14): Verification Approval Queue built, live-
 verified.** Opt-in per client, off by default. WF-013/WF-016 both
-regression-proven unchanged when off. Real DB-side execution on approve;
-calendar-event deletion and the `zenny-notification-sender` credential
-gap both disclosed, not fixed (see Active Blockers). This was the last
-of the 3 Build Cards from the 2026-08-14 decision session — all done.
+regression-proven unchanged when off. Real DB-side execution on approve.
+Its 2 disclosed gaps from this card (calendar-delete, credential
+reconnect) were both closed later the same session — see below.
+
+**Credential reconnect verified, BC-054/055/056 complete (2026-08-14):**
+all 4 remaining Next-Build-Card candidates from that list were closed in
+one continued session (see Last Updated above for full detail):
+`zenny-notification-sender` reconnect live-reverified; BC-054 (recovery
+max-steps enforcement); BC-055 (CancelAppointment real calendar-event
+deletion, live-proven end-to-end against a real disposable Google
+event); BC-056 (INT-008's real ownership-release caller). The residual
+Edge Function client_id-trust gap (BC-052 finding) and Phase 5A/5D/
+SCH-007 remain open — see below.
 
 No Build Card currently issued and un-actioned. Candidates for next
 session, roughly in order of what's most immediately useful:
-1. Fix the `zenny-notification-sender` n8n credential (human OAuth
-   reconnection — quick once the human does the reconnect step).
-2. CancelAppointment's real calendar-event deletion (only matters once
-   a real client actually opts into the verification tier).
-3. INT-008's ownership-release caller — worth scoping together with the
-   escalation/ownership concept BC-053 touched, rather than separately.
-4. The recovery max-steps enforcement gap (design direction discussed:
-   per-client `max_recovery_steps` override falling back to a small
-   `control.archetype_recovery_defaults` lookup table).
-5. The residual Edge Function client_id-trust gap (BC-052 finding, low
-   severity today).
-6. Phase 5A (Inventory dashboard) / 5D (Onboarding dashboard), SCH-007.
+1. The residual Edge Function client_id-trust gap (BC-052 finding, low
+   severity today — `oauth-callback`/`shopify-connect`/
+   `woocommerce-connect`/`connection-lifecycle` trust body-supplied
+   `client_id`; `release-lead-ownership` (BC-056) shows the fix pattern
+   — forward the caller's real JWT instead).
+2. Calendly's real calendar-delete path (BC-055 built it to spec but
+   could not live-test — no roster Calendly connection).
+3. Phase 5A (Inventory dashboard) / 5D (Onboarding dashboard), SCH-007.
 
 ADP-001 (Voiceflow Adapter doc/reality mismatch) dropped from candidates
 per human instruction (2026-08-14) — no longer worth investigating.
@@ -339,29 +365,22 @@ Blockers, deferred.)
 ## Handoff Note (for next session)
 
 **Where things stand:** Phase 8 (Conversion Engine, all 11 Tools) done.
-Phase 9 (Recovery Engine) has all 4 internal workflows + SCH-001 live
-(WF-018, INT-006, INT-007, INT-008); INT-007 is genuinely wired into
-Email Manager's live chain, INT-008 is proven but has no caller (see
-Active Blockers). Phase 10 (Email Manager) is feature-complete: all 7
-workflows live (WF-019, INT-009/010/011/012, SCH-003/004), fully chained
-and cadenced, no open Credential Gate. KB source is Notion+Pinecone;
+Phase 9 (Recovery Engine) is now fully live and closed-loop: all 4
+internal workflows + SCH-001 (WF-018, INT-006, INT-007, INT-008), INT-007
+wired into Email Manager's live chain, INT-008 now has a real dashboard
+caller (BC-056), max-steps genuinely enforced (BC-054). Phase 10 (Email
+Manager) is feature-complete: all 7 workflows live, fully chained and
+cadenced, no open Credential Gate. KB source is Notion+Pinecone;
 Convocore stays wired-dormant. All 3 human-approved Build Cards from the
-2026-08-14 decision session shipped this session: BC-051 (Dashboard Auth
-Mapping — real `control.dashboard_users` caller-identity mechanism),
-BC-052 (Connection Lifecycle Actions — real Revoke/Reconnect/Refresh,
-plus an unplanned critical anon-key RPC exposure found and fixed live,
-see `Wiki/platform-quirks/anon-grant-exposure-bc052.md`), BC-053
-(Verification Approval Queue — opt-in, off by default, real DB-side
-execution, calendar-delete and a `zenny-notification-sender` credential
-gap both disclosed not fixed, see `Wiki/infra/verification-approval-queue.md`).
-Nothing is mid-flight; the next session starts clean. Full narrative:
-`Wiki/log.md` (search by BC number).
+2026-08-14 decision session shipped (BC-051/052/053), then all 4
+remaining Next-Build-Card candidates also shipped the same session
+(credential reconnect, BC-054/055/056) — see `Wiki/log.md` for full
+narrative of each. Nothing is mid-flight; the next session starts clean.
 
 **What's genuinely open, in priority order:** see Next Build Card
-candidates above (credential reconnection, calendar-delete integration,
-INT-008's caller, max-steps enforcement, the Edge Function trust gap,
-then Phase 5A/5D/SCH-007). `appointments` doc diff stays deferred, see
-Active Blockers.
+candidates above (Edge Function client_id-trust gap, Calendly
+calendar-delete, then Phase 5A/5D/SCH-007). `appointments` doc diff
+stays deferred, see Active Blockers.
 
 Nothing requires human acknowledgment before proceeding — all
 self-resolved document-level items from recent sessions are logged in

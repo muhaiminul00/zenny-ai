@@ -97,13 +97,23 @@ still built and live-tested standalone (per explicit human decision,
 BC-050) rather than deferred again, so the resume/stop-at-max-steps logic
 is proven the moment a real ownership-release mechanism gets scoped.
 
-**Real gap surfaced by this investigation, not fixed by it:** no
-per-archetype max-recovery-step count exists anywhere in the DB
-(`leads.recovery_profile` is free text), and neither WF-018 nor
-INT-006/SCH-001 enforce `Agent_Runtime_System_v1.md` §6's "max steps
-reached → Stopped" stop condition — a lead could theoretically keep
-receiving recovery sends past its archetype's documented step count.
-INT-008 reproduces `Recovery_Engine_Flow.md` §3's step-count table as a
-local hardcoded map for its own resume-decision use only; that doesn't
-enforce the condition at the sweep level. Flagged in `PROJECT_STATE.md`
-Active Blockers as a genuine future Build Card, not resolved here.
+**Gap closed (BC-054, 2026-08-14):** `control.archetype_recovery_defaults`
+(one row per archetype, seeded from `Recovery_Engine_Flow.md` §3's exact
+step counts — emergency 3, appointment 4, commerce_ecom 3,
+commerce_restaurant 2, consultation 5, engagement 3, the same source
+INT-008's own hardcoded map already reproduced) + a nullable
+`control.clients.max_recovery_steps` per-client override (`NULL` = use
+the archetype default; no roster client has this set, so no existing
+behavior changed). Enforced in two places: `advance_client_recovery_step`
+now flips `status` to `'stopped'` in the same atomic UPDATE the instant
+a step reaches the effective max (matching
+`Recovery_Engine_Flow.md` §6's StatusMap — "Max steps reached → Stopped"
+— exactly, real cause not a synthetic one), and `get_due_recovery_queue`
+defensively excludes any row whose `current_step` already reached the
+max as a second gate. Live-verified against 3 disposable fixtures on
+Client B (emergency, effective max 3): a step-2 row advanced to step 3
+and correctly flipped to `stopped`; a pre-existing step-3 row was
+correctly excluded from the sweep; a step-0 row advanced to step 1 and
+correctly stayed `active` (regression — below-max advances unaffected).
+All fixtures deleted after verification. See `PROJECT_STATE.md` (Active
+Blocker removed).
