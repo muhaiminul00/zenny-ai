@@ -9,6 +9,85 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-14] session-BC-051 | Dashboard Auth Mapping table built, published, live-verified
+
+**Execute (/execute):** Mandatory MCP Verification first — read both
+existing `app_metadata`-reading RPCs (`dashboard_get_my_client_schema`,
+`dashboard_get_my_client`), confirmed via `pg_constraint` that
+`control.clients.client_schema_name` has no unique constraint (so the new
+table FKs to `client_id`, the real PK, not a duplicated text column —
+self-resolved mechanical/structural decision, Document Resolution
+Authority tier 3), confirmed only 1 real dashboard user exists
+(`test-dashboard-bc015@zenny.internal`), confirmed no dashboard-repo or
+Edge Function code path currently provisions dashboard users (it's done
+manually via Admin API — no automation to update).
+
+Applied migration `add_dashboard_users_mapping_table`: new
+`control.dashboard_users(auth_user_id, client_id, role, created_at)`,
+RLS enabled, no anon/authenticated grants; backfilled the 1 existing user
+from their `app_metadata`; `CREATE OR REPLACE`'d both existing RPCs to
+read the new table (grants survived the replace, verified before/after);
+added new `dashboard_provision_user(p_auth_user_id, p_client_id, p_role)`
+RPC, `service_role`-only, as the real replacement for manually setting
+`app_metadata` going forward.
+
+**Live-verified, all 5 acceptance criteria:** (1) backfill matched
+1-for-1; (2) regression-tested — `dashboard_get_my_client_schema()` under
+the real user's simulated JWT (`set_config('request.jwt.claims', ...)`
++ `set local role authenticated`) returned the identical
+`client_test_002_acme_commerce_test` as before the migration; (3) an
+unmapped `auth.uid()` correctly fails closed
+("No dashboard_users mapping..."); (4) `dashboard_provision_user` upsert
+confirmed working, and confirmed an `authenticated`-role caller gets
+`permission denied for function` (service_role-only holds); (5) direct
+`SELECT` on `control.dashboard_users` as `authenticated` correctly denied
+(no grant, RLS present).
+
+New Wiki fact page `infra/dashboard-auth-mapping.md` written (mechanism,
+what it replaced, what's still not built — no dashboard-UI provisioning
+flow exists yet, this RPC just gives the next one a real target instead
+of `app_metadata`). `decisions/dashboard-auth-mapping.md` closed,
+`Wiki/index.md` updated. No n8n workflow touched — `Workflow_Registry.md`
+not applicable this card. Per bounded auto-handoff (card wrote to live
+Supabase state), stopping for pulse-check before BC-052.
+
+## [2026-08-14] session-decisions | 4 open product decisions resolved by human; BC-051/052/053 planned
+
+**Commander (/commander):** Advisor-mode conversation surfaced and closed all 4
+items in `Wiki/decisions/`, previously logged as open with no build action:
+
+1. **Calendar category-sharing** → stays "one provider at a time," no schema
+   change. Closed permanently, no future card.
+2. **Disconnect provider revocation** → build real per-provider revoke calls
+   (Google, Shopify, Calendly, Cal.com, WooCommerce) plus dedicated
+   Revoke/Reconnect/Refresh dashboard actions (today only Disconnect exists).
+   Scoped as BC-052.
+3. **Dashboard auth mapping** → build `control.dashboard_users`, a real
+   `auth.users.id → client_schema_name` mapping table, replacing the
+   `app_metadata` stopgap (chosen over the JWT-claim-hook and
+   keep-app_metadata alternatives — supports self-serve signup, explicit
+   and queryable). Scoped as BC-051.
+4. **Verification-tier redesign** → build the third, queued-human-approval
+   tier for WF-013 (CancelAppointment) / WF-016 (UpdateCustomer), including
+   making Phase 5C's Appointments dashboard write-capable. Scoped as BC-053.
+
+**Sequencing decision:** BC-051 first — both BC-052 and BC-053 add new
+dashboard-write RPCs that need a real caller-identity check, and building
+those on top of the `app_metadata` stopgap now would mean redoing them once
+BC-051 lands. BC-052 next (self-contained, reuses existing Integrations
+dashboard). BC-053 last (largest: new approval-queue table, WF-013/WF-016
+rewiring, Appointments dashboard read-only→write-capable). All three
+Build Cards issued in this session for human approval before auto-handoff
+to Execute. `Wiki/decisions/*.md` and `Wiki/index.md` updated to DECIDED
+(BC-052/053 stay "open until that card ships" — this session only planned,
+did not build).
+
+**Follow-up decision:** BC-053's third verification tier is **opt-in per
+client**, not a default-behavior replacement — existing clients keep
+today's always-handoff behavior on WF-013/WF-016 until a new
+`control.clients` flag is explicitly turned on for them. All 3 cards
+approved; execution starts with BC-051 (auth mapping, foundational).
+
 ## [2026-08-13] session-BC-050 | INT-007 (Stop Recovery) + INT-008 (Resume Recovery) built, published, live-verified — INT-007 genuinely wired into Email Manager; INT-008 standalone by design
 
 **Commander (/commander):** Human said "Build INT-007/INT-008 next." Before drafting the Build Card, read the actual spec (`Agent_Runtime_System_v1.md` §6/§6.1/Paused-State Resumption) rather than assuming the two workflows were symmetric halves of one feature. Found: INT-007 (reply stops the cadence) is genuinely unblocked by Phase 10 as originally assumed — INT-009/010 already resolve inbound emails to a `customer_id`. INT-008 (resume) is NOT reply-triggered per the spec's own resumption triggers (A: reply, handled by INT-007 itself, not a resume; B: human closes task without reply, needs `human_ownership_flag` to clear; C: live conversation ends without conversion) — and a grep confirmed nothing anywhere in the built system writes `human_ownership_flag=false`, so INT-008's real trigger has no event source. Surfaced this to the human before issuing the card rather than silently building a narrower or broader scope than expected — asked how to scope INT-008 given the gap. **Human decision:** build INT-008's logic standalone, no caller, rather than deferring again. Issued BC-050 with that scope. Bounded auto-handoff to Execute (card was always going to touch live n8n/Supabase state).

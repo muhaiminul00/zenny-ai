@@ -30,6 +30,7 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 - [infra/traefik-proxies.md](infra/traefik-proxies.md) — the dashboard.zeromanuals.com and auth.zeromanuals.com Traefik routers and the real Host-header-rewrite mechanism that makes the OAuth proxy work.
 - [infra/supabase-tier-limits.md](infra/supabase-tier-limits.md) — the Supabase org is still on the free tier; the branded-domain need was solved by a VPS-side proxy instead of a Pro upgrade.
 - [infra/platform-limitations.md](infra/platform-limitations.md) — Hostinger's Compose API has no `build:` key support, and the restart-vs-recreate container trap it leads to.
+- [infra/dashboard-auth-mapping.md](infra/dashboard-auth-mapping.md) — `control.dashboard_users`, the real mapping table (BC-051) that replaced the `app_metadata` stopgap; the new `dashboard_provision_user` RPC for creating dashboard users going forward.
 
 ## Platform Quirks
 
@@ -44,7 +45,7 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 
 ## Open Decisions
 
-- [decisions/calendar-category-sharing.md](decisions/calendar-category-sharing.md) — should Google Calendar and Calendly/Cal.com be able to coexist per client instead of sharing one `category` slot? Still open.
-- [decisions/disconnect-provider-revocation.md](decisions/disconnect-provider-revocation.md) — should dashboard Disconnect also revoke access at the provider, not just locally? Still open.
-- [decisions/dashboard-auth-mapping.md](decisions/dashboard-auth-mapping.md) — which production mechanism should map a dashboard Auth user to their client schema (3 options identified, none chosen)? Still open.
-- [decisions/verification-tier-redesign.md](decisions/verification-tier-redesign.md) — should CancelAppointment/UpdateCustomer get a third, queued-human-approval verification tier beyond today's binary auto-execute/always-handoff? Still open.
+- [decisions/calendar-category-sharing.md](decisions/calendar-category-sharing.md) — DECIDED 2026-08-14: one calendar provider at a time, no schema change. Closed.
+- [decisions/disconnect-provider-revocation.md](decisions/disconnect-provider-revocation.md) — DECIDED 2026-08-14: build real per-provider revocation + Revoke/Reconnect/Refresh actions. Scoped as BC-052, still open until that card ships.
+- [decisions/dashboard-auth-mapping.md](decisions/dashboard-auth-mapping.md) — DECIDED + BUILT (BC-051): `control.dashboard_users` mapping table live. See [[infra/dashboard-auth-mapping]]. Closed.
+- [decisions/verification-tier-redesign.md](decisions/verification-tier-redesign.md) — DECIDED 2026-08-14: build the third, queued-human-approval verification tier. Scoped as BC-053, still open until that card ships.
