@@ -40,7 +40,7 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 - [platform-quirks/recovery-queue-sweep-design.md](platform-quirks/recovery-queue-sweep-design.md) — why INT-006's client sweep doesn't filter on `control.clients.status` (unused as a gate anywhere else), the `human_ownership_flag` check WF-018 itself never covers, and BC-041's per-client active-hours window replacing WF-018's old hardcoded UTC 8-20.
 - [platform-quirks/mode-self-invocation-limits.md](platform-quirks/mode-self-invocation-limits.md) — `/commander`/`/execute`/`/advisor` are real self-invocable Skills (they write `mode.json` for real); `/clear`/`/compact` are not — no tool exists for either, so they're recommended to the human, never self-triggered.
 - [platform-quirks/n8n-openrouter-direct-llm-pattern.md](platform-quirks/n8n-openrouter-direct-llm-pattern.md) — the `chainLlm`+`lmChatOpenRouter`+structured-output pattern for the first direct AI judgment call made from n8n itself (INT-010), and why it was a human decision, not self-resolved.
-- [platform-quirks/notion-pinecone-kb-pattern.md](platform-quirks/notion-pinecone-kb-pattern.md) — Email Manager's Notion+Pinecone multi-tenant KB design (INT-011/INT-012), why Convocore's KB API was dropped (a real account-plan/billing gate), and the open Pinecone-credential gate.
+- [platform-quirks/notion-pinecone-kb-pattern.md](platform-quirks/notion-pinecone-kb-pattern.md) — Email Manager's Notion+Pinecone multi-tenant KB design (INT-011/INT-012), why Convocore's KB API was dropped, the resolved Pinecone-credential-type gate, and the still-open Notion-credential-secret-mismatch gate.
 
 ## Open Decisions
 

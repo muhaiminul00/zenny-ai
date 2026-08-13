@@ -10,17 +10,30 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-13 — by /execute — BC-047 complete: INT-011 Draft Email + INT-012
-Sync Notion KB built, published, live-verified (Phase 10, Email Manager).
-KB source pivoted from Convocore (hit a real, confirmed account-plan
-billing gate — see `Wiki/log.md`) to Notion (doc storage) + Pinecone
-(vector search, `namespace = client_id`) — Convocore path stays wired-
-dormant, not deleted. INT-011 is Level 2 only (draft + human-approval);
-Complaint/Refund always escalate to WF-017. `reply_style` resolved to
-`'generative'` always (no scripted-template content exists in the DB).
-7 new RPCs, all verified live via direct SQL/REST; 5 `test_workflow`-
-pinned scenarios passed. One disclosed Credential Gate open — see Active
-Blockers. Full narrative: `Wiki/log.md`.
+2026-08-13 — by /execute — BC-048 complete: Email Manager chain is now
+genuinely live-wired end to end. INT-009 → INT-010 → INT-011 fan out for
+real (Execute Workflow, `mode: 'each'`); Pinecone credential fixed
+(native `pineconeApi` type, not `httpHeaderAuth` as BC-047 assumed) and
+live-verified working. Found+fixed a real pre-existing BC-045 bug in
+INT-010: `list_client_email_categories`'s HTTP response gets split into
+N separate n8n items, but the prompt-builder code only read the first
+one, so the LLM's category prompt was silently empty on every real run
+and it hallucinated categories instead (reproduced live 3x, now fixed).
+After the fix, a full live round trip (categorize → DB write → draft →
+Pinecone query → fallback grounding → draft written) was proven genuinely
+live for the first time. One Credential Gate remains: `zenny-notion-api`'s
+stored secret does not match the token that was supplied (confirmed via
+direct Notion REST call) — blocks only INT-012's Notion leg. Full
+narrative: `Wiki/log.md`.
+
+2026-08-13 (same day, prior) — BC-047 complete: INT-011 Draft Email + INT-012
+Sync Notion KB built, published (Phase 10, Email Manager). KB source
+pivoted from Convocore (hit a real, confirmed account-plan billing gate)
+to Notion (doc storage) + Pinecone (vector search, `namespace =
+client_id`) — Convocore path stays wired-dormant, not deleted. INT-011 is
+Level 2 only (draft + human-approval); Complaint/Refund always escalate
+to WF-017. `reply_style` resolved to `'generative'` always. Full
+narrative: `Wiki/log.md`.
 
 2026-08-12 (prior session) — BC-045 complete: INT-010 Categorize Email
 built and published, closing INT-009's disclosed gap — first n8n-direct
@@ -39,11 +52,12 @@ cadence now fires automatically, email channel only per explicit scope
 cut; INT-007/008 stop/resume not started, still deferred pending
 Phase 10's reply-trigger surface)
 Phase 10 — Email Manager — IN PROGRESS (WF-019, INT-009, INT-010, INT-011,
-INT-012 all built/published/verified (BC-043/044/045/047). KB source is
-now Notion+Pinecone, not Convocore (blocked, see Active Blockers). SCH-003
-(inbox cadence), SCH-004 (KB sync cadence) not started; INT-009→010→011
-chaining still a small wiring follow-up; Pinecone credential still needs
-manual creation before full live verification)
+INT-012 all built/published/verified (BC-043/044/045/047/048). KB source
+is Notion+Pinecone, not Convocore (dormant). INT-009→010→011 now
+genuinely chained and live-verified end to end (Pinecone leg). SCH-003
+(inbox cadence), SCH-004 (KB sync cadence) not started. One Credential
+Gate open: `zenny-notion-api`'s stored secret needs re-pasting — blocks
+only INT-012's Notion leg, see Active Blockers)
 
 ## Standing Gate
 None open.
@@ -79,25 +93,29 @@ Recovery Engine ........ 🟡 partial — WF-018 SendRecoveryMessage +
                           (BC-041); stop/resume (INT-007/008) not built
 Email Manager .......... 🟡 partial — WF-019, INT-009, INT-010, INT-011
                           (draft), INT-012 (Notion KB sync) all live-
-                          tested (BC-043/044/045/047); KB source is Notion+
-                          Pinecone now, Convocore path wired-dormant
-                          (blocked, see Active Blockers); SCH-003/SCH-004
-                          cadences and the INT-009→010→011 call chain not
-                          built yet (small wiring follow-up, not a scope
-                          gap); Pinecone credential still needs manual
-                          creation (see Active Blockers)
+                          tested (BC-043/044/045/047/048); KB source is
+                          Notion+Pinecone, Convocore path wired-dormant;
+                          INT-009→010→011 now genuinely chained and live-
+                          verified end to end for the Pinecone leg;
+                          SCH-003/SCH-004 cadences not built yet; INT-012's
+                          Notion leg blocked on a credential-secret
+                          mismatch (see Active Blockers)
 Credentials Platform ... ✅ working — Wiki/credentials/
 Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
 ```
 
 ## Active Blockers
-- **Credential Gate (BC-047):** a "Pinecone API Key" HTTP Header Auth
-  credential does not exist in the live n8n instance — the MCP cannot
-  create credentials. Human action: Credentials → New → Header Auth →
-  Name `Api-Key`, Value the Pinecone key already supplied → select it on
-  INT-011's `Query Pinecone` and INT-012's `Upsert To Pinecone` nodes.
-  Both workflows are otherwise production-ready; this only blocks a fully
-  unpinned live-verification pass.
+- **Credential Gate (BC-048):** the `zenny-notion-api` n8n credential's
+  stored secret does not match the token that was supplied in chat — live
+  `List Child Pages` calls in INT-012 404 on a page that a direct `curl`
+  using the supplied token (confirmed to be the same "n8n" bot
+  integration) can see fine. The MCP cannot read or fix a stored
+  credential secret. Human action: open the `zenny-notion-api` credential
+  in the n8n UI and re-paste the exact Internal Integration Secret token.
+  This blocks only INT-012's Notion leg — the Pinecone leg (INT-011 +
+  INT-012's upsert) is fixed and live-verified working (BC-048 found the
+  Pinecone credential was created as native `pineconeApi` type, not
+  `httpHeaderAuth` as BC-047 assumed, and corrected both nodes).
 - **External, Convocore-KB path blocked:** Convocore's REST API now
   returns 403 "requires Business plan or higher" workspace-wide (`Zenny-
   UI` workspace, same secret/agent that worked live on 2026-08-02/04) —
@@ -148,44 +166,51 @@ hit a real account-plan/billing gate mid-verification, before any live
 n8n/Supabase state was touched.** Not resumed — superseded by BC-047.
 
 **BC-047 complete (2026-08-13): INT-011 Draft Email + INT-012 Sync Notion
-KB built, published, verified (5 pinned scenarios across both + 7 RPCs
-verified genuinely live via direct SQL/REST).** Pivoted the KB source
-from Convocore to Notion+Pinecone per human decision. One disclosed
-Credential Gate open (Pinecone API key needs manual n8n credential
-creation — see Active Blockers). Per the bounded auto-handoff rule, the
-loop stopped here (this card wrote to live n8n/Supabase/credentials) for
-a human pulse-check before continuing Phase 10.
+KB built, published.** Pivoted the KB source from Convocore to
+Notion+Pinecone per human decision.
+
+**BC-048 complete (2026-08-13): Email Manager chain genuinely live-wired.**
+INT-009 → INT-010 → INT-011 now fan out for real; fixed the Pinecone
+credential-type mismatch (native `pineconeApi`, not `httpHeaderAuth`) and
+proved it live; found and fixed a real pre-existing BC-045 bug in INT-010
+(`list_client_email_categories`'s n8n item-splitting silently emptied the
+LLM's category prompt on every real run); full live round trip proven
+(categorize → DB write → draft → Pinecone query → fallback → draft
+written). One Credential Gate remains open (`zenny-notion-api` secret
+mismatch — see Active Blockers), blocking only INT-012's Notion leg. Per
+the bounded auto-handoff rule, the loop stops here (this card wrote to
+live n8n/Supabase/credentials, and hit a Credential Gate) for a human
+pulse-check before continuing Phase 10.
 
 No Build Card currently issued and un-actioned. Candidates for the next
-session, in dependency order for Phase 10: (1) create the Pinecone n8n
-credential (human action, unblocks full live verification of INT-011/
-INT-012), (2) wire INT-009 → INT-010 → INT-011 as a real call chain (each
-built/verified independently, not yet connected), (3) SCH-003 (inbox sync
-cadence) + SCH-004 (KB sync cadence, new). Other candidates: Phase 5A
-(Inventory dashboard) / 5D (Onboarding dashboard), SCH-007, ADP-001
-doc/reality investigation. (`appointments` doc diff intentionally NOT in
-this list — see Active Blockers, deferred.)
+session, in dependency order for Phase 10: (1) fix the `zenny-notion-api`
+credential secret (human action, unblocks full live verification of
+INT-012's Notion leg), (2) SCH-003 (inbox sync cadence) + SCH-004 (KB sync
+cadence, new). Other candidates: Phase 5A (Inventory dashboard) / 5D
+(Onboarding dashboard), SCH-007, ADP-001 doc/reality investigation.
+(`appointments` doc diff intentionally NOT in this list — see Active
+Blockers, deferred.)
 
 ## Handoff Note (for next session)
 
 **Where things stand:** Phase 8 (Conversion Engine, all 11 Tools) done.
 Phase 9 (Recovery Engine) has 3/4 internal workflows live; INT-007/008
 (reply-based stop/resume) deliberately deferred. Phase 10 (Email Manager)
-now has 5 workflows live: WF-019 SendEmailReply, INT-009 Sync Inbox,
-INT-010 Categorize Email, INT-011 Draft Email, INT-012 Sync Notion KB —
-each built/verified independently but not yet chained together end-to-end
-(small wiring follow-up). KB source is Notion+Pinecone; Convocore stays
-wired-dormant pending a plan-tier decision. Nothing is mid-flight; the
-next session starts clean. Full narrative: `Wiki/log.md` (search by BC
-number).
+has 5 workflows live: WF-019 SendEmailReply, INT-009 Sync Inbox, INT-010
+Categorize Email, INT-011 Draft Email, INT-012 Sync Notion KB — now
+genuinely chained (INT-009→010→011) and live-verified end to end for the
+Pinecone leg. KB source is Notion+Pinecone; Convocore stays wired-dormant.
+Nothing is mid-flight; the next session starts clean. Full narrative:
+`Wiki/log.md` (search by BC number).
 
 **What's genuinely open, in priority order:**
-1. Create the Pinecone n8n credential — see Active Blockers.
+1. Fix the `zenny-notion-api` credential's stored secret — see Active
+   Blockers. Blocks only INT-012's Notion leg.
 2. No roster client (old or new) has a real connected calendar/
    ecommerce store. (Email/Gmail is the one exception, Client A only.)
 3. `appointments` doc diff — deferred, see Active Blockers.
-4. Phase 10 continuation: wire INT-009 → INT-010 → INT-011 for real, then
-   SCH-003 + SCH-004.
+4. Phase 10 continuation: SCH-003 (inbox cadence) + SCH-004 (KB sync
+   cadence).
 5. Everything else is a genuine next-phase choice — see Next Build Card
    candidates above.
 

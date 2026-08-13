@@ -34,6 +34,18 @@ recurring class of bug in this project):**
   into `item.json` being the row object directly (not an array of one) —
   code assuming `Array.isArray(rows)` on such a response will always be
   false, wrongly treating a real successful result as "not found."
+- The general case of the above: a MULTI-row JSON array HTTP response is
+  split into one n8n ITEM PER array element, not one item containing the
+  whole array. A downstream Code node reading `$('Node').item.json` only
+  ever sees the FIRST element, and `Array.isArray()` on it is always
+  `false`. Confirmed live, BC-048: INT-010's `list_client_email_categories`
+  RPC genuinely returns all 16 categories over HTTP, but `Build
+  Classification Prompt`/`Match Category` read `.item.json` and got an
+  empty list every real run since BC-045 — the LLM's prompt silently had
+  no real categories to choose from and hallucinated one instead (never
+  caught because BC-045's pinned test data for that node wasn't shaped as
+  N separate items). Fix: `$('Node').all().map(i => i.json)` to gather
+  every item, not `.item.json` for the first one only.
 
 **2. Output-pin wiring gotchas:**
 - `Execute Workflow` nodes calling a sub-workflow with multiple internal

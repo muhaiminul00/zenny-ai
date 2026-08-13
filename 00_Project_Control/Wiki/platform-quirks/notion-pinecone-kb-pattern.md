@@ -82,14 +82,45 @@ Calendar scopes) risks triggering Google's sensitive-scope re-
 verification process. Notion's internal-integration token model sidesteps
 that entirely — no OAuth consent flow, no scope review, single API key.
 
-## Open credential gate
+## Credential gates (BC-048 update)
 
-The n8n MCP cannot create credentials (a known, documented limitation).
-A "Pinecone API Key" HTTP Header Auth credential (header name `Api-Key`)
-needs manual creation in the n8n UI before INT-011/INT-012 can be fully
-live-verified end-to-end (structural/pinned testing is complete and
-passing on both). See `PROJECT_STATE.md` Active Blockers for the exact
-steps.
+**Pinecone — resolved.** The human-created `zenny-pinecone-api` credential
+turned out to be a native `pineconeApi`-typed credential, not the
+`httpHeaderAuth` type BC-047 assumed (the MCP can't create credentials, so
+it never got to verify the type live until BC-048). Both `Query Pinecone`
+(INT-011) and `Upsert To Pinecone` (INT-012) switched from
+`genericCredentialType`/`httpHeaderAuth` to `predefinedCredentialType`/
+`pineconeApi` — live-verified working (see below).
+
+**Notion — newly found broken, still open.** Live-testing INT-012 hit a
+real 404: `List Child Pages` (credential `zenny-notion-api`) cannot see
+the client's own KB root page. Direct `curl` verification against
+`api.notion.com` using the exact token supplied in chat confirms that
+token *does* belong to the "n8n" bot integration that owns and can see
+the page — meaning the n8n credential's stored secret does not actually
+match the token that was supplied (a credential-store mismatch, not a
+sharing/permissions problem). The MCP cannot read or fix a stored
+credential secret. **Human action:** open the `zenny-notion-api`
+credential in the n8n UI and re-paste the exact Internal Integration
+Secret, then INT-012's Notion→Pinecone round trip can be genuinely
+live-verified for the first time.
+
+## BC-048 live verification (Pinecone leg only)
+
+Triggered INT-010 for real (via a temporary harness, deleted after) with
+a genuine test email against Client A. Full chain ran live: customer
+resolution → categorization → `emails` row write → INT-010's new call
+into INT-011 → real embed → real Pinecone query (0 matches, namespace
+still empty since INT-012 can't sync yet) → correct fallback grounding →
+real LLM draft → real `update_client_email_draft` write, confirmed via
+direct SQL. This is the first genuinely-live proof the Pinecone leg
+authenticates and works end-to-end; only the Notion-sourced KB-match
+branch remains unverified, blocked on the credential above.
+
+While chasing this, also found and fixed a real, pre-existing bug in
+INT-010 (BC-045, not this pattern's own code) that was silently causing
+every real categorization to fail — see
+[[n8n-node-behaviors]] for the n8n array-response-splitting root cause.
 
 ## Related
 
