@@ -77,3 +77,21 @@ export interface AppointmentListItem {
 export interface AppointmentDetail extends AppointmentListItem {
   source_channel: string;
 }
+
+// BC-053: opt-in third verification tier (queued human-approval -> real
+// auto-execute) for WF-013 CancelAppointment / WF-016 UpdateCustomer.
+export type PendingVerificationTool = 'CancelAppointment' | 'UpdateCustomer';
+export type PendingVerificationTargetType = 'appointment' | 'customer';
+
+export interface PendingVerification {
+  pending_verification_id: string;
+  tool_name: PendingVerificationTool;
+  target_type: PendingVerificationTargetType;
+  target_id: string;
+  customer_id: string;
+  requested_payload: Record<string, unknown>;
+  status: 'pending' | 'approved_executed' | 'rejected';
+  created_at: string;
+  resolved_at: string | null;
+  execution_result: Record<string, unknown> | null;
+}

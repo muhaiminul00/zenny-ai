@@ -10,7 +10,32 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-14 (later) — by /execute — BC-052 complete: Connection Lifecycle
+2026-08-14 (latest) — by /execute — BC-053 complete: Verification
+Approval Queue built, live-verified — the last of the 3 Build Cards
+approved from this session's decision round (BC-051/052/053 all done).
+Opt-in per client (`control.clients.verification_tier_enabled`, default
+false — no existing client's behavior changed). WF-013/WF-016 each gained
+a branch: tier off = byte-identical to pre-BC-053 always-handoff
+(regression-proven live); tier on = queues a `pending_verifications` row
+(new table, dynamically created across all 10 client/template schemas)
+and responds `pending_approval`. New dashboard `/approvals` page +
+`resolve-pending-verification` Edge Function does the real execution on
+approve (`cancel_client_appointment`/`apply_customer_update`, both reusing
+existing columns — no new appointments/customers columns needed, a real
+scope-narrowing finding) + sends confirmation via WF-019's real webhook
+(reused, not rebuilt). **Known, disclosed gap:** CancelAppointment's real
+calendar-event deletion is not built (no existing DELETE pattern anywhere
+in the platform to reuse) — DB-side cancellation is real; calendar
+deletion honestly reported as not implemented. **Bug found+fixed mid-card:**
+a migration mistake briefly broke `get_client_appointment_with_customer`
+(WF-013/WF-015's real dependency) — caught within minutes via live
+testing, restored, reverified; no evidence real traffic was affected.
+**New unrelated finding:** n8n's internal `zenny-notification-sender`
+Gmail credential has expired, crashing UTIL-006 when a client lacks an
+email connection — needs human OAuth reconnection, not fixed this card.
+Full narrative: `Wiki/log.md`.
+
+2026-08-14 (earlier) — by /execute — BC-052 complete: Connection Lifecycle
 Actions built, live-verified. **Also: a critical live security exposure
 found mid-card and fixed** — ~40 internal RPCs (read_credential_secret,
 etc.) were granted EXECUTE to `anon` with no internal caller-identity
@@ -136,10 +161,13 @@ Growth Agent ........... ✅ working
 Conversion Engine ...... ✅ working — all 11/11 Tools built and live-tested (BC-034)
 Dashboard (5B/5C/Int) .. ✅ working — auth mapping now real (BC-051,
                           control.dashboard_users); Integrations page has
-                          real Revoke/Reconnect/Refresh (BC-052); a
-                          critical anon-key RPC exposure was found+fixed
-                          same session (see Active Blockers for the
-                          smaller residual gap); Wiki/infra/ for deployment
+                          real Revoke/Reconnect/Refresh (BC-052);
+                          Appointments dashboard gained a real write
+                          action (BC-053, /approvals page, opt-in per
+                          client, off by default); a critical anon-key
+                          RPC exposure was found+fixed same session (see
+                          Active Blockers for the smaller residual gap);
+                          Wiki/infra/ for deployment
 Recovery Engine ........ 🟡 partial — WF-018 SendRecoveryMessage +
                           INT-006/SCH-001 Process Recovery Queue +
                           INT-007 StopRecovery + INT-008 ResumeRecovery
@@ -203,6 +231,25 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
   missing the SCH-007 row.
 - UTIL-002 (Data Validator) has no real caller anywhere — not urgent,
   no live risk.
+- **n8n's internal `zenny-notification-sender` Gmail credential has
+  expired (found BC-053):** crashes UTIL-006's Credential Resolver with
+  an uncaught error whenever a client lacks the requested credential
+  category (surfaced via WF-019 email-send inside BC-053's approval
+  flow, for a client with no email connection). Unrelated to any
+  per-client credential. Needs human OAuth reconnection in n8n — Credential
+  Gate, cannot self-resolve. Callers that hit this today (like
+  `resolve-pending-verification`) already handle the failure gracefully
+  (no crash, no false success), but the underlying UTIL-006 reliability
+  gap is real and worth fixing independently.
+- **CancelAppointment's real calendar-event deletion is not built
+  (BC-053):** approving a queued cancellation genuinely cancels in
+  Zenny's own DB (`conversions.final_state='cancelled'`) but does NOT
+  yet delete the event from the client's real Google Calendar/Calendly —
+  no existing DELETE-event pattern exists anywhere in the platform to
+  reuse (WF-002's Provider Router is read-only). Honestly disclosed via
+  `execution_result.calendar_delete: 'not_implemented_this_card'`, not
+  faked. Worth a future Build Card once wanted for real — likely mirrors
+  BC-052/053's provider-router-call pattern.
 - **Residual, smaller-severity security gap (found BC-052, not fixed):**
   the connect/lifecycle Edge Functions (`oauth-callback`,
   `shopify-connect`, `woocommerce-connect`, `connection-lifecycle`) all
@@ -216,10 +263,10 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
 
 (ADP-001 doc/reality mismatch dropped per human instruction, 2026-08-14
 — no longer tracked. The 4 open product/design decisions were all
-resolved 2026-08-14 — see Wiki/decisions/: BC-051 done, BC-052 done,
-BC-053 queued, 1 closed with no build needed. A critical anon-grant
-RPC-exposure bug, unrelated to any of the 4 decisions, was found and
-fixed live during BC-052 — see Last Updated above.)
+resolved 2026-08-14 — see Wiki/decisions/: BC-051, BC-052, BC-053 all
+done; 1 closed with no build needed. A critical anon-grant RPC-exposure
+bug, unrelated to any of the 4 decisions, was found and fixed live
+during BC-052 — see Last Updated above.)
 ## Test-Client Roster
 ```
 Client A: baa673b5-c51a-4a7b-91f5-a37027f8dca4 — commerce_ecom — client_test_002_acme_commerce_test
@@ -262,26 +309,32 @@ build gap). Refresh: Google live-tested non-destructively; Shopify
 built but not live-tested (no live Shopify connection in the roster).
 Reconnect: no new backend, reuses the existing Connect flow.
 
-**Issued, queued next (approved by human, not yet started):**
-- **BC-053 — Verification Approval Queue:** third tier (queued human-
-  approval → real auto-execute) for WF-013 CancelAppointment / WF-016
-  UpdateCustomer, **opt-in per client** (new `control.clients` flag,
-  default off — human-decided 2026-08-14, does not replace always-handoff
-  by default). Requires Phase 5C Appointments dashboard to go read-only →
-  write-capable. Depends on BC-051 (done). Likely spans >1 session.
+**BC-053 complete (2026-08-14): Verification Approval Queue built, live-
+verified.** Opt-in per client, off by default. WF-013/WF-016 both
+regression-proven unchanged when off. Real DB-side execution on approve;
+calendar-event deletion and the `zenny-notification-sender` credential
+gap both disclosed, not fixed (see Active Blockers). This was the last
+of the 3 Build Cards from the 2026-08-14 decision session — all done.
+
+No Build Card currently issued and un-actioned. Candidates for next
+session, roughly in order of what's most immediately useful:
+1. Fix the `zenny-notification-sender` n8n credential (human OAuth
+   reconnection — quick once the human does the reconnect step).
+2. CancelAppointment's real calendar-event deletion (only matters once
+   a real client actually opts into the verification tier).
+3. INT-008's ownership-release caller — worth scoping together with the
+   escalation/ownership concept BC-053 touched, rather than separately.
+4. The recovery max-steps enforcement gap (design direction discussed:
+   per-client `max_recovery_steps` override falling back to a small
+   `control.archetype_recovery_defaults` lookup table).
+5. The residual Edge Function client_id-trust gap (BC-052 finding, low
+   severity today).
+6. Phase 5A (Inventory dashboard) / 5D (Onboarding dashboard), SCH-007.
 
 ADP-001 (Voiceflow Adapter doc/reality mismatch) dropped from candidates
 per human instruction (2026-08-14) — no longer worth investigating.
-
-Other candidates for whenever there's room: Phase 5A (Inventory
-dashboard) / 5D (Onboarding dashboard), SCH-007, the recovery
-max-steps-enforcement gap (design direction discussed: per-client
-`max_recovery_steps` override falling back to a small
-`control.archetype_recovery_defaults` lookup table, not a flat default —
-not yet a Build Card), scoping INT-008's ownership-release caller (likely
-folds into BC-053's escalation/approval-queue work rather than being
-separate — worth scoping together when BC-053 starts). (`appointments`
-doc diff intentionally NOT in this list — see Active Blockers, deferred.)
+(`appointments` doc diff intentionally NOT in this list — see Active
+Blockers, deferred.)
 
 ## Handoff Note (for next session)
 
@@ -292,29 +345,23 @@ Email Manager's live chain, INT-008 is proven but has no caller (see
 Active Blockers). Phase 10 (Email Manager) is feature-complete: all 7
 workflows live (WF-019, INT-009/010/011/012, SCH-003/004), fully chained
 and cadenced, no open Credential Gate. KB source is Notion+Pinecone;
-Convocore stays wired-dormant. BC-051 (Dashboard Auth Mapping) and
-BC-052 (Connection Lifecycle Actions) both shipped this session — real
-`control.dashboard_users` caller-identity mechanism, and real
-Revoke/Reconnect/Refresh on the Integrations page. A critical anon-key
-RPC exposure was also found and fixed live mid-BC-052 (see Last Updated
-above and `Wiki/platform-quirks/anon-grant-exposure-bc052.md`). Nothing
-is mid-flight; the next session starts clean. Full narrative:
+Convocore stays wired-dormant. All 3 human-approved Build Cards from the
+2026-08-14 decision session shipped this session: BC-051 (Dashboard Auth
+Mapping — real `control.dashboard_users` caller-identity mechanism),
+BC-052 (Connection Lifecycle Actions — real Revoke/Reconnect/Refresh,
+plus an unplanned critical anon-key RPC exposure found and fixed live,
+see `Wiki/platform-quirks/anon-grant-exposure-bc052.md`), BC-053
+(Verification Approval Queue — opt-in, off by default, real DB-side
+execution, calendar-delete and a `zenny-notification-sender` credential
+gap both disclosed not fixed, see `Wiki/infra/verification-approval-queue.md`).
+Nothing is mid-flight; the next session starts clean. Full narrative:
 `Wiki/log.md` (search by BC number).
 
-**What's genuinely open, in priority order:**
-1. **BC-053 (Verification Approval Queue) is issued and approved, not
-   yet started** — see Next Build Card above for full scope/deps.
-   Likely spans >1 session.
-2. The residual Edge Function client_id-trust gap (BC-052 finding, low
-   severity today) — see Active Blockers.
-3. `appointments` doc diff — deferred, see Active Blockers.
-4. INT-008's ownership-release caller — worth scoping together with
-   BC-053's approval-queue work rather than separately.
-5. The recovery max-steps enforcement gap — design direction discussed
-   (per-client override + archetype-default lookup table), not yet a
-   Build Card.
-6. Everything else is a genuine next-phase choice — see Next Build Card
-   candidates above.
+**What's genuinely open, in priority order:** see Next Build Card
+candidates above (credential reconnection, calendar-delete integration,
+INT-008's caller, max-steps enforcement, the Edge Function trust gap,
+then Phase 5A/5D/SCH-007). `appointments` doc diff stays deferred, see
+Active Blockers.
 
 Nothing requires human acknowledgment before proceeding — all
 self-resolved document-level items from recent sessions are logged in

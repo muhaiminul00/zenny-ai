@@ -9,6 +9,101 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-14] session-BC-053 | Verification Approval Queue built, published, live-verified; last of the 3 planned Build Cards
+
+**Execute (/execute):** Mandatory MCP Verification first — read live
+WF-013/WF-016 (confirmed: strictly binary, always handoff, no
+verification mechanism exists), `tpl_appointment.appointments` (confirmed:
+no `status` column at all — real structural gap), `conversions` (confirmed:
+`final_state`/`conversion_state` already has a real `'cancelled'` enum
+value — the correct existing place to represent cancellation, no new
+column needed), `customers`/`customer_preferences` (confirmed:
+`primary_contact_method` + a flexible preference key/value table already
+cover UpdateCustomer's arbitrary fields, no new columns needed), WF-002
+CheckAvailability (confirmed its Provider Router pattern is read-only,
+no DELETE precedent to reuse for calendar cancellation), and WF-019
+SendEmailReply (confirmed the real, reusable client-email-send mechanism
+— idempotent, suppression-checked, credential-resolved — and confirmed
+its `get_email_record` RPC gracefully returns `{found:false}` for an
+unknown `email_id` rather than erroring, meaning a fresh random id can be
+used without a pre-existing `emails` row).
+
+**Real scope correction from these findings:** the schema-design piece
+of this card ended up smaller than assumed (reuse, not new columns) but
+a genuinely new capability — real client-calendar event deletion for
+CancelAppointment — turned out to have no existing pattern to reuse
+anywhere in the platform. Rather than rush a first-ever calendar-DELETE
+integration untested within this same sitting, scoped it out as a
+disclosed gap (`execution_result.calendar_delete: 'not_implemented_this_card'`),
+consistent with the project's established disclosed-limitation precedent
+(UTIL-007's Calendly gap, BC-052's Shopify/WooCommerce revoke gap) rather
+than inventing something untested.
+
+**Built:** `control.clients.verification_tier_enabled` (opt-in, default
+false, human-decided 2026-08-14 — does not replace always-handoff for
+existing clients); `pending_verifications` table created dynamically
+across all 5 `tpl_*` templates + all 5 real client schemas (not
+hardcoded per-schema DDL) and registered in
+`create_client_schema_from_template` for future clients; RPCs
+(`get_client_verification_tier`, `queue_pending_verification`,
+`dashboard_list_pending_verifications`,
+`get_pending_verification_for_action`, `resolve_pending_verification`,
+`apply_customer_update`, `cancel_client_appointment`,
+`get_customer_contact`), none granted to `anon` (BC-052 discipline
+applied from the start this time); new Edge Function
+`resolve-pending-verification` (approve/reject); WF-013 and WF-016 each
+got a `Check Verification Tier -> Tier Enabled?` branch inserted via
+`update_workflow` (not SDK recreate — both are live, active workflows).
+
+**Real bug found and fixed mid-card:** a copy-paste error in one of this
+card's own migrations briefly overwrote `public.get_client_appointment_with_customer`
+(a real dependency of WF-013 AND WF-015) with an empty stub. Caught within
+minutes via the same live disposable-fixture testing discipline already
+being applied to every RPC this card touched — not by luck. Restored
+using the exact join pattern already proven correct in
+`dashboard_get_appointment` (read live before restoring, not
+reconstructed from memory), reverified against a fresh fixture. No
+evidence real traffic hit the broken window (0 real appointments exist
+in the roster).
+
+**Live-verified, exhaustively:** every new RPC individually via direct
+SQL with disposable fixtures; WF-013 and WF-016 both branches (tier-on
+queues + responds `pending_approval`; tier-off produces the byte-identical
+pre-BC-053 handoff response — real regression proof, not assumed) via
+their real production webhooks; the full queue→approve→real-DB-write→
+confirmation-attempt round trip for UpdateCustomer via the real
+production webhook chain (WF-016 → `resolve-pending-verification` →
+`apply_customer_update` + WF-019 attempt); `cancel_client_appointment`'s
+real DB write (`conversions.final_state/conversion_state = 'cancelled'`);
+`dashboard_list_pending_verifications` under a real simulated dashboard-
+user JWT (BC-051's `control.dashboard_users`); reject action. All test
+fixtures (customers/leads/conversions/appointments/pending_verifications/
+escalations, 2 disposable Vault-adjacent test rows) deleted after.
+
+**Real, unrelated finding surfaced (not fixed):** sending a real
+confirmation email for a client without an email connection triggers an
+uncaught crash inside UTIL-006's Credential Resolver — traced to n8n's
+internal `zenny-notification-sender` Gmail credential having expired,
+unrelated to any per-client credential. `resolve-pending-verification`
+itself already handles this gracefully (DB change stands, email failure
+honestly reported, nothing crashes or over-claims). Needs human OAuth
+reconnection — Credential Gate, logged as a new Active Blocker, not
+fixed this card.
+
+Dashboard: new `/approvals` page (`PendingApprovals`), `tsc -b`/`oxlint`
+clean on all changed files. Full browser click-through not done (same
+disclosed limitation as BC-052 — no credentials for the one real
+dashboard test user).
+
+Wiki: new `infra/verification-approval-queue.md`;
+`decisions/verification-tier-redesign.md` closed; `Wiki/index.md`
+updated; `Workflow_Registry.md`'s WF-013/WF-015/WF-016 entries updated
+from live reads (including the incident writeup). This was the last of
+the 3 Build Cards approved from the human's 2026-08-14 decision session
+— all 3 (BC-051, BC-052, BC-053) now complete. Per bounded auto-handoff
+(this card wrote to live Supabase + n8n + Edge Function state), stopping
+for pulse-check.
+
 ## [2026-08-14] session-BC-052 | Connection Lifecycle Actions built + a critical live security exposure found and fixed mid-card
 
 **Execute (/execute):** Mandatory MCP Verification first — read

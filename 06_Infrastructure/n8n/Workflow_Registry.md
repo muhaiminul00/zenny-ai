@@ -411,17 +411,23 @@ own entry below.
 ### WF-013 — Zenny Core Agent - CancelAppointment
 **n8n ID:** `68tMXAV7lPzsX4fn` · **published**, active
 
-**PURPOSE:** Cancels an appointment. Classified HIGH-RISK per the Customer Verification Rule (modifies a booking). No verification mechanism is configured anywhere in the real system (confirmed empirically) — per the rule's own exact language ("do not attempt to improvise a verification approach"), this workflow **always** routes to Human Handoff Handler (WF-017) rather than executing.
+**PURPOSE:** Cancels an appointment. Classified HIGH-RISK per the Customer Verification Rule (modifies a booking). **BC-053 UPDATE (2026-08-14):** now branches on `control.clients.verification_tier_enabled` (opt-in per client, default false). If **off** (all existing clients today), behavior is unchanged from BC-026 — always routes to Human Handoff Handler (WF-017). If **on**, queues a `<schema>.pending_verifications` row instead and responds `pending_approval` — a dashboard approval genuinely executes the cancellation (see PENDING-VERIFICATION note below), it does not just flip a status.
 
 **TRIGGER:** Webhook, `POST /cancel-appointment`.
 
 **INPUT (Standard Request Contract):** `{ client_id, payload: { customer_id, appointment_id } }`
 
-**OUTPUT / END STATE:** Always: 200, `{ result: { appointment_id, status: "pending_human_review" }, handoff: { result: { escalation_id, status: "open" } } }` — a real new `escalations` row is always created via WF-017, no cancellation is ever actually attempted by this workflow itself.
+**OUTPUT / END STATE:**
+- Tier off (default): 200, `{ result: { appointment_id, status: "pending_human_review" }, handoff: { result: { escalation_id, status: "open" } } }` — real `escalations` row via WF-017, unchanged from BC-026.
+- Tier on: 200, `{ result: { appointment_id, status: "pending_approval", pending_verification_id } }` — no escalation, no handoff call.
 
-**REAL DEPENDENCIES:** UTIL-001 (schema resolution), WF-017 (via a direct HTTP POST to its production webhook, not an Execute Workflow node).
+**REAL DEPENDENCIES:** UTIL-001 (schema resolution), WF-017 (via a direct HTTP POST to its production webhook, not an Execute Workflow node — tier-off path only), `get_client_verification_tier` + `queue_pending_verification` RPCs (BC-053, tier-on path).
 
-**LAST VERIFIED:** BC-026, 2026-08-06 — real webhook call, real escalation confirmed (`0642be06-...`).
+**PENDING-VERIFICATION note:** approval is NOT handled inside this workflow — the dashboard's Pending Approvals page calls the `resolve-pending-verification` Edge Function directly, which calls `cancel_client_appointment` (sets `conversions.final_state`/`conversion_state = 'cancelled'` — real DB state, live-verified) and sends a confirmation from the client's own connected email via WF-019. **Known gap:** the real client-calendar event deletion (Google/Calendly DELETE call) is NOT built — `execution_result.calendar_delete` is honestly reported as `'not_implemented_this_card'`. See `Wiki/infra/verification-approval-queue.md`.
+
+**BUG FOUND + FIXED THIS CARD:** while adding BC-053's RPCs, a copy-paste error in the same migration batch briefly overwrote `public.get_client_appointment_with_customer` (this workflow's own "Get Appointment + Customer" node dependency, also used by WF-015) with an empty stub. Caught immediately via a live disposable-fixture test, restored using the exact join already proven correct in `dashboard_get_appointment` (read live before restoring, not reconstructed from memory), re-verified against a fresh fixture. Live window: a few minutes within this session; no evidence any real traffic hit it during that window (roster clients have 0 real appointments).
+
+**LAST VERIFIED:** BC-053, 2026-08-14 — both branches (tier on/off) proven live via the real production webhook against a real synthetic fixture, plus the `get_client_appointment_with_customer` regression fix reverified. Prior: BC-026, 2026-08-06 — real webhook call, real escalation confirmed (`0642be06-...`).
 
 ---
 
@@ -461,24 +467,28 @@ own entry below.
 
 **REAL DEPENDENCIES:** UTIL-001.
 
-**LAST VERIFIED:** BC-026, 2026-08-06 — real webhook call against a real appointment (`45555555-...`), correct `status: "success"` derived from `authoritative_source: client_calendar`.
+**LAST VERIFIED:** BC-026, 2026-08-06 — real webhook call against a real appointment (`45555555-...`), correct `status: "success"` derived from `authoritative_source: client_calendar`. **Note (BC-053):** this workflow's `get_client_appointment_with_customer` dependency was briefly (a few minutes) broken by an unrelated migration mistake during BC-053, then fixed and reverified with the exact join documented above — see WF-013's entry for the full incident. No evidence this workflow's own real traffic hit the broken window.
 
 ---
 
 ### WF-016 — Zenny Core Agent - UpdateCustomer
 **n8n ID:** `ogYca9QFCMIEWrWG` · **published**, active
 
-**PURPOSE:** Updates customer account fields. HIGH-RISK per the Customer Verification Rule (modifies account data). Same as WF-013: no verification mechanism configured anywhere → always routes to Human Handoff Handler instead of executing unverified.
+**PURPOSE:** Updates customer account fields. HIGH-RISK per the Customer Verification Rule (modifies account data). **BC-053 UPDATE (2026-08-14):** same opt-in branch as WF-013 — off (default) unchanged from BC-026; on, queues a `pending_verifications` row instead of always handing off.
 
 **TRIGGER:** Webhook, `POST /update-customer`.
 
 **INPUT:** `{ client_id, payload: { customer_id, fields: {...requested field changes...} } }`
 
-**OUTPUT / END STATE:** Always: 200, `{ result: { customer_id, updated_fields: [] }, handoff: { result: { escalation_id, status: "open" } } }` — `updated_fields` is always empty because no update is ever actually applied; a real new `escalations` row is always created via WF-017.
+**OUTPUT / END STATE:**
+- Tier off (default): 200, `{ result: { customer_id, updated_fields: [] }, handoff: { result: { escalation_id, status: "open" } } }` — unchanged from BC-026, no update ever actually applied on this path.
+- Tier on: 200, `{ result: { customer_id, status: "pending_approval", pending_verification_id } }`.
 
-**REAL DEPENDENCIES:** UTIL-001, WF-017 (direct HTTP POST to its production webhook).
+**REAL DEPENDENCIES:** UTIL-001, WF-017 (tier-off path), `get_client_verification_tier` + `queue_pending_verification` RPCs (BC-053, tier-on path).
 
-**LAST VERIFIED:** BC-026, 2026-08-06 — real webhook call, real escalation confirmed (`5e7a3855-...`).
+**PENDING-VERIFICATION note:** approval executes via the `resolve-pending-verification` Edge Function, same as WF-013 — calls `apply_customer_update` (maps the `primary_contact_method` field directly, everything else upserts into `customer_preferences` — real DB writes, live-verified), then sends confirmation via WF-019. See `Wiki/infra/verification-approval-queue.md`.
+
+**LAST VERIFIED:** BC-053, 2026-08-14 — both branches proven live via the real production webhook, plus a full queue→approve→real-DB-update→confirmation-attempt round trip. Prior: BC-026, 2026-08-06 — real webhook call, real escalation confirmed (`5e7a3855-...`).
 
 ---
 

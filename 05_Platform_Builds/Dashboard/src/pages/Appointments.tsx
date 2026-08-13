@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import type { AppointmentDetail, AppointmentListItem } from '../lib/types';
+import type { AppointmentDetail, AppointmentListItem, DashboardClient, PendingVerification } from '../lib/types';
 
 function SourcePill({ source }: { source: string }) {
   const label = source === 'client_calendar' ? 'Client calendar (live)' : 'Our DB (fallback)';
@@ -152,6 +152,119 @@ export function AppointmentDetailPage() {
           {appt.client_calendar_event_id ?? 'none (write did not succeed)'}
         </p>
       </section>
+    </div>
+  );
+}
+
+// BC-053: the dashboard side of the opt-in third verification tier.
+// WF-013 (CancelAppointment) / WF-016 (UpdateCustomer) queue a row here
+// instead of always handing off to a human when
+// control.clients.verification_tier_enabled is on for this client.
+// Approve genuinely executes the change (real DB write, real confirmation
+// email from the client's own connected inbox) via the
+// resolve-pending-verification Edge Function — not just a status flip.
+function describePendingItem(item: PendingVerification): string {
+  if (item.tool_name === 'CancelAppointment') {
+    const reason = (item.requested_payload?.reason as string) ?? 'not specified';
+    return `Cancel appointment ${item.target_id.slice(0, 8)}… — reason: ${reason}`;
+  }
+  const fields = Object.keys(item.requested_payload ?? {});
+  return `Update customer ${item.target_id.slice(0, 8)}… — fields: ${fields.join(', ') || 'none'}`;
+}
+
+export function PendingApprovals() {
+  const [client, setClient] = useState<DashboardClient | null>(null);
+  const [items, setItems] = useState<PendingVerification[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    const [{ data: clientData, error: clientErr }, { data: itemsData, error: itemsErr }] = await Promise.all([
+      supabase.rpc('dashboard_get_my_client'),
+      supabase.rpc('dashboard_list_pending_verifications'),
+    ]);
+    if (clientErr) {
+      setError(clientErr.message);
+      return;
+    }
+    if (itemsErr) {
+      setError(itemsErr.message);
+      return;
+    }
+    setClient(clientData as DashboardClient);
+    setItems((itemsData as PendingVerification[]) ?? []);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const resolve = async (item: PendingVerification, action: 'approve' | 'reject') => {
+    if (!client) return;
+    setBusyId(item.pending_verification_id);
+    const { data, error } = await supabase.functions.invoke('resolve-pending-verification', {
+      body: {
+        client_id: client.client_id,
+        client_schema_name: client.client_schema_name,
+        pending_verification_id: item.pending_verification_id,
+        action,
+      },
+    });
+    setBusyId(null);
+    if (error || data?.error) {
+      setError(data?.error?.message ?? error?.message ?? 'Action failed.');
+      return;
+    }
+    load();
+  };
+
+  if (error) return <p className="error-text">Failed to load pending approvals: {error}</p>;
+  if (!client || items === null) return <p>Loading pending approvals…</p>;
+
+  return (
+    <div>
+      <h2>Pending Approvals</h2>
+      <p className="note">
+        Only appears here when the opt-in third verification tier is turned on for this client —
+        otherwise CancelAppointment/UpdateCustomer always go straight to a human, as before.
+        Approving genuinely executes the change and emails the customer from this client's own
+        connected inbox; rejecting does nothing further.
+      </p>
+
+      {items.length === 0 ? (
+        <p>Nothing waiting on approval.</p>
+      ) : (
+        <table className="orders-table" style={{ marginTop: 16 }}>
+          <thead>
+            <tr>
+              <th>Requested</th>
+              <th>Queued</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.pending_verification_id}>
+                <td>{describePendingItem(item)}</td>
+                <td>{new Date(item.created_at).toLocaleString()}</td>
+                <td>
+                  <button disabled={busyId === item.pending_verification_id} onClick={() => resolve(item, 'approve')}>
+                    Approve
+                  </button>{' '}
+                  <button
+                    className="secondary"
+                    disabled={busyId === item.pending_verification_id}
+                    onClick={() => resolve(item, 'reject')}
+                  >
+                    Reject
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

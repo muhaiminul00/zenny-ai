@@ -32,6 +32,7 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 - [infra/platform-limitations.md](infra/platform-limitations.md) — Hostinger's Compose API has no `build:` key support, and the restart-vs-recreate container trap it leads to.
 - [infra/dashboard-auth-mapping.md](infra/dashboard-auth-mapping.md) — `control.dashboard_users`, the real mapping table (BC-051) that replaced the `app_metadata` stopgap; the new `dashboard_provision_user` RPC for creating dashboard users going forward.
 - [infra/connection-lifecycle-actions.md](infra/connection-lifecycle-actions.md) — the `connection-lifecycle` Edge Function (BC-052): real per-provider Revoke (Google/Calendly) + honest local-only disclosure (Shopify/WooCommerce), plus Reconnect/Refresh dashboard actions.
+- [infra/verification-approval-queue.md](infra/verification-approval-queue.md) — the opt-in third verification tier (BC-053): `pending_verifications` queue, WF-013/WF-016's new branch, the `resolve-pending-verification` Edge Function, and the disclosed calendar-delete + `zenny-notification-sender` credential gaps it surfaced.
 
 ## Platform Quirks
 
@@ -50,4 +51,4 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 - [decisions/calendar-category-sharing.md](decisions/calendar-category-sharing.md) — DECIDED 2026-08-14: one calendar provider at a time, no schema change. Closed.
 - [decisions/disconnect-provider-revocation.md](decisions/disconnect-provider-revocation.md) — DECIDED + BUILT (BC-052): real per-provider revoke (Google/Calendly) + honest local-only disclosure (Shopify/WooCommerce) + Reconnect/Refresh. See [[infra/connection-lifecycle-actions]]. Closed.
 - [decisions/dashboard-auth-mapping.md](decisions/dashboard-auth-mapping.md) — DECIDED + BUILT (BC-051): `control.dashboard_users` mapping table live. See [[infra/dashboard-auth-mapping]]. Closed.
-- [decisions/verification-tier-redesign.md](decisions/verification-tier-redesign.md) — DECIDED 2026-08-14: build the third, queued-human-approval verification tier. Scoped as BC-053, still open until that card ships.
+- [decisions/verification-tier-redesign.md](decisions/verification-tier-redesign.md) — DECIDED + BUILT (BC-053): opt-in third verification tier, default off. See [[infra/verification-approval-queue]]. Closed.
