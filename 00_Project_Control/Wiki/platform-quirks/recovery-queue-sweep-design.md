@@ -72,3 +72,38 @@ configurability only, not timezone-awareness — the "local" framing in
 `Recovery_Engine_Flow.md` §3.1 remains an honest placeholder, just a
 configurable one now instead of a fixed one. A real timezone column/system
 is a separate, larger future problem.
+
+## Reply-triggered stop, and why resume isn't reply-triggered (BC-050)
+
+`Agent_Runtime_System_v1.md` §6.1 Recovery Reply Handling ("stop the
+cadence the moment a customer replies") is INT-007, wired directly into
+INT-010 (Categorize Email) — every inbound email calls it right after
+customer/lead identity resolution, before categorization. It stops every
+active/paused `recovery_queue` row for the resolved `customer_id` via a
+new `stop_client_recovery_for_customer` RPC (joins `leads`→`recovery_queue`
+by `customer_id`, since INT-010 only ever resolves `customer_id`, not
+`lead_id`, and a customer can have more than one lead/recovery record).
+
+**INT-008 (Resume Recovery) is easy to mis-scope as "the reply-handling
+counterpart" — it isn't.** Per the spec's own Paused-State Resumption
+section, a customer reply (trigger A) is handled entirely by INT-007's
+stop-and-re-enter-as-new-session flow, not by "resuming" anything. INT-008
+implements triggers B (a human closes their task without the customer
+replying — needs `human_ownership_flag` to flip back to `false`) and C (a
+live conversation ends without conversion). **Confirmed by grep: nothing in
+the built system writes `human_ownership_flag=false` anywhere** — trigger B
+has no real event source yet, and trigger C isn't built either. INT-008 was
+still built and live-tested standalone (per explicit human decision,
+BC-050) rather than deferred again, so the resume/stop-at-max-steps logic
+is proven the moment a real ownership-release mechanism gets scoped.
+
+**Real gap surfaced by this investigation, not fixed by it:** no
+per-archetype max-recovery-step count exists anywhere in the DB
+(`leads.recovery_profile` is free text), and neither WF-018 nor
+INT-006/SCH-001 enforce `Agent_Runtime_System_v1.md` §6's "max steps
+reached → Stopped" stop condition — a lead could theoretically keep
+receiving recovery sends past its archetype's documented step count.
+INT-008 reproduces `Recovery_Engine_Flow.md` §3's step-count table as a
+local hardcoded map for its own resume-decision use only; that doesn't
+enforce the condition at the sweep level. Flagged in `PROJECT_STATE.md`
+Active Blockers as a genuine future Build Card, not resolved here.

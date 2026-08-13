@@ -935,6 +935,8 @@ own entry below.
 
 **BC-048 UPDATE (2026-08-13):** now genuinely chained to INT-011 — after a successful categorize+upsert, `Build Final Result (Success)` → new `Call INT-011 Draft Email` (`executeWorkflow`, `waitForSubWorkflow: true`, passes the same email object + the new `email_id`) → new `Build Final Result (Chained)`, which is now this workflow's real terminal leaf. **Return contract changed**: success now returns `{ email_id, customer_id, category_id, category_name, category_scope, deduped, created, email_status, drafted }` (was categorization-only before) — documented, not silent; no external caller existed to break. Failure branches (unknown client, unmatched category, DB write failure) are unchanged. Live-verified end to end via a temporary harness workflow (Manual Trigger → Call INT-010, deleted after verification): real email → real customer resolution → real "Support" categorization → real `emails` row write → real INT-011 call → real Pinecone query (0 matches, correctly fell back to `client_config` grounding since INT-012/Notion hasn't synced yet — see INT-012's Credential Gate) → real `draft_content` written to `client_test_002_acme_commerce_test.emails`, `email_status: 'draft_ready'`.
 
+**BC-050 UPDATE (2026-08-13):** new `Call INT-007 Stop Recovery` node inserted between customer/lead identity resolution (both the `Customer Found?` true branch and the new-customer `Link Channel Identity` branch converge into it) and `List Categories` — every inbound email now stops any active/paused `recovery_queue` cadence for its resolved `customer_id` via INT-007, per Agent_Runtime_System_v1.md §6.1. Not gated by category; runs before classification, doesn't change categorization/drafting behavior. Live-verified as part of INT-007's own Last Verified entry (full real chain: reply correctly categorized+drafted AND the customer's real `recovery_queue` row independently confirmed `stopped` in the database afterward).
+
 ---
 
 ### INT-012 — Zenny Email Manager - SyncNotionKB (INT-012)
@@ -1055,6 +1057,54 @@ own entry below.
 **REAL DEPENDENCIES:** INT-012 (called, never modified this card). Reuses the `zenny-vault-suparbase` Supabase credential.
 
 **LAST VERIFIED:** BC-049, 2026-08-13 — genuine live manual run (not `test_workflow`-pinned), post-GRANT-fix: successfully enumerated and dispatched to every client with a real `notion_page_id` (Client A only, at present), which re-confirmed the full live Notion→Pinecone round trip already proven in this same session (see INT-012's entry).
+
+---
+
+### INT-007 — Zenny Recovery Engine - StopRecovery (INT-007)
+**n8n ID:** `tncscZAt6lKkO6c9` · **published**, active (no independent trigger — called from INT-010)
+
+**PURPOSE:** BC-050. Implements `Agent_Runtime_System_v1.md` §6.1 Recovery Reply Handling's first line — "Stop the scheduled recovery cadence immediately" — the moment a customer replies to any email. Wired as a call from INT-010 (Categorize Email), right after customer/lead identity resolution, for every inbound email — not gated by category, since a recovery reply can carry any content and gets classified normally afterward regardless.
+
+**TRIGGER:** `executeWorkflowTrigger` only — no independent cadence, called synchronously by INT-010.
+
+**INPUT:** `{ client_id, customer_id }`. Deliberately `customer_id`, not `lead_id` — INT-010 only ever resolves `customer_id` (via `channel_identity_links`), and a customer can have multiple leads/recovery records over its lifetime, so the RPC joins `leads`→`recovery_queue` by `customer_id` and stops every active/paused record found (normally 0 or 1, but not guaranteed to be exactly 1 — see Last Verified).
+
+**OUTPUT \ END STATE (no HTTP response — Execute Workflow return value):**
+- `{ client_id, customer_id, stopped_count, stopped_records: [{recovery_id, lead_id}, ...], recovery_stopped: boolean }` — `stopped_count: 0` for the overwhelming majority of inbound emails (sender has no recovery record at all), which is the expected common case, not an error.
+- Unknown client: `{ client_id, error: { code: 'UNKNOWN_CLIENT', message } }`.
+
+**REAL NEW DB OBJECT:** `public.stop_client_recovery_for_customer(p_schema text, p_customer_id uuid)` RPC — SECURITY DEFINER, `SET search_path TO ''`, same dynamic-SQL-per-schema convention as `get_client_recovery_context`/`advance_client_recovery_step`. `UPDATE ... WHERE status IN ('active','paused')` — reuses the existing `recovery_status_enum` (no new enum value added; mechanical, Document Resolution Authority tier 3, since the spec never names a distinct terminal state for a reply-triggered stop and `'stopped'` already means "cadence over, not a failure" per the existing status-mapping rule).
+
+**REAL DEPENDENCIES:** UTIL-001 (schema resolution). Called by INT-010 (`Call INT-007 Stop Recovery`, inserted between customer-identity resolution and `List Categories`).
+
+**LAST VERIFIED:** BC-050, 2026-08-13 — live, not `test_workflow`-pinned, via a disposable harness (Manual Trigger → Execute Workflow → INT-007) plus a real end-to-end run through INT-010: (1) standalone, a customer with 2 real active/paused synthetic `recovery_queue` rows across 2 different leads got both stopped in one call (`stopped_count: 2`) — genuinely proved the multi-lead-per-customer join, not just the single-row case; (2) standalone, a customer with zero recovery rows correctly returned `stopped_count: 0`; (3) full chain: a synthetic inbound email from a real customer with one real `active` `recovery_queue` row was run through the live (unpublished-at-the-time) INT-010 draft — the email was genuinely categorized (`Support`) and drafted via INT-011 exactly as before, AND the recovery row was independently confirmed `status='stopped'` in the database afterward, proving the wiring doesn't disturb the existing pipeline while genuinely adding the stop. All synthetic rows/links deleted after verification.
+
+---
+
+### INT-008 — Zenny Recovery Engine - ResumeRecovery (INT-008)
+**n8n ID:** `elsNaj0yIj8f6KCl` · **published**, active (no caller wired — see Known Gap)
+
+**PURPOSE:** BC-050. Implements `Agent_Runtime_System_v1.md`'s Paused-State Resumption logic (resumption triggers B and C: a human closes their task without the customer replying, or a live conversation ends without conversion) — resume from the next step if the archetype's max cadence steps haven't been reached, otherwise stop.
+
+**TRIGGER:** `executeWorkflowTrigger` only.
+
+**INPUT:** `{ client_id, lead_id }` — matches the existing `get_client_recovery_context`/`advance_client_recovery_step` convention (keyed on lead, since that RPC assumes at most one live recovery row per lead at a time).
+
+**OUTPUT \ END STATE (no HTTP response — Execute Workflow return value):**
+- Resumed: `{ client_id, lead_id, action: 'resume', resumed: true, stopped: false, new_status: 'active', next_follow_up }`.
+- Max steps reached during pause: `{ ..., action: 'stop', resumed: false, stopped: true, new_status: 'stopped' }`.
+- No-op (no recovery record, or record isn't `paused`): `{ client_id, lead_id, action: 'noop', reason: 'NO_RECOVERY_RECORD' | 'NOT_PAUSED', resumed: false, stopped: false }` — not an error.
+- Unknown client: `{ client_id, error: { code: 'UNKNOWN_CLIENT', message } }`.
+
+**REAL NEW DB OBJECT:** `public.resume_client_recovery(p_schema text, p_lead_id uuid, p_new_status text)` RPC — SECURITY DEFINER, `SET search_path TO ''`, `UPDATE ... WHERE status = 'paused'` (idempotency guard — a second call after the first already resumed/stopped the record correctly no-ops via `Get Recovery Context` reporting `NOT_PAUSED`, same "database is the final guarantee" philosophy as `advance_client_recovery_step`). Sets `next_follow_up = now()` only on the `active` branch so the resumed record is immediately eligible for INT-006/SCH-001's next sweep tick.
+
+**MAX-STEPS-PER-ARCHETYPE, DISCLOSED PLACEHOLDER:** no per-archetype max-step count exists anywhere in the DB — `leads.recovery_profile` is free text (flagged as an open item since `Database_Structure_v4_FINAL.md`), and neither WF-018 nor INT-006 currently enforce the "max steps reached → Stopped" condition either (a real, previously-undocumented gap this card's investigation surfaced — not fixed here, out of this card's scope, flagged in `Wiki/log.md`). INT-008's `Compute Resume Decision` node reproduces `Recovery_Engine_Flow.md` §3's documented cadence-profile step counts directly as a hardcoded map (emergency:3, appointment:4, commerce_ecom:3, commerce_restaurant:2, consultation:5, engagement:3) — Document Resolution Authority tier 3, single documented source, mechanical.
+
+**KNOWN GAP — NOT WIRED TO ANY CALLER (by design, per human decision this session):** confirmed live via repo-wide grep that nothing in the built system writes `human_ownership_flag = false` anywhere — so resumption trigger B (human closes task) has no real event source. Trigger C (live conversation ends without conversion, Module 3 §5.1 re-evaluation) isn't built either. Built and live-tested standalone now so the logic is proven the moment a real ownership-release mechanism is scoped, rather than deferring the whole card again. This is a genuinely open follow-up item, not an oversight — logged in `PROJECT_STATE.md` Active Blockers.
+
+**REAL DEPENDENCIES:** UTIL-001 (schema resolution), `get_client_recovery_context` (reused, not modified).
+
+**LAST VERIFIED:** BC-050, 2026-08-13 — live, not `test_workflow`-pinned, via a disposable harness (Manual Trigger → Execute Workflow → INT-008) against real synthetic `recovery_queue` rows, all 3 branches: (1) paused, `current_step: 1 < 3` (commerce_ecom max) → `resumed: true`, `new_status: 'active'`, `next_follow_up` set to the call time; (2) paused, `current_step: 3 >= 3` → `stopped: true`, `new_status: 'stopped'`; (3) same lead re-called after (1), now `status='active'` not `'paused'` → `action: 'noop', reason: 'NOT_PAUSED'`. All synthetic rows deleted after verification.
 
 ---
 
