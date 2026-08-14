@@ -1,6 +1,6 @@
 # n8n Direct-LLM-Call Pattern (OpenRouter)
 
-**Status:** current as of 2026-08-14/15 (BC-062, in progress)
+**Status:** current as of 2026-08-15 (BC-062, complete)
 
 ## What's true now
 
@@ -66,7 +66,7 @@ Authority's own discipline says Claude should never self-resolve.
   project's own doc (`Agent_Runtime_System_v1.md` §5) already specifies
   in full.
 
-## Known gap — IN PROGRESS as of BC-062 (2026-08-14/15), blocked on a Credential Gate
+## Prompt externalization — CLOSED, BC-062 (2026-08-15)
 
 BC-062 wired both INT-010's classification prompt and INT-011's draft
 prompt to read from `control.agent_prompts` via a new
@@ -88,23 +88,24 @@ addition (nullable `client_id`, client-specific row wins over the
 archetype/generic default). Not built this card — flagged here as a
 real candidate, not silently assumed solved.
 
-**Currently blocked, not yet published:** both new HTTP nodes
-(`Get Classification Prompt Template` in INT-010, `Get Draft Prompt
-Template` in INT-011) need a Supabase credential attached, and the n8n
-MCP's `update_workflow`/`addNode` tool silently drops any `credentials`
-value passed — confirmed by its own response text ("HTTP Request nodes
-were skipped during credential auto-assignment. Their credentials must
-be configured manually."). This is a genuine tooling gap, not a missed
-step — a human needs to open each node in the n8n UI and select the
-credential (believed `zenny-vault-suparbase`, id `guCWYmcVycnfMixw`,
-inferred from naming/chronology against the only other `supabaseApi`
-candidate, `Zenny Dashboard Service Key Role` — not independently
-confirmed, since every existing sibling node's credential assignment is
-redacted in every read this session's MCP access allowed). Production
-publish validation requires a real credential on every credentialed
-node, so neither workflow can be tested or published until this is
-done. **Both workflows' active/production versions are unchanged —
-this is draft-only.** Full finding: `Wiki/infra/convocore-agent-provisioning.md`.
+**Redesigned from the first-pass control-schema/archetype-keyed
+approach.** A human review found the live `email_categories` table is
+the correct precedent for this kind of per-client-overridable content —
+per-client-schema, not `control`. Rebuilt accordingly (full detail:
+`Wiki/infra/convocore-agent-provisioning.md`): `agent_prompts` now
+lives in `public` + all 5 `tpl_*` templates + every real client schema,
+read via `public.get_client_agent_prompt(p_schema, p_prompt_key)`.
+
+**Credential-attach note (resolved):** the `addNode` operation's inline
+`credentials` field is silently dropped by this n8n MCP tool version —
+not a Supabase permission issue (checked and ruled out; credential
+attachment is n8n-internal, unrelated to what BC-052's Supabase grants
+touched). The dedicated `setNodeCredential` operation works correctly
+and was used instead.
+
+Both INT-010 and INT-011 rewired, tested live (real, unpinned LLM
+calls — not just pinned structural checks), and published. Output
+confirmed byte-identical to the pre-BC-062 hardcoded prompts.
 
 ## Source
 

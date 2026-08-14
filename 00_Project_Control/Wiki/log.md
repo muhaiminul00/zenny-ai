@@ -9,6 +9,58 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-15] session-BC-062 redesign | agent_prompts moved per-client-schema, INT-010/INT-011 rewired, tested live, published
+
+**Commander → Execute, human approved ("Go ahead, redesign BC-062
+properly")** following the verification pass below. Full redesign
+built in one pass:
+
+1. `public.agent_prompts` created (reference scaffolding), same posture
+   as every other `public.*` table (RLS on, zero grants).
+2. Backfilled into all 5 `tpl_*` templates (structure only, matching
+   `create_archetype_template`'s own `LIKE ... INCLUDING ALL` pattern —
+   confirmed live by reading the function body before writing the
+   migration, not assumed) and all 5 real `client_test_*` schemas
+   (seeded with the 2 default rows, content copied verbatim from
+   `control.agent_prompts`, not re-authored).
+3. Both provisioning functions (`create_archetype_template`,
+   `create_client_schema_from_template`) updated — `agent_prompts`
+   added to their `v_common_tables` arrays — so future template/client
+   creation includes it automatically, matching how `email_categories`
+   was added at BC-045.
+4. New RPC `public.get_client_agent_prompt(p_schema, p_prompt_key)`
+   built (SECURITY DEFINER, `search_path=''`, `EXECUTE format(...FROM
+   %I.agent_prompts...)`, granted `service_role`/`authenticated` only)
+   — same shape as `list_client_email_categories`. Live-tested directly
+   via SQL before touching n8n: returned both templates correctly.
+5. `control.agent_prompts` kept as-is, repurposed as the master-
+   defaults seed source used by step 2's backfill — not dropped. The
+   old control-schema/archetype-keyed RPC (`get_agent_prompt`) was
+   genuinely dead after the rewire (never referenced by any published
+   workflow, only this session's own draft nodes) — dropped.
+6. INT-010 and INT-011 rewired: both HTTP nodes now call
+   `get_client_agent_prompt` with the client's real resolved schema
+   name (already available via UTIL-001 earlier in each workflow, not
+   hardcoded). Stale inline code comments referencing the old
+   control-schema design also fixed while in there.
+7. **Both workflows tested live via `test_workflow`, with real
+   (unpinned) LLM calls, not just structural pinning** — INT-010
+   correctly classified a test email `"Support"` with the real LLM
+   reasoning; the chained call into INT-011 (via `waitForSubWorkflow`)
+   correctly 404'd on the synthetic email_id (expected, real DB call);
+   a dedicated INT-011 test with realistic pin data then confirmed the
+   fallback-grounding draft path end to end. Both workflows' `prompt_
+   text` output was compared directly against execution data and
+   confirmed byte-identical to the pre-BC-062 hardcoded versions.
+8. Both published, live.
+
+Full findings: `Wiki/infra/convocore-agent-provisioning.md`,
+`Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`,
+`06_Infrastructure/n8n/Workflow_Registry.md` (INT-010/INT-011 entries).
+
+**BC-062 is now genuinely complete** — the `agent_prompts` Path A
+candidate item is closed.
+
 ## [2026-08-15] session-BC-062 follow-up | Credential-attach fixed, architecture question resolved — real redesign needed, not self-built
 
 **Commander → Execute, verification-only pass** (no build changes

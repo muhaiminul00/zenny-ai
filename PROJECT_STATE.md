@@ -10,7 +10,25 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-15 (latest) — by /execute — BC-062 verification follow-up:
+2026-08-15 (latest) — by /execute — **BC-062 COMPLETE.** Human
+approved the redesign; built in one pass: `public.agent_prompts`
+created + backfilled into all 5 `tpl_*` templates (structure only) and
+all 5 real client schemas (2 seed rows each, from `control.
+agent_prompts`); `create_archetype_template`/`create_client_schema_
+from_template` updated to include it for future provisioning; new
+`public.get_client_agent_prompt(p_schema, p_prompt_key)` RPC (same
+shape as `list_client_email_categories`); old control-schema RPC
+dropped (genuinely dead); `control.agent_prompts` kept as the
+master-defaults seed source. INT-010 and INT-011 rewired to the new
+RPC using each client's real resolved schema name, **live-tested with
+real (unpinned) LLM calls** — not just structural pinning — confirmed
+byte-identical prompt output to the pre-BC-062 hardcoded version, both
+published. The `agent_prompts` wiring gap (Path A #4) is closed. Full
+detail: `Wiki/log.md` session-BC-062 redesign entry,
+`Wiki/infra/convocore-agent-provisioning.md`,
+`Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
+
+2026-08-15 (prior) — by /execute — BC-062 verification follow-up:
 human pushed back on 2 things from the first pass, both checked live,
 both resolved. **(1) Credential-attach was NOT a Supabase permission
 issue** — it's an n8n MCP tool gap (`addNode`'s inline `credentials`
@@ -374,27 +392,17 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
   proof: created a real disposable Google event, deleted it via the live
   deployed Edge Function, independently confirmed `status: "cancelled"`
   on Google's side. See `Wiki/infra/verification-approval-queue.md`.
-- ~~BC-062 credential-attach block~~ **DIAGNOSED AND FIXED IN DRAFT
-  (2026-08-15).** Was an n8n MCP tool gap (`addNode`'s inline
-  `credentials` silently dropped), not a Supabase permission issue —
-  `setNodeCredential` applied cleanly to both nodes. **Superseded by a
-  bigger open item below: the whole `agent_prompts` design needs a
-  redesign before either workflow is tested/published** — see next
-  item.
-- **BC-062, REDESIGN NEEDED before continuing — real "shape the
-  system" decision, awaiting human go-ahead:** the control-schema,
-  archetype-keyed `agent_prompts`/`get_agent_prompt` design built in
-  the first BC-062 pass is the wrong shape. Live-confirmed precedent
-  (`email_categories`, per-client-schema, not `control`) + the
-  architecture doc's own `control.agent_prompts ← never synced to any
-  client schema` note both point the same way: `agent_prompts` should
-  live in `public` reference scaffolding + all 5 `tpl_*` templates +
-  each real client schema, queried via a per-schema RPC (same shape as
-  `list_client_email_categories`), with `control.agent_prompts` kept
-  only as an optional master-defaults seed source. INT-010/INT-011's
-  current draft wiring targets the old (wrong-shape) RPC and will need
-  to be rewired once the redesign is built. See `Wiki/log.md`
-  session-BC-062 follow-up, `Wiki/infra/convocore-agent-provisioning.md`.
+- ~~BC-062 (credential-attach block, then agent_prompts redesign)~~
+  **CLOSED (2026-08-15).** Credential-attach was an n8n MCP tool gap
+  (`addNode`'s inline `credentials` silently dropped), not a Supabase
+  permission issue — fixed via `setNodeCredential`. The control-schema/
+  archetype-keyed design was the wrong shape (live `email_categories`
+  precedent + the architecture doc's own "never synced to any client
+  schema" note both pointed to per-client-schema) — rebuilt:
+  `agent_prompts` now lives in `public`+`tpl_*`+every client schema,
+  read via `get_client_agent_prompt`. INT-010/INT-011 rewired,
+  live-tested with real LLM calls, published. See `Wiki/log.md`
+  session-BC-062 redesign entry, `Wiki/infra/convocore-agent-provisioning.md`.
 - **Residual, smaller-severity security gap (found BC-052, not fixed):**
   the connect/lifecycle Edge Functions (`oauth-callback`,
   `shopify-connect`, `woocommerce-connect`, `connection-lifecycle`) all
@@ -494,11 +502,10 @@ actually needs it:
 2. Calendly's real calendar-delete path (BC-055 built it to spec but
    could not live-test — no roster Calendly connection).
 3. Phase 5A (Inventory dashboard) / SCH-007.
-4. `control.agent_prompts` wiring gap (BC-058c finding) — **BC-062
-   started 2026-08-15, blocked on a Credential Gate the MCP tooling
-   can't clear itself.** See Active Blockers above. Once a human
-   attaches the credential: run `test_workflow` on both, then
-   `publish_workflow`, then close this item out.
+4. ~~`control.agent_prompts` wiring gap (BC-058c finding)~~ **CLOSED
+   (BC-062, 2026-08-15).** Redesigned to per-client-schema, INT-010/
+   INT-011 rewired and live-tested, both published. See Last Updated
+   above and `Wiki/log.md` session-BC-062 redesign entry.
 5. Edge Function client_id/JWT-trust gap (BC-052 finding, item #1 above)
    — raised again 2026-08-15, not yet started as BC-063. Needs a live
    MCP-verification pass of each function's actual call pattern first

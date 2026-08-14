@@ -114,19 +114,32 @@ harmless orphan — pre-dates BC-045 (2026-08-12), which correctly
 migrated this exact kind of per-client-overridable content to the
 per-schema pattern and never dropped the old control copy.
 
-**Conclusion: `agent_prompts` should follow the same pattern —
-added to `public` reference scaffolding + all 5 `tpl_*` templates +
-backfilled into the 5 real client schemas, queried via a per-schema RPC
-(same shape as `list_client_email_categories`), not a control-schema,
-archetype-keyed RPC.** `control.agent_prompts` doesn't need to be
-dropped — it can stay as a genuine master-defaults seed source read
-once at client-provisioning time (mirroring what `control.email_
-categories` may originally have been for), which also resolves the
-human's original "per-client override" framing exactly, since each
-client schema's own copy is trivially overridable without touching any
-other client. **Not yet redesigned — this is a real "shape the system"
-decision, reported to the human, not self-resolved.** Full detail:
-`Wiki/log.md` session-BC-062 (2026-08-15 entry),
+**Conclusion, BUILT (2026-08-15):** `agent_prompts` now follows the
+same pattern as `email_categories` — added to `public` reference
+scaffolding + all 5 `tpl_*` templates + backfilled into the 5 real
+client schemas (2 seed rows each, copied verbatim from `control.
+agent_prompts`), queried via a new per-schema RPC
+(`public.get_client_agent_prompt(p_schema, p_prompt_key)`, same shape
+as `list_client_email_categories`). `create_archetype_template` and
+`create_client_schema_from_template` both updated (`agent_prompts`
+added to their `v_common_tables` arrays) so future template/client
+creation includes it automatically, same as `email_categories`.
+`control.agent_prompts` kept in place as the master-defaults seed
+source (not dropped); the old control-schema/archetype-keyed RPC
+(`get_agent_prompt`) was genuinely dead after the rewire (never
+referenced by any published workflow) and was dropped.
+
+**INT-010 and INT-011 rewired and live-verified end to end** — both
+now call `get_client_agent_prompt` with the client's real resolved
+schema name (already available via UTIL-001 earlier in each workflow),
+not a hardcoded/archetype value. Tested via `test_workflow` with real
+(unpinned) LLM calls: INT-010 correctly classified a test email as
+"Support" with the exact expected prompt text (byte-identical
+substitution verified directly from execution data); INT-011 correctly
+generated a grounded draft reply using the fallback-context path. Both
+published, live.
+
+Full detail: `Wiki/log.md` session-BC-062 redesign entry (2026-08-15),
 `Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
 
 ## Related
