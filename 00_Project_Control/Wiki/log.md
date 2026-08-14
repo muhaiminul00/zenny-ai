@@ -9,6 +9,72 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-15] session-BC-062 | Email Manager prompt externalization — draft-wired, blocked on Credential Gate
+
+**Commander → Execute:** human asked to pull in 2 Path A items "in the
+mean time" while waiting on Carmelli's ASK answers: the `agent_prompts`
+wiring gap and a "supabase jwt issue" (interpreted as the disclosed
+Edge Function client_id-trust gap, BC-063, not started this session).
+
+**BC-062 work:**
+1. Live-verified `control.agent_prompts` is empty (0 rows) and that
+   `control` is not PostgREST-exposed directly (same pattern as every
+   other control-schema read in this project — needs an RPC wrapper).
+2. Built `public.get_agent_prompt(p_module, p_prompt_key, p_archetype)`
+   — SECURITY DEFINER, `search_path=''`, matches the archetype-specific
+   row or falls back to the archetype-generic (NULL) row. Granted to
+   `service_role`/`authenticated` only, explicitly revoked from
+   `PUBLIC`/`anon` — applying the BC-052 anon-grant lesson proactively
+   rather than waiting to find the same class of bug again.
+3. Seeded 2 default rows (`module='email_manager'`, `prompt_key=
+   'classify_email'`/`'draft_email'`, `archetype=NULL`, `status=
+   'stable'`) — the exact prior hardcoded wording, template-ized.
+   Live-tested the RPC directly via SQL: returns both templates
+   correctly.
+4. **Real finding, not assumed:** the live `agent_prompts` schema has
+   no `client_id` column — today's build gets to "one default prompt,
+   swappable per archetype," not literally "per client" as the human's
+   original framing described. Disclosed, not silently built around;
+   a real future schema addition if true per-client granularity is
+   wanted.
+5. Wired both INT-010 and INT-011 in draft (`update_workflow`): new
+   HTTP node calling the RPC, inserted upstream of each workflow's
+   prompt-building Code node; each Code node's hardcoded prompt text
+   replaced with the same wording as a template, substituted from the
+   DB-sourced string — byte-identical output by construction (compared
+   the old concatenation against the new template + substitution by
+   hand, they match exactly).
+6. **Stopped here — genuine Credential Gate, not self-resolved:** the
+   n8n MCP's `update_workflow`/`addNode` tool silently drops any
+   `credentials` value passed on a new node and says so explicitly in
+   its own response ("HTTP Request nodes were skipped during credential
+   auto-assignment. Their credentials must be configured manually.").
+   Confirmed via `get_workflow_details` — the new node genuinely has no
+   credential attached in the draft. Production publish validation
+   requires a real credential on every credentialed node (a known
+   platform behavior, `platform-quirks/n8n-node-behaviors.md` §4), so
+   neither workflow can be tested or published past this point.
+   Attempted to determine which of the 2 candidate `supabaseApi`
+   credentials (`zenny-vault-suparbase` vs. `Zenny Dashboard Service Key
+   Role`) sibling nodes already use, to at least document a confident
+   recommendation — every read path available this session (
+   `get_workflow_details`, `get_workflow_history`/`get_workflow_version`)
+   redacts credential assignments, so this could not be independently
+   confirmed. Recommendation left in the Wiki/registry as inferred-not-
+   confirmed (naming/chronology favor `zenny-vault-suparbase`).
+   **Both workflows' active/production versions are unchanged — this is
+   draft-only, no live behavior affected.**
+
+Full findings: `Wiki/infra/convocore-agent-provisioning.md`,
+`Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`,
+`06_Infrastructure/n8n/Workflow_Registry.md` (INT-010/INT-011 entries).
+
+**Not started this session:** BC-063 (the client_id/JWT gap) — per
+CLAUDE.md's bounded auto-chain, a card that writes live n8n/Supabase
+state triggers a pulse-check before the next one starts, and this card
+hit a real stop condition (Credential Gate) rather than completing
+cleanly, so it was not chained into regardless.
+
 ## [2026-08-14] session-BC-059 | Intake checklist run against carmelli.co.uk, restructured with Type + Why-it-matters columns
 
 **Commander → Execute:** Human supplied the first real Path B target,

@@ -10,7 +10,27 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-14 (latest) — by /execute — BC-059 complete: ran the intake
+2026-08-15 (latest) — by /execute — BC-062 STARTED, BLOCKED (Credential
+Gate, not self-resolved): Email Manager prompt externalization
+(`agent_prompts` wiring gap, Path A #4). Built `public.get_agent_prompt`
+RPC (live, tested), seeded 2 default rows, draft-wired INT-010 and
+INT-011 (new HTTP node + Code node updates, byte-identical output by
+construction). **Real finding:** the live `agent_prompts` schema has no
+`client_id` column — supports default+archetype-level override today,
+not literally per-client as originally framed; disclosed, not built
+around. **Blocked:** the n8n MCP tooling cannot attach a credential to
+the 2 new HTTP nodes (confirmed via the tool's own response) — needs a
+human to set it in the n8n UI (believed `zenny-vault-suparbase`, not
+independently confirmed — every existing node's credential assignment
+is redacted from every read path this session had). Neither workflow
+can be tested/published until that's done; **both workflows' live/
+active versions are unchanged.** BC-063 (the other item raised this
+session — Edge Function client_id/JWT-trust gap, Path A #1) not started.
+Full detail: `Wiki/log.md` session-BC-062,
+`Wiki/infra/convocore-agent-provisioning.md`,
+`Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
+
+2026-08-14 (prior) — by /execute — BC-059 complete: ran the intake
 checklist against a real target, carmelli.co.uk (a kosher bakery,
 click-and-collect only). Fetched the homepage + contact page (About and
 a guessed shipping-policy URL both 404'd, disclosed rather than
@@ -335,6 +355,17 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
   proof: created a real disposable Google event, deleted it via the live
   deployed Edge Function, independently confirmed `status: "cancelled"`
   on Google's side. See `Wiki/infra/verification-approval-queue.md`.
+- **BC-062, IN PROGRESS: Email Manager prompt externalization blocked
+  on a credential the n8n MCP tooling can't attach.** INT-010/INT-011
+  are draft-wired to `control.agent_prompts` (new `get_agent_prompt`
+  RPC, live, tested) but the 2 new HTTP nodes have no Supabase
+  credential — `update_workflow`/`addNode` silently drops any
+  `credentials` value passed. **Needs a human to open `Get
+  Classification Prompt Template` (INT-010) and `Get Draft Prompt
+  Template` (INT-011) in the n8n UI and select the Supabase credential**
+  (believed `zenny-vault-suparbase`) before either workflow can be
+  tested/published. Both workflows' live/active versions are unaffected
+  in the meantime. See `Wiki/log.md` session-BC-062.
 - **Residual, smaller-severity security gap (found BC-052, not fixed):**
   the connect/lifecycle Edge Functions (`oauth-callback`,
   `shopify-connect`, `woocommerce-connect`, `connection-lifecycle`) all
@@ -434,12 +465,16 @@ actually needs it:
 2. Calendly's real calendar-delete path (BC-055 built it to spec but
    could not live-test — no roster Calendly connection).
 3. Phase 5A (Inventory dashboard) / SCH-007.
-4. `control.agent_prompts` wiring gap (BC-058c finding) — Email
-   Manager's per-client prompt-override table exists but INT-010/011
-   both still hardcode their LLM prompts in a Code node. Real, disclosed
-   improvement: swap both prompt-building Code nodes to read from
-   `agent_prompts` (module + archetype keyed), falling back to a default
-   row when no client-specific override exists.
+4. `control.agent_prompts` wiring gap (BC-058c finding) — **BC-062
+   started 2026-08-15, blocked on a Credential Gate the MCP tooling
+   can't clear itself.** See Active Blockers above. Once a human
+   attaches the credential: run `test_workflow` on both, then
+   `publish_workflow`, then close this item out.
+5. Edge Function client_id/JWT-trust gap (BC-052 finding, item #1 above)
+   — raised again 2026-08-15, not yet started as BC-063. Needs a live
+   MCP-verification pass of each function's actual call pattern first
+   (per its Build Card) before any `verify_jwt` change, since
+   `oauth-callback` may be called mid-redirect without a session.
 
 **Path B — real Convocore agent build (test+verify+build for a demo
 business):**

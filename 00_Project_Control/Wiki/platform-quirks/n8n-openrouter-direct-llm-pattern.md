@@ -1,6 +1,6 @@
 # n8n Direct-LLM-Call Pattern (OpenRouter)
 
-**Status:** current as of 2026-08-12 (BC-045)
+**Status:** current as of 2026-08-14/15 (BC-062, in progress)
 
 ## What's true now
 
@@ -66,21 +66,45 @@ Authority's own discipline says Claude should never self-resolve.
   project's own doc (`Agent_Runtime_System_v1.md` §5) already specifies
   in full.
 
-## Known gap, disclosed (as of BC-058c, 2026-08-14)
+## Known gap — IN PROGRESS as of BC-062 (2026-08-14/15), blocked on a Credential Gate
 
-Both INT-010's classification prompt and INT-011's draft-generation
-prompt (`Zenny Email Manager - DraftEmail`, id `fmBjtfi7vqdszs78`) are
-still built entirely inline in a Code node, per the gotcha above.
-`control.agent_prompts` (`prompt_key, module, archetype, content,
-version, status`) already exists specifically to move these off
-hardcoded-in-n8n to per-client-overridable (one default prompt at
-build time, override-able later) — confirmed by the human as its real
-purpose, unrelated to Convocore. **Not wired to either workflow yet** —
-live-verified via `get_workflow_details` on both, zero references.
-Real candidate for a future Build Card: swap each prompt-building Code
-node to read from `agent_prompts` (module + archetype keyed), falling
-back to a default row. Full finding:
-`Wiki/infra/convocore-agent-provisioning.md`.
+BC-062 wired both INT-010's classification prompt and INT-011's draft
+prompt to read from `control.agent_prompts` via a new
+`public.get_agent_prompt(p_module, p_prompt_key, p_archetype)` RPC
+(SECURITY DEFINER, `search_path=''`, granted to `service_role`/
+`authenticated` only — not `anon`/`PUBLIC`, applying the BC-052 lesson
+proactively). Two default rows seeded live (`module='email_manager'`,
+`prompt_key='classify_email'`/`'draft_email'`, `archetype=NULL`,
+`status='stable'`) with the exact prior hardcoded wording, now
+template-ized (`{{categories}}` etc.) — output is byte-identical to
+the old hardcoded prompt by construction.
+
+**Real, disclosed scope limitation found doing this:** the live
+`agent_prompts` schema is module+archetype keyed, with **no `client_id`
+column** — so today's build supports "one default prompt, swappable per
+archetype" but not literally "per client" as the human's original
+framing described. A true per-client override would need a schema
+addition (nullable `client_id`, client-specific row wins over the
+archetype/generic default). Not built this card — flagged here as a
+real candidate, not silently assumed solved.
+
+**Currently blocked, not yet published:** both new HTTP nodes
+(`Get Classification Prompt Template` in INT-010, `Get Draft Prompt
+Template` in INT-011) need a Supabase credential attached, and the n8n
+MCP's `update_workflow`/`addNode` tool silently drops any `credentials`
+value passed — confirmed by its own response text ("HTTP Request nodes
+were skipped during credential auto-assignment. Their credentials must
+be configured manually."). This is a genuine tooling gap, not a missed
+step — a human needs to open each node in the n8n UI and select the
+credential (believed `zenny-vault-suparbase`, id `guCWYmcVycnfMixw`,
+inferred from naming/chronology against the only other `supabaseApi`
+candidate, `Zenny Dashboard Service Key Role` — not independently
+confirmed, since every existing sibling node's credential assignment is
+redacted in every read this session's MCP access allowed). Production
+publish validation requires a real credential on every credentialed
+node, so neither workflow can be tested or published until this is
+done. **Both workflows' active/production versions are unchanged —
+this is draft-only.** Full finding: `Wiki/infra/convocore-agent-provisioning.md`.
 
 ## Source
 

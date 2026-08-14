@@ -71,6 +71,18 @@ override exists). Not built this card — out of scope, flagged as a
 real candidate for a future Build Card. See
 `Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
 
+**BC-062 UPDATE (2026-08-14/15) — build started, blocked mid-card on a
+Credential Gate:** both workflows now have draft (unpublished) wiring
+to a new `public.get_agent_prompt` RPC reading `agent_prompts`, with 2
+seed rows live. Also surfaced doing this: the live `agent_prompts`
+schema has **no `client_id` column** — it supports a default +
+archetype-level override today, not literally per-client as originally
+framed. Blocked on: the n8n MCP tooling cannot attach a credential to
+the 2 new HTTP nodes (confirmed via the tool's own response, not
+assumed) — needs a human to set it in the n8n UI before either workflow
+can be tested/published. Full detail:
+`Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
+
 ## Related
 
 - [[../reference/convocore-doc-status]] — which Convocore docs are
