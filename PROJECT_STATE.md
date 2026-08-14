@@ -10,7 +10,27 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-15 (latest) — by /execute — **BC-062 COMPLETE.** Human
+2026-08-15 (latest) — by /execute — **BC-064 COMPLETE.** Human flagged
+117 live Supabase Security Advisor warnings via screenshot. Root cause:
+BC-052 (2026-08-14) only revoked `anon` EXECUTE from ~40 internal RPCs
+— `authenticated` was never touched (73 functions, including
+`read_credential_secret`/`store_credential_secret` themselves — any
+real signed-in dashboard user, not just anon, could read/rotate any
+client's Vault secrets). Also found: new functions built since BC-052
+(including this session's own `get_client_agent_prompt`) inherit
+Supabase's ambient anon+authenticated default grant on new `public`
+functions unless explicitly revoked. **Fix:** grepped the dashboard's
+real frontend code + checked the one Edge Function that forwards a
+caller's real JWT to find the true 10-function "needs authenticated"
+set; revoked anon+authenticated from the other 62 (service_role only).
+**Live-verified:** advisor warnings 117 → 11 (10 intentional + 1
+unrelated Auth setting, not a grant issue, disclosed not fixed). Re-ran
+INT-010's `test_workflow` against the tightened grants — confirmed
+live, unaffected (n8n's credential is genuinely `service_role`). Full
+detail: `Wiki/log.md` session-BC-064,
+`Wiki/platform-quirks/anon-grant-exposure-bc052.md`.
+
+2026-08-15 (prior) — by /execute — **BC-062 COMPLETE.** Human
 approved the redesign; built in one pass: `public.agent_prompts`
 created + backfilled into all 5 `tpl_*` templates (structure only) and
 all 5 real client schemas (2 seed rows each, from `control.

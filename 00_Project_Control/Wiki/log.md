@@ -9,6 +9,48 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-15] session-BC-064 | Security Advisor: 117 warnings → 11, authenticated-grant gap found + fixed
+
+**Commander → Execute:** human shared a screenshot of the live Supabase
+Security Advisor showing 117 warnings, asking what was causing them and
+to fix it.
+
+**Investigation:** pulled the full advisor lint list (not just the
+screenshot's partial view) and found 2 distinct lint types making up
+the 117: `anon_security_definer_function_executable` (43) and
+`authenticated_security_definer_function_executable` (73), plus 1
+unrelated `auth_leaked_password_protection`. Cross-checked against
+BC-052's fix: it explicitly revoked `anon` only, leaving `authenticated`
+completely untouched — a real, disclosed scope cut at the time, now the
+actual root cause of the bulk of these warnings. Also found: BC-052's
+fix doesn't cover functions created AFTER it ran — Supabase grants
+`anon`+`authenticated` EXECUTE by ambient default privilege on new
+`public`-schema functions, which is exactly how this session's own
+`get_client_agent_prompt` (BC-062) ended up flagged despite an explicit
+(but wrong-target — `FROM PUBLIC`, not `FROM anon`) revoke.
+
+**Root-cause-confirmed fix:** grepped the dashboard's real frontend
+code for `supabase.rpc(...)` calls + checked which Edge Function
+genuinely forwards a caller's real JWT (`release-lead-ownership`,
+BC-056) to find the true "needs `authenticated`" set — exactly 10
+functions. Every other flagged function (62) is `service_role`-only in
+practice (called only by n8n or a `service_role`-key Edge Function) —
+revoked `anon`+`authenticated` from all 62, kept the 10 dashboard-facing
+ones on `authenticated` (revoking their `anon` too, which was
+unnecessarily present on 2 of them).
+
+**Live-verified:** re-ran the advisor — 43+73+1=117 down to 10+1=11 (the
+10 remaining are the intentional dashboard set; the 1 is the unrelated
+Auth setting, disclosed as out-of-scope for a grant fix). Re-ran
+INT-010's `test_workflow` against the tightened grants: `List
+Categories`, `Get Classification Prompt Template`, `Upsert Email` all
+executed genuinely live (real Supabase response data/headers) —
+empirically confirms n8n's `supabaseApi` credential is `service_role`,
+unaffected by the fix.
+
+Full findings + the full 62/10 function lists:
+`Wiki/platform-quirks/anon-grant-exposure-bc052.md`.
+
 ## [2026-08-15] session-BC-062 redesign | agent_prompts moved per-client-schema, INT-010/INT-011 rewired, tested live, published
 
 **Commander → Execute, human approved ("Go ahead, redesign BC-062
