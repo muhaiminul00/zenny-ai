@@ -9,6 +9,51 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-15] session-BC-063 | Edge Function client_id trust — 4 of 6 fixed, 2 intentionally left
+
+**Commander → Execute:** the originally-scoped card from the prior
+commander turn, executed after BC-064.
+
+**Live-verified first, per Mandatory MCP Verification:** read the real
+deployed source of all 6 connect/lifecycle Edge Functions
+(`oauth-initiate`, `oauth-callback`, `shopify-connect`,
+`woocommerce-connect`, `connection-lifecycle`,
+`resolve-pending-verification`) and cross-checked how the dashboard
+frontend actually calls each (`grep` for `supabase.functions.
+invoke(...)` vs. `window.open(...)`), rather than assuming a uniform
+fix applies to all 6.
+
+**Fixed (4):** `shopify-connect`, `woocommerce-connect`,
+`connection-lifecycle`, `resolve-pending-verification` — all genuinely
+called via `supabase.functions.invoke()`, which forwards the caller's
+real session `Authorization` header automatically, the same mechanism
+`release-lead-ownership` (BC-056) already established. Each now
+verifies the caller's identity via `dashboard_get_my_client()` (using
+an anon-key client + forwarded header, under the caller's own
+`auth.uid()`) and uses the RESOLVED `client_id`/`client_schema_name` —
+never the body-supplied one, which is now silently ignored rather than
+trusted. All 4 redeployed with `verify_jwt: true`.
+
+**Left as-is, intentionally (2):** `oauth-callback` is a genuine public
+redirect target hit directly by external OAuth providers — never
+carries a Supabase bearer token; its own code comment already states
+this. `oauth-initiate` is opened via a plain `window.open(url)` browser
+popup, not `functions.invoke()` — no Authorization header is ever
+attached to a browser navigation either. Both genuinely can't be fixed
+this way; residual risk for `oauth-initiate` is real but low (starting
+an OAuth flow on another client's behalf requires knowing their UUID,
+and nothing is written until the provider's own consent screen
+completes, gated by `oauth-callback`'s `state` mechanism).
+
+**Not fully browser-tested end-to-end** — same disclosed limitation as
+BC-056's `release-lead-ownership`: no real logged-in dashboard session
+exists to prove the JWT-forwarding live (Credential Gate — no real
+dashboard user credentials to test with). Structurally verified via
+source review and the already-established, documented `supabase.
+functions.invoke()` behavior, not live-clicked.
+
+Full detail: `Wiki/platform-quirks/anon-grant-exposure-bc052.md`.
+
 ## [2026-08-15] session-BC-064 | Security Advisor: 117 warnings → 11, authenticated-grant gap found + fixed
 
 **Commander → Execute:** human shared a screenshot of the live Supabase

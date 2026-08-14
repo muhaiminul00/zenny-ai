@@ -10,7 +10,27 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-15 (latest) — by /execute — **BC-064 COMPLETE.** Human flagged
+2026-08-15 (latest) — by /execute — **BC-063 COMPLETE (4 of 6 fixed,
+2 intentionally left).** Live-verified all 6 connect/lifecycle Edge
+Functions' real source + how the dashboard frontend actually calls
+each before changing anything. **Fixed:** `shopify-connect`,
+`woocommerce-connect`, `connection-lifecycle`,
+`resolve-pending-verification` — all called via `supabase.functions.
+invoke()` (forwards the caller's real session JWT automatically, same
+mechanism BC-056's `release-lead-ownership` already established); each
+now derives `client_id`/`client_schema_name` from `dashboard_get_my_
+client()` under the caller's own session, ignoring the body-supplied
+value entirely. Redeployed with `verify_jwt: true`. **Left as-is,
+intentionally:** `oauth-callback` (genuine public OAuth redirect
+target, never carries a bearer token) and `oauth-initiate` (opened via
+browser `window.open()`, not `functions.invoke()` — no Authorization
+header possible). **Not fully browser-tested end-to-end** — same
+disclosed limitation as BC-056 (no real dashboard login to test with);
+verified via source review + the already-established `functions.
+invoke()` JWT-forwarding pattern. Full detail: `Wiki/log.md`
+session-BC-063, `Wiki/platform-quirks/anon-grant-exposure-bc052.md`.
+
+2026-08-15 (prior) — by /execute — **BC-064 COMPLETE.** Human flagged
 117 live Supabase Security Advisor warnings via screenshot. Root cause:
 BC-052 (2026-08-14) only revoked `anon` EXECUTE from ~40 internal RPCs
 — `authenticated` was never touched (73 functions, including
@@ -423,15 +443,15 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
   read via `get_client_agent_prompt`. INT-010/INT-011 rewired,
   live-tested with real LLM calls, published. See `Wiki/log.md`
   session-BC-062 redesign entry, `Wiki/infra/convocore-agent-provisioning.md`.
-- **Residual, smaller-severity security gap (found BC-052, not fixed):**
-  the connect/lifecycle Edge Functions (`oauth-callback`,
-  `shopify-connect`, `woocommerce-connect`, `connection-lifecycle`) all
-  trust `client_id` from the request body rather than verifying it
-  against the caller's own JWT (`verify_jwt: false`, a project-wide
-  convention predating BC-052, not introduced by it). Low real risk
-  today (client_id UUIDs aren't guessable, one real dashboard user
-  total), worth a small future Build Card once self-serve signup makes
-  client_id enumeration a real concern. See
+- ~~Residual security gap (found BC-052): connect/lifecycle Edge
+  Functions trusting client_id from the request body~~ **CLOSED for 4
+  of 6 (BC-063, 2026-08-15).** `shopify-connect`, `woocommerce-connect`,
+  `connection-lifecycle`, `resolve-pending-verification` now derive
+  identity from the caller's real session JWT. `oauth-callback` and
+  `oauth-initiate` intentionally left as-is — genuinely no bearer token
+  available in either flow (public OAuth redirect / browser popup
+  navigation), disclosed not silently skipped. Not fully
+  browser-tested end-to-end (no real dashboard login available). See
   `Wiki/platform-quirks/anon-grant-exposure-bc052.md`.
 
 (ADP-001 doc/reality mismatch dropped per human instruction, 2026-08-14
@@ -515,10 +535,8 @@ Dual build path agreed with human 2026-08-14:
 
 **Path A — remaining backend**, pulled in only as the demo business
 actually needs it:
-1. Residual Edge Function client_id-trust gap (BC-052 finding, lower
-   priority than previously framed — this is an agency-provisioned
-   build, not client self-signup, so client_id enumeration risk is low
-   until self-serve exists).
+1. ~~Residual Edge Function client_id-trust gap (BC-052 finding)~~
+   **CLOSED for 4 of 6 (BC-063, 2026-08-15).** See Last Updated above.
 2. Calendly's real calendar-delete path (BC-055 built it to spec but
    could not live-test — no roster Calendly connection).
 3. Phase 5A (Inventory dashboard) / SCH-007.
@@ -526,11 +544,8 @@ actually needs it:
    (BC-062, 2026-08-15).** Redesigned to per-client-schema, INT-010/
    INT-011 rewired and live-tested, both published. See Last Updated
    above and `Wiki/log.md` session-BC-062 redesign entry.
-5. Edge Function client_id/JWT-trust gap (BC-052 finding, item #1 above)
-   — raised again 2026-08-15, not yet started as BC-063. Needs a live
-   MCP-verification pass of each function's actual call pattern first
-   (per its Build Card) before any `verify_jwt` change, since
-   `oauth-callback` may be called mid-redirect without a session.
+5. ~~Security Advisor authenticated-grant gap~~ **CLOSED (BC-064,
+   2026-08-15).** 117 warnings → 11. See Last Updated above.
 
 **Path B — real Convocore agent build (test+verify+build for a demo
 business):**

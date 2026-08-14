@@ -97,23 +97,57 @@ response headers/data, not simulated) — **empirically confirms n8n's
 `supabaseApi` credential resolves to `service_role`**, exactly as
 BC-052 already stated, now re-proven after a stricter revoke.
 
-## Residual, smaller-severity gap — Edge Function client_id trust (BC-063, in progress)
+## Edge Function client_id trust — CLOSED for 4 of 6, 2 intentionally left (BC-063, 2026-08-15)
 
 The Edge Functions that DO front-facing connect/lifecycle work
-(`oauth-callback`, `shopify-connect`, `woocommerce-connect`,
-`connection-lifecycle` — BC-052) all trust `client_id` from the request
-body rather than verifying the caller's own JWT against it
+(`oauth-callback`, `oauth-initiate`, `shopify-connect`,
+`woocommerce-connect`, `connection-lifecycle`,
+`resolve-pending-verification`) all trusted `client_id` (and, for
+`resolve-pending-verification`, `client_schema_name` too) from the
+request body rather than verifying the caller's own JWT against it
 (`verify_jwt: false` at deploy, matching an existing project-wide
-convention, not something BC-052 introduced). Today this means a
-caller who knows another client's `client_id` UUID could, in principle,
-invoke these functions on that client's behalf. Real blast radius is
-low today (client_id UUIDs aren't guessable, and there's genuinely one
-real dashboard user in the whole system as of this writing — see
-[[../infra/dashboard-auth-mapping]]) but this is architecturally the
-same class of issue as the `anon`-grant one above, just at the Edge
-Function layer instead of the RPC layer. **BC-063 (2026-08-15) is
-building the fix** — see [[../log]] for the live investigation of each
-function's actual call pattern before changing `verify_jwt`.
+convention, not something BC-052 introduced).
+
+**Live-verified before changing anything** (per Mandatory MCP
+Verification): read every one of the 6 functions' real deployed source
+and cross-checked how the dashboard frontend actually calls each one
+(`grep` for `supabase.functions.invoke(...)` vs. `window.open(...)`/raw
+`fetch`):
+
+- `shopify-connect`, `woocommerce-connect`, `connection-lifecycle`,
+  `resolve-pending-verification` — all called via `supabase.functions.
+  invoke(...)`, which forwards the caller's real session `Authorization`
+  header automatically (same mechanism `release-lead-ownership`,
+  BC-056, already established as the project's pattern for this). **Fixed:**
+  each now derives `client_id`/`client_schema_name` from a real
+  `dashboard_get_my_client()` call under the caller's own session JWT
+  (via the anon-key client + forwarded header), ignoring whatever the
+  body claims. `verify_jwt: true` set at deploy. The body-supplied
+  `client_id` field is harmless now if a frontend caller still sends
+  it — silently ignored, never trusted.
+- `oauth-callback` — genuinely NOT fixable this way. It's a public
+  redirect target hit directly by Google/Shopify/Slack/Calendly/Cal.com's
+  own OAuth servers, never carrying a Supabase bearer token — its own
+  code comment already states this explicitly (`verify_jwt: false...
+  MUST stay false or every real OAuth callback 401s`). Left as-is,
+  intentionally.
+- `oauth-initiate` — also genuinely NOT fixable this way: the dashboard
+  opens it via a plain `window.open(url)` browser popup navigation
+  (confirmed live in `Integrations.tsx`), not `functions.invoke()` — no
+  Authorization header is ever attached to a browser navigation.
+  Real residual risk here matches the original disclosure below (a
+  caller who knows another client's UUID could start an OAuth flow on
+  their behalf) — genuinely low blast radius since nothing is written
+  until the OAuth provider's own consent screen completes for that
+  client, gated by `oauth-callback`'s own `state` mechanism.
+
+**Not fully browser-tested end-to-end** — same disclosed limitation
+class as `release-lead-ownership` (BC-056): the identity-verification
+code matches the documented, already-established `supabase.functions.
+invoke()` JWT-forwarding pattern, but no real logged-in dashboard
+session exists to prove it live (Credential Gate — no real dashboard
+user credentials to test with). Structurally verified via source
+review, not live-clicked.
 
 ## Still open, not a grant issue — `auth_leaked_password_protection`
 
