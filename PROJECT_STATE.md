@@ -10,7 +10,24 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-14 (latest) — by /execute — BC-058c complete: the 2 stale
+2026-08-14 (latest) — by /execute — BC-059 complete: ran the intake
+checklist against a real target, carmelli.co.uk (a kosher bakery,
+click-and-collect only). Fetched the homepage + contact page (About and
+a guessed shipping-policy URL both 404'd, disclosed rather than
+guessed). Archetype diagnostic run for real: **Commerce-Ecom**
+(transactional, customer already knows what they want, no booking slot,
+no advisory step). All AUTO rows filled with real site content
+(products/pricing, 24h/48h advance-order policy, kosher certs, contact
+info, UK locale); genuinely unanswerable-from-the-website items (hours,
+refund policy, actual ecommerce platform) left as disclosed gaps, not
+guessed. Checklist restructured per human request: added a `Type`
+column (`Placeholder` vs. `Option: [real enumerated choices]` — never
+vague) and a client-facing `Why it matters` column (no internal field
+names). Also added `control.agent_prompts`'s per-client-prompt-override
+gap (BC-058c finding) to the Next Build Card candidates list below.
+Full checklist: `05_Platform_Builds/Convocore/Convocore_Agent_Intake_Checklist_v1.md`.
+
+2026-08-14 (prior) — by /execute — BC-058c complete: the 2 stale
 Convocore docs actually corrected (`Findings_Required_Updates_FINAL.md`
 §1.1/§1.2, `Adapter_Spec_FINAL.md` Part 2.3 — both now match live
 reality), and `control.agent_prompts` resolved to a real, non-Convocore
@@ -417,6 +434,12 @@ actually needs it:
 2. Calendly's real calendar-delete path (BC-055 built it to spec but
    could not live-test — no roster Calendly connection).
 3. Phase 5A (Inventory dashboard) / SCH-007.
+4. `control.agent_prompts` wiring gap (BC-058c finding) — Email
+   Manager's per-client prompt-override table exists but INT-010/011
+   both still hardcode their LLM prompts in a Code node. Real, disclosed
+   improvement: swap both prompt-building Code nodes to read from
+   `agent_prompts` (module + archetype keyed), falling back to a default
+   row when no client-specific override exists.
 
 **Path B — real Convocore agent build (test+verify+build for a demo
 business):**
@@ -425,8 +448,13 @@ business):**
   schema-grounded.
 - BC-058c done — stale docs fixed, `agent_prompts` finding corrected
   (Email Manager, not Convocore). Pause closed.
-- BC-059 (next): run BC-058's checklist against a real target business
-  (human to provide link).
+- BC-059 done — checklist run against carmelli.co.uk (Commerce-Ecom).
+  All AUTO rows filled; a short real ASK list is now ready to send to
+  the business (hours, refund policy, ecommerce platform, plus the
+  standard module/channel/integration questions).
+- BC-060 (next): once Carmelli's ASK answers come back, build the real
+  Convocore agent (manual Canvas UI, per BC-057b) + Supabase
+  provisioning + n8n/credential wiring from the completed checklist.
 - BC-060: populate Convocore (manual Canvas build, per BC-057b) +
   Supabase provisioning (live schema, not the stale sequence spec) + n8n
   wiring from the completed checklist.

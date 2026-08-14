@@ -1,7 +1,8 @@
 # Convocore Agent Intake Checklist (v1)
 
 ```
-Status:     v1. Built BC-058 (2026-08-14).
+Status:     v1. Built BC-058 (2026-08-14). AUTO rows filled BC-059
+            against carmelli.co.uk (2026-08-14).
 Purpose:    The single input document for building one real Convocore
             agent + its Zenny backend record, for a demo business built
             by us and shown to that client (not client self-onboarding).
@@ -19,6 +20,10 @@ How to use: Give Claude a business website/description. Claude fills
             real, short question list to send to the business. Once
             answered, this same filled document is BC-060's build input
             — no second document, no re-derivation.
+Columns:    Type = Placeholder (free-text, business-specific answer) or
+            Option: [...] (a fixed, real set of choices — never a vague
+            "client picks"). Why it matters = one client-facing
+            sentence, no internal field names or builder jargon.
 ```
 
 ---
@@ -31,75 +36,80 @@ each node's Instructions — is **not a checklist answer**. Per
 `Convocore_Agent_Build_Order_Guide_v2.md` Part 6.2's Doc-Search-First
 rule, that text is authored at build time (BC-060) directly from
 `Agent_Runtime_System_v1.md`'s per-module sections, using the module
-list from Q8 below to know which sections apply. This document tells
-BC-060 *which modules, channels, and settings*; it does not write the
-prompts themselves.
+list from B1 below to know which sections apply.
 
-**Real finding, flagged here for visibility:** `control.agent_prompts`
-(`prompt_key, module, archetype, content, version, status`) already
-exists in the live schema — it looks like scaffolding for exactly the
-"Template Dashboard" that `Convocore_Adapter_Spec_FINAL.md` Part 8.2
-says doesn't exist yet. Whether it's actually wired to anything or a
-dormant leftover is unknown — not investigated further in this card
-(out of scope), disclosed rather than assumed either way. Worth a
-direct look before BC-060 if manual prompt-authoring turns out to
-duplicate something this table already half-solves.
+`control.agent_prompts` is a separate, unrelated system (Email
+Manager's per-client prompt override — BC-058c finding, not wired yet)
+— see `Wiki/infra/convocore-agent-provisioning.md`, not relevant to
+this checklist.
 
 ---
 
+## Filled for: Carmelli Bakery (carmelli.co.uk) — BC-059, 2026-08-14
+
+Fetched: homepage + contact page. About page and a guessed shipping-
+policy URL both 404'd — not every AUTO field could be filled; those are
+disclosed as still-open below rather than guessed.
+
 ## A. Business & Archetype Identity
 
-| # | Question | Feeds → | Source | Answer |
-|---|---|---|---|---|
-| A1 | Business name | `clients.business_name`; Convocore agent display name | AUTO (website) | |
-| A2 | What does this business do / primary industry | Archetype diagnostic context | AUTO (website) | |
-| A3 | Why does a customer typically contact this business — the actual interaction pattern (urgent problem? known purchase? booking a slot? needs to be advised first? mission-driven?) | Archetype Fit Diagnostic Q1-Q5 (`Client_Onboarding_Guide.md` §1.5) | AUTO-draft from website, confirm if diagnostic result is ambiguous | |
-| A4 | Resulting archetype (Emergency / Commerce-Ecom / Commerce-Restaurant / Appointment / Consultation / Engagement) | `clients.archetype` (`archetype_enum`) | AUTO — output of A3's diagnostic run | |
-| A5 | Does this business run more than one distinct customer journey (e.g. dine-in + delivery, consulting + a self-serve product)? | `clients.secondary_archetypes` | AUTO-suggest from website, ASK to confirm | |
-| A6 | Brand voice / tone description | Convocore Global Prompt identity | AUTO-draft from website copy, ASK to confirm | |
-| A7 | Agent name preference | `convocore_agent_map.agent_display_name` | AUTO — default `{business_name} Assistant` (confirmed convention, `Planning_to_Build_Transition_v1.md` §2.5); ASK only if they want something else | |
+| # | Question | Why it matters | Type | Source | Answer |
+|---|---|---|---|---|---|
+| A1 | Business name | The name your customers and your AI assistant will use for your business. | Placeholder | AUTO | **Carmelli Bakery** (Carmelli Kosher Bakery, Golders Green) |
+| A2 | What does this business do / primary industry | Sets the general context your assistant works from. | Placeholder | AUTO | Kosher bakery & catering, trading since 1987. Bread, bagels, rolls, croissants, challah, sandwiches, pre-packed and custom cakes, catering platters. |
+| A3 | How do customers typically reach you — do they already know exactly what they want, or do they need advice first? | Decides how much your assistant guides vs. simply takes the order. | Option: Urgent problem / Already knows what they want / Needs a booked time slot / Needs advice first / Supports a cause | AUTO | **Already knows what they want** — customers order specific named items (a dozen bagels, a challah, a custom cake) for click-and-collect pickup, no advisory step. |
+| A4 | Resulting service style (Emergency / Commerce-Ecom / Commerce-Restaurant / Appointment / Consultation / Engagement) | This is the core behavior mode your AI assistant runs in. | Option: Emergency / Commerce-Ecom / Commerce-Restaurant / Appointment / Consultation / Engagement | AUTO | **Commerce-Ecom** — transactional, click-and-collect, no dine-in/reservation slot, no advisory sales process. |
+| A5 | Do you run more than one distinct kind of customer journey (e.g. counter orders AND custom bespoke orders)? | Some businesses need their assistant to handle two different kinds of requests differently — worth confirming so nothing gets missed. | Option: Yes (name the second) / No | AUTO-suggested, confirm | **Suggested: No** — the Online Cake Builder (custom cakes) is still an ordering flow, not a separate service style. Flag if this reading is wrong. |
+| A6 | Brand voice / tone | How your assistant should "sound" when talking to your customers. | Placeholder | AUTO-draft, confirm | Warm, welcoming, community/family-bakery feel; emphasizes freshness, in-house baking, and its kosher heritage (Kedassia & KLBD certified). |
+| A7 | Agent name | The name shown to customers in the chat widget. | Placeholder (default provided) | AUTO — default convention | **Carmelli Bakery Assistant** (confirm or provide an alternative) |
 
 ## B. Convocore Agent Configuration
 
-| # | Question | Feeds → | Source | Answer |
-|---|---|---|---|---|
-| B1 | Which modules are active? (Core always on; Growth Agent / Conversion Engine / Recovery Engine / Email Manager per purchase) | `control.client_active_modules`; Canvas node structure — one node per active module | ASK | |
-| B2 | Which channels? (Web, WhatsApp, Instagram, Messenger, Telegram, Voice) | Convocore channel connections; Part 1 build planning | ASK | |
-| B3 | Voice needed? | `client_config.voice_agent_enabled`; rules out Google Live if multi-node (near-certain given B1) | ASK | |
-| B4 | SMS needed? | `client_config.sms_agent_enabled` — per-client opt-in only, never default | ASK | |
-| B5 | Freedom level — archetype default, or an override + business rationale? | `client_config.archetype_settings` (jsonb — exact key shape not yet confirmed live, inspect a real row before BC-060 rather than assume) | ASK only if override wanted | |
-| B6 | Conversion mode per archetype (Mode A Agentic / B Assisted / C Human Handoff) | Same `archetype_settings`; Convocore Custom Tool wiring | Derived from Section D's integration answers — fill after D | |
-| B7 | Language config — fixed or adaptive, which language(s)? | `client_config.language_mode` / `language_list` | AUTO-guess from website language, ASK to confirm; default adaptive/single | |
-| B8 | Operating hours / send-window override | `client_config.send_window_start` / `send_window_end` (default 08:00–20:00 local) | AUTO from published hours, ASK to confirm | |
-| B9 | Escalation contact(s) — who receives P1/P2/P3 | Convocore `human-handoff` Tool's `team_key` / notify-emails | ASK | |
-| B10 | After-hours emergency contact (Emergency archetype only) | `client_config.after_hours_emergency_contact` | ASK, only if A4 = emergency | |
-| B11 | Recovery Engine cadence — archetype default or override? | `clients.max_recovery_steps` / `control.archetype_recovery_defaults` | ASK, only if B1 includes Recovery Engine | |
-| B12 | Service/product catalog, pricing, policies, FAQ | Convocore Knowledge Base content | AUTO-draft from website scrape, ASK to fill gaps (pricing/policies are often not fully public) | |
-| B13 | Lead Qualification Funnel setup — steps, point weights, notification thresholds | Convocore's own dashboard config (`Convocore_Adapter_Spec_FINAL.md` Part 9 — primary lead-scoring mechanism, real per-client setup required) | ASK — what counts as "qualified" is a business call | |
+| # | Question | Why it matters | Type | Source | Answer |
+|---|---|---|---|---|---|
+| B1 | Which of these should your assistant handle? | Decides what your assistant is actually able to do beyond answering questions. | Option (multi-select): Core Agent (always on) / Growth Agent / Conversion Engine / Recovery Engine / Email Manager | ASK | |
+| B2 | Where should customers be able to reach your assistant? | Decides which platforms carry your assistant. | Option (multi-select): Web chat / WhatsApp / Instagram / Messenger / Telegram / Voice (phone) | ASK | |
+| B3 | Do you want a phone/voice assistant, not just chat? | Adds a phone-answering capability, with its own setup. | Option: Yes / No | ASK | |
+| B4 | Do you want SMS text messaging? | Adds a text-message channel, separate from web chat. | Option: Yes / No | ASK | |
+| B5 | Should your assistant follow the standard behavior for this business type, or something more/less proactive? | Controls how much your assistant recommends or upsells vs. staying purely reactive. | Option: Use standard default / Customize (then explain why) | ASK, only if customizing | |
+| B6 | How should orders actually get completed — can your assistant place the order directly, or should it hand off? | Decides whether customers can finish an order in the chat itself. | Option: Assistant completes it directly / Assistant guides to your website to finish / Assistant hands off to a person | Depends on D2 — fill once you confirm your ecommerce platform | |
+| B7 | What language(s) should your assistant use? | Decides which language(s) customers get replied to in. | Option: Single language (name it) / Automatically match the customer | AUTO, confirm | **English** — site is English-only, no language switcher found. Suggested default: English only. |
+| B8 | What are your opening hours (and should your assistant only message during those hours)? | Controls when your assistant sends any proactive messages (never affects live chat replies, which are always available). | Placeholder | ASK — not published on the website | |
+| B9 | Who should be notified when your assistant needs to hand a conversation to a real person? | Makes sure a real staff member actually sees escalations, not just the assistant. | Placeholder (name + contact per priority level) | ASK | |
+| B10 | *(Emergency businesses only)* After-hours emergency contact | N/A for this business type. | N/A | N/A — A4 is not Emergency | — |
+| B11 | If a customer goes quiet mid-order, should your assistant follow up, and on what schedule? | Controls whether/how your assistant nudges an abandoned order. | Option: Use standard default schedule / Customize | ASK, only if B1 includes Recovery Engine | |
+| B12 | Product catalogue, pricing, and policies your assistant should know | This becomes your assistant's actual knowledge — what it can answer accurately vs. has to say "let me check." | Placeholder | AUTO-draft, confirm & fill gaps | **Products/pricing found:** bread, bagels (£0.95), rolls, croissants, challah (Baby £1.80 / Medium Kitka £18.00), sandwiches, pre-packed & custom cakes, catering platters (e.g. Mediterranean Platter £58.00). **Policy found:** click-and-collect only, no delivery; bread/bagels/rolls/sandwiches need 24h advance order (next-day cutoff 2pm); croissants, pre-packaged items, and custom cakes need 48h. Kosher-certified (Kedassia, KLBD). **Not found — please provide:** refund/cancellation policy, full current price list, allergen info. |
+| B13 | What counts as a "good lead" worth flagging to you? | Only relevant if you want your assistant to flag high-value inquiries (e.g. a large catering order) for personal follow-up. | Placeholder | ASK | |
 
 ## C. Backend / Supabase Provisioning
 
-Grounded in a live schema read (2026-08-14), not the older sequence
-spec — see the flag at the top of this document.
-
-| # | Question | Feeds → | Source | Answer |
-|---|---|---|---|---|
-| C1 | `client_id`, `client_schema_name` | System-generated (`client_{client_id}_{business_slug}`), via `create_client_schema_from_template(p_archetype, p_specific_tables, p_client_schema)` | AUTO | |
-| C2 | Billing tier — is this a demo/internal build or a real paying tier? | `clients.billing_tier` | ASK (internal decision) | |
-| C3 | Client status at build time | `clients.status` (`client_status_enum`) | AUTO = `onboarding` until go-live | |
-| C4 | Dashboard user(s) — who logs in, what role | `dashboard_provision_user(p_auth_user_id, p_client_id, p_role)` | ASK | |
-| C5 | Default country code, max booking horizon | `client_config.default_country_code` / `max_booking_horizon` | AUTO from business locale, confirm | |
-| C6 | Cart-value escalation threshold, waitlist enabled | `client_config.cart_value_escalation_threshold` / `waitlist_enabled` | ASK, only if Commerce/Appointment-relevant | |
+| # | Question | Why it matters | Type | Source | Answer |
+|---|---|---|---|---|---|
+| C1 | Your business's internal account setup | Purely internal bookkeeping — not something you need to provide. | N/A | AUTO — system-generated | — |
+| C2 | Is this a demo build or a live paid account? | Determines your account's internal status. | Option: Demo/internal / Live paid | ASK | |
+| C3 | Account status at build time | Internal only. | N/A | AUTO = "onboarding" until go-live | — |
+| C4 | Who should be able to log into your dashboard? | Decides who gets a login and what they can see/do there. | Placeholder (name, email, role) | ASK | |
+| C5 | Country / locale | Affects date formats, phone number parsing, and defaults. | Placeholder (default suggested) | AUTO, confirm | **United Kingdom** — London address (126-128 Golders Green Road, NW11 8HB). |
+| C6 | Should there be a minimum order value that triggers a manual review, or a waitlist for out-of-stock/fully-booked items? | Optional safety net for large or unusual orders. | Option: Yes (set a value) / No | ASK | |
 
 ## D. Integration Credentials
 
-| # | Question | Feeds → | Source | Answer |
-|---|---|---|---|---|
-| D1 | Calendar system in use (Google Calendar / Calendly / none) | Our own OAuth platform, **not** Convocore's native calendar tools (`Convocore_Canvas_Ground_Truth_FINAL.md` Part 8 #3) | ASK | |
-| D2 | Ecommerce platform (Shopify / WooCommerce / none) | Shopify: confirmed exception, routed through Convocore's native tool via our credential platform (`Convocore_Adapter_Spec_FINAL.md` Part 10). WooCommerce: our own OAuth, no Convocore-native path. | ASK | |
-| D3 | Voice: Twilio Account SID + Auth Token + phone number (only if B3 = yes) | `client_config.client_voice_number`; Credential Gate — never invented, human supplies | ASK | |
-| D4 | SMS: Twilio SMS-capable number (only if B4 = yes) | `client_config.client_sms_number`; Credential Gate | ASK | |
-| D5 | Email connection for Email Manager (only if B1 includes Email Manager) | `client_config.email_address`; Gmail via UTIL-006 | ASK | |
+| # | Question | Why it matters | Type | Source | Answer |
+|---|---|---|---|---|---|
+| D1 | Calendar system (for appointment-style bookings) | Not applicable — this business doesn't book time slots. | N/A | N/A — A4 is Commerce-Ecom, not Appointment | — |
+| D2 | What platform do you sell/take orders through today (Shopify, WooCommerce, other, or none online yet)? | Decides how your assistant can actually check stock or place orders. | Option: Shopify / WooCommerce / Other / None yet | ASK — **AUTO-suspected, unconfirmed:** the site's URL patterns are consistent with Shopify, but this was not independently confirmed and should not be treated as fact. | |
+| D3 | Twilio Account SID + Auth Token + phone number | Needed only if you want a phone assistant (B3). We never invent or guess credentials — you provide these directly. | Placeholder (real credential) | ASK, only if B3 = Yes | |
+| D4 | Twilio SMS-capable number | Needed only if you want SMS (B4). Same credential rule as above. | Placeholder (real credential) | ASK, only if B4 = Yes | |
+| D5 | Which email inbox should your assistant read/draft from? | Needed only if Email Manager is active (B1). | Placeholder | ASK, only if B1 includes Email Manager. **AUTO-known, for reference:** current published order inbox is `orders@carmelli.co.uk`. | |
+
+---
+
+## Still open after this pass (send to Carmelli)
+
+Everything marked **ASK** above, plus 3 things the website didn't
+answer that AUTO couldn't fill: **opening hours** (B8), **refund/
+cancellation policy** (part of B12), and **which ecommerce platform is
+actually in use** (D2, only a URL-pattern guess so far).
 
 ---
 
@@ -108,3 +118,6 @@ spec — see the flag at the top of this document.
   archetype diagnostic + workbook fields with the 3 primary Convocore
   docs' genuine business-decision inputs, cross-checked against a live
   Supabase schema read rather than the stale sequence spec.
+- **BC-059 (2026-08-14)** — added Type and Why-it-matters columns;
+  AUTO rows filled against carmelli.co.uk; archetype diagnostic run
+  (result: Commerce-Ecom).

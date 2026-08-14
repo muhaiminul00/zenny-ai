@@ -9,6 +9,44 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-14] session-BC-059 | Intake checklist run against carmelli.co.uk, restructured with Type + Why-it-matters columns
+
+**Commander → Execute:** Human supplied the first real Path B target,
+carmelli.co.uk, plus 3 formatting requirements for the checklist: a
+`Type` column distinguishing free-text `Placeholder` answers from
+fixed-choice `Option: [...]` ones (real enumerated values, not vague
+"client picks"), and a client-facing `Why it matters` column with no
+internal field names.
+
+**Execute:** Fetched the homepage + contact page via WebFetch (About
+page and a guessed shipping-policy URL both 404'd — disclosed as
+genuine gaps rather than papered over). Ran the archetype diagnostic
+for real against what was found: transactional, customer already knows
+what they want (specific bakery items/custom cakes), click-and-collect
+with an order cutoff rather than a booked appointment slot → **Commerce-
+Ecom**, no secondary archetype (the Online Cake Builder is still an
+ordering flow, not a distinct journey).
+
+Filled every AUTO row in `Convocore_Agent_Intake_Checklist_v1.md` with
+real site content: products/pricing examples, the 24h/48h advance-order
+policy, kosher certification (Kedassia/KLBD), contact details, UK
+locale, English-only language. Left genuinely unanswerable items
+disclosed rather than guessed: opening hours (not published), refund/
+cancellation policy (not found), and the actual ecommerce platform
+(D2 — Shopify-like URL conventions noticed but explicitly flagged as
+unconfirmed, not asserted as fact). Restructured the whole table with
+the 2 new columns per the human's spec, marking N/A rows explicitly
+(B10 emergency contact, D1 calendar — neither applies to a Commerce-Ecom
+build) rather than leaving them as blank ASK rows.
+
+Also added `control.agent_prompts`'s wiring gap (BC-058c finding) to
+`PROJECT_STATE.md`'s Path A candidates list per the human's request.
+
+Result: a short, real ASK list ready to send to Carmelli — hours,
+refund policy, ecommerce platform, plus the standard module/channel/
+voice/SMS/integration questions every build needs. Next: BC-060 once
+those answers come back.
+
 ## [2026-08-14] session-BC-058c | Stale docs corrected, agent_prompts real finding (Email Manager, not Convocore)
 
 **Commander:** Human acknowledged BC-058's 2 self-resolved doc/reality

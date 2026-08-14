@@ -51,7 +51,7 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 ## Reference
 
 - [reference/convocore-doc-status.md](reference/convocore-doc-status.md) — which `05_Platform_Builds/Convocore/` docs are primary/backing/background/optional/superseded, and the BC-057b (2026-08-14) live recheck confirming the REST+MCP billing block is still active on both paths — manual Canvas UI is the fallback build method.
-- `05_Platform_Builds/Convocore/Convocore_Agent_Intake_Checklist_v1.md` — BC-058's master intake checklist (business/archetype ID, agent config, backend provisioning, integration credentials), AUTO/ASK split, doubles as onboarding-manual v1's seed.
+- `05_Platform_Builds/Convocore/Convocore_Agent_Intake_Checklist_v1.md` — BC-058's master intake checklist (business/archetype ID, agent config, backend provisioning, integration credentials), Type/Source/Why-it-matters columns, doubles as onboarding-manual v1's seed. BC-059 (2026-08-14) ran it for real against carmelli.co.uk — result: Commerce-Ecom, short ASK list ready to send.
 
 ## Open Decisions
 
