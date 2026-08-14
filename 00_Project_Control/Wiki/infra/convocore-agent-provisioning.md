@@ -71,16 +71,62 @@ override exists). Not built this card — out of scope, flagged as a
 real candidate for a future Build Card. See
 `Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
 
-**BC-062 UPDATE (2026-08-14/15) — build started, blocked mid-card on a
-Credential Gate:** both workflows now have draft (unpublished) wiring
-to a new `public.get_agent_prompt` RPC reading `agent_prompts`, with 2
-seed rows live. Also surfaced doing this: the live `agent_prompts`
-schema has **no `client_id` column** — it supports a default +
-archetype-level override today, not literally per-client as originally
-framed. Blocked on: the n8n MCP tooling cannot attach a credential to
-the 2 new HTTP nodes (confirmed via the tool's own response, not
-assumed) — needs a human to set it in the n8n UI before either workflow
-can be tested/published. Full detail:
+**BC-062 UPDATE (2026-08-14/15) — build started, then correctly
+paused for a real architecture question, not self-resolved:** both
+workflows have draft (unpublished) wiring to a new
+`public.get_agent_prompt` RPC reading `control.agent_prompts`, with 2
+seed rows live.
+
+**Finding 1, resolved — the credential-attach failure was NOT a
+Supabase permission block.** Human's hypothesis (BC-052's anon-grant
+REVOKEs blocking this) was checked and is wrong: attaching a credential
+to an n8n node is a purely n8n-internal action (a reference into n8n's
+own credential store), unrelated to what that credential can later do
+against Supabase's REST API. The real cause: `update_workflow`'s
+`addNode` operation silently drops an inline `credentials` value —
+confirmed by re-testing with the dedicated `setNodeCredential`
+operation instead, which applied cleanly with no skip-note (both nodes
+now have `zenny-vault-suparbase`, id `guCWYmcVycnfMixw`, attached in
+draft — inferred correct by naming/chronology, not yet live-execution-
+confirmed since credential assignments are redacted from every read
+path available). Both workflows are still unpublished — no live
+behavior changed by this fix.
+
+**Finding 2, resolved — the control-schema, archetype-keyed design
+BC-062 built was the wrong shape.** Human's stated mental model
+(`control` = cross-client shared plane; each client gets its own
+schema cloned from a `tpl_{archetype}` template, tracked via
+`control.clients.client_schema_name`) is confirmed correct, live, and
+consistently applied — schema list matches the roster exactly, and
+`Database_Structure_v4_FINAL.md` §1 documents it directly. That same
+doc **already flags `control.agent_prompts` with `← never synced to
+any client schema`** — a known, disclosed gap in the original design,
+not a doc/reality conflict.
+
+The live database has a direct, working precedent for exactly this
+shape of data: `email_categories`. It exists in **both** `control`
+(16 rows) **and** every `tpl_*` template (0 rows, structure only) and
+every `client_test_*` schema (16 real rows each) — and the only thing
+that's actually queried at runtime (`list_client_email_categories`,
+`EXECUTE format('... FROM %I.email_categories', p_schema)`) is the
+**per-client-schema copy**. `control.email_categories` is a real,
+harmless orphan — pre-dates BC-045 (2026-08-12), which correctly
+migrated this exact kind of per-client-overridable content to the
+per-schema pattern and never dropped the old control copy.
+
+**Conclusion: `agent_prompts` should follow the same pattern —
+added to `public` reference scaffolding + all 5 `tpl_*` templates +
+backfilled into the 5 real client schemas, queried via a per-schema RPC
+(same shape as `list_client_email_categories`), not a control-schema,
+archetype-keyed RPC.** `control.agent_prompts` doesn't need to be
+dropped — it can stay as a genuine master-defaults seed source read
+once at client-provisioning time (mirroring what `control.email_
+categories` may originally have been for), which also resolves the
+human's original "per-client override" framing exactly, since each
+client schema's own copy is trivially overridable without touching any
+other client. **Not yet redesigned — this is a real "shape the system"
+decision, reported to the human, not self-resolved.** Full detail:
+`Wiki/log.md` session-BC-062 (2026-08-15 entry),
 `Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
 
 ## Related

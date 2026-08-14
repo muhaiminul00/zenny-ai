@@ -9,6 +9,76 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-15] session-BC-062 follow-up | Credential-attach fixed, architecture question resolved — real redesign needed, not self-built
+
+**Commander → Execute, verification-only pass** (no build changes
+authorized beyond the diagnostic itself): human pushed back on 2 things
+from the prior entry — the credential block ("it should [work], cause
+already did many times itself") and the `agent_prompts` schema shape
+("I don't think you understood database structure... each client will
+have own separate schema, tracked into control by client id... for
+email, simple solution: each client has it's own prompt table on its
+own schema").
+
+**1. Credential-attach — human's specific hypothesis (BC-052's
+anon-grant REVOKEs blocking this) checked and confirmed wrong.**
+Attaching an n8n node credential is entirely n8n-internal (a reference
+into n8n's own credential store) — has no relationship to what that
+credential can later do against Supabase's REST API, which is what
+BC-052 touched. Real cause found empirically: `update_workflow`'s
+`addNode` operation silently drops an inline `credentials` value (no
+error, no note the first time — the tool's own response only disclosed
+"must be configured manually" after the fact). Re-tested with the
+dedicated `setNodeCredential` operation instead: applied cleanly, no
+skip-note, on both INT-010's and INT-011's new nodes. Both now have
+`zenny-vault-suparbase` (`guCWYmcVycnfMixw`) attached in draft — a
+confident inference (naming/chronology against the only other
+`supabaseApi` candidate), not yet live-execution-confirmed (credential
+assignments are redacted from every read path this session has). Both
+workflows remain unpublished.
+
+**2. Database architecture — human was right, the BC-062 design was
+the wrong shape.** Live-verified the human's stated mental model
+(`control` = cross-client plane; each client gets its own schema cloned
+from a `tpl_{archetype}` template, tracked via `control.clients.
+client_schema_name`) directly against `information_schema`: schema list
+is exactly `control` + 5 `tpl_*` + 5 `client_test_*`, matching the
+roster in PROJECT_STATE.md precisely. `Database_Structure_v4_FINAL.md`
+§1 documents this design directly and — critically — **already flags
+`control.agent_prompts` with `← never synced to any client schema`**
+in its own schema tree. Not a doc/reality conflict; a disclosed gap in
+the original design that BC-062 built straight into instead of
+questioning.
+
+Found a direct, working precedent for exactly this shape of data:
+`email_categories`. Lives in `control` (16 rows, orphaned), every
+`tpl_*` template (0 rows, structure only), and every `client_test_*`
+schema (16 real rows each) — and `list_client_email_categories`
+(the only thing that actually queries it) reads the **per-client-
+schema copy** via `EXECUTE format('... FROM %I.email_categories',
+p_schema)`, never `control`. `control.email_categories` predates
+BC-045 (2026-08-12), which correctly migrated this exact kind of
+per-client-overridable content to the per-schema pattern and simply
+never dropped the old control copy — a small, harmless, real cleanup
+candidate, not urgent.
+
+**Conclusion, not yet built:** `agent_prompts` should follow the same
+pattern as `email_categories` — added to `public` reference scaffolding
++ all 5 `tpl_*` templates + backfilled into the 5 real client schemas,
+queried via a per-schema RPC (same shape as `list_client_email_
+categories`), not the control-schema/archetype-keyed RPC BC-062 built.
+`control.agent_prompts` doesn't need to be dropped — it can serve as a
+genuine master-defaults seed source read once at client-provisioning
+time, which resolves the original "per-client override" framing
+exactly (each client's own schema copy is independently overridable).
+
+**Correctly stopped here — a real "shape the system" decision, not
+self-resolved past.** Reported to the human; BC-062 will be redesigned
+once acknowledged. No further n8n/Supabase changes made beyond the 2
+`setNodeCredential` calls (draft-only, both workflows still
+unpublished, live behavior unchanged). Full detail:
+`Wiki/infra/convocore-agent-provisioning.md`.
+
 ## [2026-08-15] session-BC-062 | Email Manager prompt externalization — draft-wired, blocked on Credential Gate
 
 **Commander → Execute:** human asked to pull in 2 Path A items "in the

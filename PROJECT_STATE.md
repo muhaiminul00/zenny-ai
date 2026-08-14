@@ -10,7 +10,26 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-15 (latest) — by /execute — BC-062 STARTED, BLOCKED (Credential
+2026-08-15 (latest) — by /execute — BC-062 verification follow-up:
+human pushed back on 2 things from the first pass, both checked live,
+both resolved. **(1) Credential-attach was NOT a Supabase permission
+issue** — it's an n8n MCP tool gap (`addNode`'s inline `credentials`
+field is silently dropped; the dedicated `setNodeCredential` operation
+works and was applied to both draft nodes, still unpublished). **(2)
+The control-schema/archetype-keyed `agent_prompts` design was the
+wrong shape** — human's per-client-schema mental model is confirmed
+correct and is the platform's real, consistently-applied pattern
+(`Database_Structure_v4_FINAL.md` §1, live schema list matches exactly).
+That same doc already flags `control.agent_prompts` as `never synced to
+any client schema` — a known original-design gap, not a doc conflict.
+Found a direct working precedent: `email_categories` lives per-client-
+schema (real, queried) with an orphaned `control` copy predating BC-045
+— `agent_prompts` should follow the same pattern. **Redesign not yet
+built — reported to human, correctly stopped rather than self-resolved
+(a real system-shape decision).** Full detail: `Wiki/log.md`
+session-BC-062 follow-up entry, `Wiki/infra/convocore-agent-provisioning.md`.
+
+2026-08-15 (prior) — by /execute — BC-062 STARTED, BLOCKED (Credential
 Gate, not self-resolved): Email Manager prompt externalization
 (`agent_prompts` wiring gap, Path A #4). Built `public.get_agent_prompt`
 RPC (live, tested), seeded 2 default rows, draft-wired INT-010 and
@@ -355,17 +374,27 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
   proof: created a real disposable Google event, deleted it via the live
   deployed Edge Function, independently confirmed `status: "cancelled"`
   on Google's side. See `Wiki/infra/verification-approval-queue.md`.
-- **BC-062, IN PROGRESS: Email Manager prompt externalization blocked
-  on a credential the n8n MCP tooling can't attach.** INT-010/INT-011
-  are draft-wired to `control.agent_prompts` (new `get_agent_prompt`
-  RPC, live, tested) but the 2 new HTTP nodes have no Supabase
-  credential — `update_workflow`/`addNode` silently drops any
-  `credentials` value passed. **Needs a human to open `Get
-  Classification Prompt Template` (INT-010) and `Get Draft Prompt
-  Template` (INT-011) in the n8n UI and select the Supabase credential**
-  (believed `zenny-vault-suparbase`) before either workflow can be
-  tested/published. Both workflows' live/active versions are unaffected
-  in the meantime. See `Wiki/log.md` session-BC-062.
+- ~~BC-062 credential-attach block~~ **DIAGNOSED AND FIXED IN DRAFT
+  (2026-08-15).** Was an n8n MCP tool gap (`addNode`'s inline
+  `credentials` silently dropped), not a Supabase permission issue —
+  `setNodeCredential` applied cleanly to both nodes. **Superseded by a
+  bigger open item below: the whole `agent_prompts` design needs a
+  redesign before either workflow is tested/published** — see next
+  item.
+- **BC-062, REDESIGN NEEDED before continuing — real "shape the
+  system" decision, awaiting human go-ahead:** the control-schema,
+  archetype-keyed `agent_prompts`/`get_agent_prompt` design built in
+  the first BC-062 pass is the wrong shape. Live-confirmed precedent
+  (`email_categories`, per-client-schema, not `control`) + the
+  architecture doc's own `control.agent_prompts ← never synced to any
+  client schema` note both point the same way: `agent_prompts` should
+  live in `public` reference scaffolding + all 5 `tpl_*` templates +
+  each real client schema, queried via a per-schema RPC (same shape as
+  `list_client_email_categories`), with `control.agent_prompts` kept
+  only as an optional master-defaults seed source. INT-010/INT-011's
+  current draft wiring targets the old (wrong-shape) RPC and will need
+  to be rewired once the redesign is built. See `Wiki/log.md`
+  session-BC-062 follow-up, `Wiki/infra/convocore-agent-provisioning.md`.
 - **Residual, smaller-severity security gap (found BC-052, not fixed):**
   the connect/lifecycle Edge Functions (`oauth-callback`,
   `shopify-connect`, `woocommerce-connect`, `connection-lifecycle`) all
