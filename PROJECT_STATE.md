@@ -10,7 +10,24 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-14 (latest) — by /execute — BC-057b complete: Convocore
+2026-08-14 (latest) — by /execute — BC-058 complete: master Convocore
+Agent Intake Checklist built (`Convocore_Agent_Intake_Checklist_v1.md`),
+grounded in a live Supabase schema read (not the flagged-stale
+`Client_Onboarding_Sequence_Spec.md`). Merges `Client_Onboarding_Guide.md`'s
+archetype diagnostic with genuine business-decision inputs from the 3
+primary Convocore docs, AUTO/ASK split, 4 sections. **2 real doc/reality
+gaps found and self-resolved per Document Resolution Authority — session
+paused here pending human acknowledgment before BC-059 starts:** (1)
+agent naming convention (`Findings_Required_Updates_FINAL.md` still
+flags this open; actually decided elsewhere — `{ClientBusinessName}
+Assistant`); (2) `convocore_agent_map`'s schema (`Adapter_Spec_FINAL.md`
+calls it "pending"; it's already built, exactly matching the spec's own
+stated minimum). Also flagged, not resolved: `control.agent_prompts`
+exists live, unmentioned by any Convocore doc, may already scaffold the
+undocumented "Template Dashboard" — worth checking before BC-060. Full
+narrative: `Wiki/log.md`; findings: `Wiki/infra/convocore-agent-provisioning.md`.
+
+2026-08-14 (prior) — by /execute — BC-057b complete: Convocore
 reachability rechecked (still `403`, both REST and MCP, identical to the
 2026-08-04 finding — same account-level billing block, not an MCP
 artifact and not cleared since). Not treated as a blocker per human
@@ -364,11 +381,16 @@ SCH-007 remain open — see below.
 
 **BC-057b complete (2026-08-14): Convocore reachability rechecked, still
 blocked (both REST and MCP), not a build blocker — manual Canvas UI
-fallback confirmed as the path forward.** Doc set annotated. See Last
-Updated above and `Wiki/reference/convocore-doc-status.md`.
+fallback confirmed as the path forward.** Doc set annotated. See
+`Wiki/reference/convocore-doc-status.md`.
 
-No Build Card currently issued and un-actioned. Dual build path agreed
-with human 2026-08-14:
+**BC-058 complete (2026-08-14): master intake checklist built, 2 doc/
+reality gaps self-resolved.** See Last Updated above and
+`Wiki/infra/convocore-agent-provisioning.md`. **Session paused per
+Document Resolution Authority — do not start BC-059 until the human has
+acknowledged the 2 resolved items above.**
+
+Dual build path agreed with human 2026-08-14:
 
 **Path A — remaining backend**, pulled in only as the demo business
 actually needs it:
@@ -382,14 +404,12 @@ actually needs it:
 
 **Path B — real Convocore agent build (test+verify+build for a demo
 business):**
-- BC-057b done (this entry).
-- BC-058 (next): build the master intake checklist — merge the
-  archetype auto-ID logic (from `Client_Onboarding_Guide.md`'s
-  diagnostic) with the 3 primary Convocore build docs' info needs, split
-  into auto-fillable-from-a-website vs. must-ask-directly. This doubles
-  as onboarding-manual v1's seed.
-- BC-059: run BC-058's checklist against a real target business (human
-  to provide link).
+- BC-057b done.
+- BC-058 done — `Convocore_Agent_Intake_Checklist_v1.md` built and
+  schema-grounded. **Blocked on human acknowledgment (Document
+  Resolution Authority) before BC-059 starts.**
+- BC-059 (next, once acknowledged): run BC-058's checklist against a
+  real target business (human to provide link).
 - BC-060: populate Convocore (manual Canvas build, per BC-057b) +
   Supabase provisioning (live schema, not the stale sequence spec) + n8n
   wiring from the completed checklist.

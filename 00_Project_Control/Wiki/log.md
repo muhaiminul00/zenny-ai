@@ -9,6 +9,57 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-14] session-BC-058 | Master intake checklist built, 2 doc/reality gaps resolved
+
+**Execute:** Built `Convocore_Agent_Intake_Checklist_v1.md` — a single
+table-based checklist (# | Question | Feeds → | Source AUTO/ASK |
+Answer), 4 sections (Business/Archetype Identity, Convocore Agent
+Config, Backend/Supabase Provisioning, Integration Credentials), merging
+`Client_Onboarding_Guide.md`'s archetype diagnostic (wording reused
+verbatim, not rephrased) with genuine business-decision inputs pulled
+from the 3 primary Convocore docs — deliberately excluding fixed
+platform mechanics that don't need a per-client answer. Explicitly
+scopes out prompt-text authoring itself (that's BC-060, sourced live
+from `Agent_Runtime_System_v1.md` per the Build Order Guide's
+Doc-Search-First rule, not a checklist question).
+
+Per the human's explicit instruction to take real time and cross-check
+against the live system rather than the docs alone, did a live Supabase
+schema read (`control.clients`, `client_config`, `client_active_modules`,
+`convocore_agent_map`, `agent_prompts`, `recovery_cadence_profiles`,
+plus `archetype_enum`/`module_name_enum`/`client_status_enum` and the
+real `create_client_schema_from_template`/`dashboard_provision_user`
+RPC signatures) to ground Section C in reality rather than the flagged-
+stale `Client_Onboarding_Sequence_Spec.md`.
+
+**Document Resolution Authority — 2 self-resolved items, logged per the
+standing rule, session paused here pending human acknowledgment before
+BC-059 starts:**
+
+1. **Agent naming convention.** `Convocore_Findings_Required_Updates_FINAL.md`
+   §1.2/§6.2 still lists this as unresolved (Open Items #2). A broader
+   search found it already decided in `Planning_to_Build_Transition_v1.md`
+   §2.5: `{ClientBusinessName} Assistant`. The later, more specific
+   document wins per the standing rule; Findings doc's flag is stale,
+   not corrected there this card (out of scope), used as-resolved in
+   the checklist (A7) instead.
+2. **`control.convocore_agent_map` schema shape.** `Convocore_Adapter_Spec_FINAL.md`
+   Part 2.3 calls this "not yet finalized." Live schema read confirms
+   the table already exists with exactly the fields the spec itself
+   names as the minimum requirement (`client_id`, `convocore_agent_id`,
+   `convocore_agent_secret_id`, `convocore_region`, `agent_display_name`).
+   Adapter Spec's "pending" framing is stale, not corrected there this
+   card, disclosed in `Wiki/infra/convocore-agent-provisioning.md`
+   instead.
+
+**Also flagged, not a resolution — genuinely unconfirmed:**
+`control.agent_prompts` (`prompt_key, module, archetype, content,
+version, status`) exists in the live schema, unmentioned by either doc
+above. Looks like it could be scaffolding for the "Template Dashboard"
+Adapter Spec Part 8.2 says doesn't exist yet — not investigated further
+this card (out of scope), flagged for whoever picks up BC-060 to check
+first. Full writeup: `Wiki/infra/convocore-agent-provisioning.md`.
+
 ## [2026-08-14] session-BC-057b | Convocore reachability recheck (still blocked) + doc-status annotations
 
 **Commander → Execute:** Human set direction for a dual build path —
