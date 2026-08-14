@@ -66,6 +66,22 @@ Authority's own discipline says Claude should never self-resolve.
   project's own doc (`Agent_Runtime_System_v1.md` §5) already specifies
   in full.
 
+## Known gap, disclosed (as of BC-058c, 2026-08-14)
+
+Both INT-010's classification prompt and INT-011's draft-generation
+prompt (`Zenny Email Manager - DraftEmail`, id `fmBjtfi7vqdszs78`) are
+still built entirely inline in a Code node, per the gotcha above.
+`control.agent_prompts` (`prompt_key, module, archetype, content,
+version, status`) already exists specifically to move these off
+hardcoded-in-n8n to per-client-overridable (one default prompt at
+build time, override-able later) — confirmed by the human as its real
+purpose, unrelated to Convocore. **Not wired to either workflow yet** —
+live-verified via `get_workflow_details` on both, zero references.
+Real candidate for a future Build Card: swap each prompt-building Code
+node to read from `agent_prompts` (module + archetype keyed), falling
+back to a default row. Full finding:
+`Wiki/infra/convocore-agent-provisioning.md`.
+
 ## Source
 
 - `Phase 10 — Email Manager, INT-010 Categorize Email (BC-045)` (log.md, 2026-08-12)

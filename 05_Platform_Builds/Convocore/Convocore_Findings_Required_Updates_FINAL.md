@@ -42,17 +42,34 @@ Relationship to Convocore_Adapter_Spec: that document (rewritten next,
 - **Option A (clean):** a dedicated `control.convocore_agent_map` table — `client_id`, `convocore_agent_id`, `convocore_agent_secret_id` (Vault reference), `convocore_region`, `agent_display_name`, `created_at`. Follows the exact pattern already used for `oauth_apps`/`client_connections`.
 - **Option B (simpler, bends the one-table-per-concern convention):** add the same fields directly as columns on the main client info table.
 
-**Status:** CONFIRMED to build (you accepted either option) — **which option is a DECISION NEEDED**, not made here.
+**Status:** RESOLVED (corrected 2026-08-14, BC-058c). Option A shipped —
+`control.convocore_agent_map` is live with exactly the field list below,
+confirmed via a live schema read: `id`, `client_id`, `convocore_agent_id`,
+`convocore_agent_secret_id` (Vault reference), `convocore_region`,
+`agent_display_name`, `created_at`. This entry's "DECISION NEEDED"
+framing was stale — the decision was made and built at some point after
+this doc was last touched; not re-litigated here, just corrected to
+match reality. Full detail: `Wiki/infra/convocore-agent-provisioning.md`.
 
-**New requirement added this round:** must also store the **agent's display name** — confirmed to mean the name shown on the web chat widget. This needs to exist in whichever option is chosen above.
+**New requirement added this round:** must also store the **agent's display name** — confirmed to mean the name shown on the web chat widget. Live in `convocore_agent_map.agent_display_name`.
 
-### 1.2 New requirement: Agent naming convention
+### 1.2 Agent naming convention — RESOLVED
 
-**What was found:** no naming convention exists yet for Convocore agents (the display name stored per 1.1).
+**Status:** RESOLVED (corrected 2026-08-14, BC-058c). Not actually open
+— `Planning_to_Build_Transition_v1.md` §2.5 already settled this:
+`{ClientBusinessName} Assistant` (e.g. "Bright Smiles Dental
+Assistant"). Client's own brand on the widget, never "Zenny" or
+"ZeroManual" client-facing — same principle already applied to OAuth
+app naming. This entry's "DECISION NEEDED" framing was stale; the
+decision exists in a different, later document, per the Document
+Resolution Authority rule (a later/more-specific document wins). Full
+detail: `Wiki/infra/convocore-agent-provisioning.md`.
 
-**Why it matters:** without one, agent names will drift inconsistently client-to-client, making support/debugging harder and any future automation (bulk operations, reporting) less reliable.
+~~**What was found:** no naming convention exists yet for Convocore agents (the display name stored per 1.1).~~
 
-**Proposed change:** DECISION NEEDED — this is a new artifact to design, not a schema change by itself. Suggest a short naming-convention note (e.g. `{ClientBusinessName} — {Zenny/product name}` or similar) gets written either into this Database doc as an appendix, or into the Adapter Spec's client-provisioning section. Flagging existence of the requirement; not designing the convention here since that's a product/branding decision, not an architecture one.
+~~**Why it matters:** without one, agent names will drift inconsistently client-to-client, making support/debugging harder and any future automation (bulk operations, reporting) less reliable.~~
+
+~~**Proposed change:** DECISION NEEDED — this is a new artifact to design, not a schema change by itself.~~ (Superseded by the resolution above — kept struck through rather than deleted, so the original open question is still visible for context.)
 
 ### 1.3 New nullable column: `leads.convocore_conversation_id`
 
@@ -269,6 +286,15 @@ These aren't changes to an existing frozen document — they're new things that 
 **Why it matters:** this is the direct enabling mechanism for the "embedded logic in Convocore prompts" decision (Runtime Part 2.3) — without it, every Convocore agent build would require manually re-deriving the correct prompt text per module combination, which doesn't scale and risks inconsistency between clients.
 
 **Status:** CONFIRMED requirement, **not designed at all yet** — this is a genuinely new system, on the scale of its own project, not a quick addition. Flagging its existence and rationale; actual design is future work, explicitly out of this document's scope.
+
+**Correction (2026-08-14, BC-058c):** `control.agent_prompts` was
+initially suspected (BC-058) to be undocumented scaffolding for this
+Template Dashboard. Human confirmed it's a **separate, unrelated
+system** — built for Email Manager's own LLM-prompt nodes (moving those
+prompts from hardcoded-in-n8n to per-client-overridable, one default
+prompt at build time). Live n8n wiring verified BC-058c; see
+`Wiki/infra/convocore-agent-provisioning.md`. This Template Dashboard
+remains genuinely not designed.
 
 ### 6.2 Agent Naming Convention
 

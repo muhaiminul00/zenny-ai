@@ -9,6 +9,38 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-14] session-BC-058c | Stale docs corrected, agent_prompts real finding (Email Manager, not Convocore)
+
+**Commander:** Human acknowledged BC-058's 2 self-resolved doc/reality
+gaps and gave the correction for the 3rd flagged item directly:
+`control.agent_prompts` was built for Email Manager's LLM-prompt nodes
+(INT-010/011), intended to move those prompts from hardcoded-in-n8n to
+per-client-overridable (one default prompt at build time). Asked for
+the 2 stale docs to actually be fixed (not just flagged) and for a live
+n8n check on whether `agent_prompts` is really in use.
+
+**Execute:** Fixed both docs in place — `Convocore_Findings_Required_Updates_FINAL.md`
+§1.1/§1.2/§6.1's Open Items table entries marked RESOLVED with citations
+(struck through the original open-question text rather than deleting
+it, for context); `Convocore_Adapter_Spec_FINAL.md` Part 2.3 rewritten
+from "pending final schema decision" to the real, live column list.
+
+Live-checked n8n directly (`get_workflow_details` on both, full node
+graphs, not just names/descriptions): INT-010's "Build Classification
+Prompt" and INT-011's "Build Draft Prompt" Code nodes both build their
+LLM prompts entirely inline in JS — neither references
+`control.agent_prompts` anywhere. A broader `search_workflows` pass for
+"agent_prompts" across the instance also returned zero matches.
+**Confirmed: the table is built but genuinely unused today** — real,
+disclosed, not-yet-built Email Manager improvement, not a mystery
+table. Corrected `Wiki/infra/convocore-agent-provisioning.md` §3 with
+the real finding (replacing BC-058's speculative "might be Template
+Dashboard scaffolding" framing, which the human's correction disproved)
+and cross-linked from `Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
+
+This closes the Document Resolution Authority pause from BC-058 — BC-059
+unblocked.
+
 ## [2026-08-14] session-BC-058 | Master intake checklist built, 2 doc/reality gaps resolved
 
 **Execute:** Built `Convocore_Agent_Intake_Checklist_v1.md` — a single

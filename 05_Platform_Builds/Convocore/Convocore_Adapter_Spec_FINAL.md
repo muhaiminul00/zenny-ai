@@ -101,9 +101,9 @@ Convocore webhook/Tool call fires
     → Adapter proceeds to build the Standard Request Contract (Part 4)
 ```
 
-### 2.3 Where the mapping lives — pending final schema decision
+### 2.3 Where the mapping lives — BUILT (corrected 2026-08-14, BC-058c)
 
-**⚠️ Not yet finalized which exact schema shape stores this mapping** — `Convocore_Findings_Required_Updates_FINAL.md` Database Part 1.1 identifies two options (a dedicated `control.convocore_agent_map` table, or additional columns on the main client table) and flags this as a builder decision, not resolved here. **Whichever shape is chosen, it must store, at minimum:** `client_id`, `convocore_agent_id`, a secure reference to that agent's secret (Vault, never plaintext), `convocore_region` (`eu`/`na` — matters because EU/NA are genuinely separate API base URLs, confirmed in `Convocore_API_Reference_v1.md` §3), and the agent's display name (the name shown on the web chat widget — new requirement, Findings doc Database Part 1.2).
+`control.convocore_agent_map` is live — Option A from `Convocore_Findings_Required_Updates_FINAL.md` Database Part 1.1 (dedicated table) shipped. Confirmed via a live schema read to hold exactly the required minimum: `id`, `client_id`, `convocore_agent_id`, `convocore_agent_secret_id` (Vault reference, never plaintext), `convocore_region` (`eu`/`na` — matters because EU/NA are genuinely separate API base URLs, confirmed in `Convocore_API_Reference_v1.md` §3), `agent_display_name` (the name shown on the web chat widget), `created_at`. This section previously said "pending final schema decision" — that was stale; the decision was made and built at some point after this doc was last touched. Full detail: `Wiki/infra/convocore-agent-provisioning.md`.
 
 ### 2.4 Authentication as a secondary confirmation
 

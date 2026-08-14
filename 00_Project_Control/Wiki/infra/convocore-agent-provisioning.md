@@ -41,18 +41,35 @@ Matches the Adapter Spec's stated minimum exactly. The Adapter Spec's
 "pending" framing is stale — not corrected in that doc this card (out
 of scope), disclosed here instead.
 
-## 3. `control.agent_prompts` — exists, purpose/wiring unconfirmed
+## 3. `control.agent_prompts` — Email Manager's, not Convocore's; built but not wired (corrected BC-058c)
 
-Found during the same schema read, not mentioned by either doc above:
-`prompt_key, module, archetype, content, version, status,
-created_date, promoted_to_stable_date`. Structurally, this looks like
-it could be scaffolding for the "Template Dashboard" that
-`Convocore_Adapter_Spec_FINAL.md` Part 8.2 says doesn't exist yet (a
-system that generates per-client, per-module embedded prompt text).
-**Not investigated further this card** — whether it's actually
-populated or wired to anything is unknown. Flagged for whoever picks up
-BC-060 (manual prompt authoring) to check first, in case it already
-half-solves that step.
+**Correction:** this table is unrelated to Convocore's Template
+Dashboard gap — human confirmed (2026-08-14) it was built for **Email
+Manager's** LLM-prompt nodes (INT-010 categorization, INT-011 drafting).
+The intent: move those prompts from hardcoded-in-n8n to per-client-
+overridable, starting with one default prompt.
+
+**Live-verified (BC-058c):** that move hasn't happened yet. Read both
+workflows' full node graphs directly —
+
+- **INT-010** (`Zenny Email Manager - CategorizeEmail`, id
+  `pk4YXHCwI3fNixb7`) — the "Build Classification Prompt" Code node
+  hardcodes the category `DEFINITIONS` object and the full prompt text
+  inline in JS.
+- **INT-011** (`Zenny Email Manager - DraftEmail`, id
+  `fmBjtfi7vqdszs78`) — the "Build Draft Prompt" Code node hardcodes
+  the entire draft-generation prompt template inline in JS.
+
+Neither workflow queries or references `control.agent_prompts`
+anywhere. A broader `search_workflows` pass for "agent_prompts" also
+returned zero matches across the instance. **Confirmed: the table is
+built but genuinely unused today** — not a Convocore artifact, not
+wired into anything yet, a real pending Email Manager improvement
+(swap the two hardcoded prompt-building Code nodes to read from
+`agent_prompts`, falling back to a default row when no client-specific
+override exists). Not built this card — out of scope, flagged as a
+real candidate for a future Build Card. See
+`Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
 
 ## Related
 

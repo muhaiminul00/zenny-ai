@@ -10,7 +10,21 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-14 (latest) — by /execute — BC-058 complete: master Convocore
+2026-08-14 (latest) — by /execute — BC-058c complete: the 2 stale
+Convocore docs actually corrected (`Findings_Required_Updates_FINAL.md`
+§1.1/§1.2, `Adapter_Spec_FINAL.md` Part 2.3 — both now match live
+reality), and `control.agent_prompts` resolved to a real, non-Convocore
+finding: human confirmed it's Email Manager's (per-client-overridable
+LLM prompts, one default at build time, replacing hardcoded-in-n8n).
+Live n8n check (full `get_workflow_details` on INT-010 + INT-011, both
+prompt-building Code nodes) confirms it is **built but not wired to
+either workflow yet** — a real, disclosed, un-built improvement, not
+mystery scaffolding. **Document Resolution Authority pause from BC-058
+is now closed — BC-059 unblocked.** Full narrative: `Wiki/log.md`;
+findings: `Wiki/infra/convocore-agent-provisioning.md`,
+`Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
+
+2026-08-14 (prior) — by /execute — BC-058 complete: master Convocore
 Agent Intake Checklist built (`Convocore_Agent_Intake_Checklist_v1.md`),
 grounded in a live Supabase schema read (not the flagged-stale
 `Client_Onboarding_Sequence_Spec.md`). Merges `Client_Onboarding_Guide.md`'s
@@ -384,11 +398,13 @@ blocked (both REST and MCP), not a build blocker — manual Canvas UI
 fallback confirmed as the path forward.** Doc set annotated. See
 `Wiki/reference/convocore-doc-status.md`.
 
-**BC-058 complete (2026-08-14): master intake checklist built, 2 doc/
-reality gaps self-resolved.** See Last Updated above and
-`Wiki/infra/convocore-agent-provisioning.md`. **Session paused per
-Document Resolution Authority — do not start BC-059 until the human has
-acknowledged the 2 resolved items above.**
+**BC-058 complete (2026-08-14): master intake checklist built.**
+**BC-058c complete (2026-08-14): the 2 stale docs actually fixed;
+`agent_prompts` resolved as a real, disclosed Email Manager gap (built,
+not wired) — unrelated to Convocore.** See Last Updated above,
+`Wiki/infra/convocore-agent-provisioning.md`,
+`Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`. Document
+Resolution Authority pause closed — BC-059 clear to proceed.
 
 Dual build path agreed with human 2026-08-14:
 
@@ -406,10 +422,11 @@ actually needs it:
 business):**
 - BC-057b done.
 - BC-058 done — `Convocore_Agent_Intake_Checklist_v1.md` built and
-  schema-grounded. **Blocked on human acknowledgment (Document
-  Resolution Authority) before BC-059 starts.**
-- BC-059 (next, once acknowledged): run BC-058's checklist against a
-  real target business (human to provide link).
+  schema-grounded.
+- BC-058c done — stale docs fixed, `agent_prompts` finding corrected
+  (Email Manager, not Convocore). Pause closed.
+- BC-059 (next): run BC-058's checklist against a real target business
+  (human to provide link).
 - BC-060: populate Convocore (manual Canvas build, per BC-057b) +
   Supabase provisioning (live schema, not the stale sequence spec) + n8n
   wiring from the completed checklist.
