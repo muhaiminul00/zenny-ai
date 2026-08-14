@@ -47,6 +47,10 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 - [platform-quirks/notion-pinecone-kb-pattern.md](platform-quirks/notion-pinecone-kb-pattern.md) — Email Manager's Notion+Pinecone multi-tenant KB design (INT-011/INT-012), why Convocore's KB API was dropped, and both credential gates now closed (Pinecone credential-type fix BC-048; Notion's real root cause was a missing page-level Connections grant, not a secret mismatch — corrected BC-049).
 - [platform-quirks/anon-grant-exposure-bc052.md](platform-quirks/anon-grant-exposure-bc052.md) — CRITICAL, fixed: ~40 internal RPCs (read_credential_secret, etc.) were live-exploitable via the public anon key, found + fixed during BC-052. A smaller residual gap (Edge Functions trust client_id from body) is disclosed and still open.
 
+## Reference
+
+- [reference/convocore-doc-status.md](reference/convocore-doc-status.md) — which `05_Platform_Builds/Convocore/` docs are primary/backing/background/optional/superseded, and the BC-057b (2026-08-14) live recheck confirming the REST+MCP billing block is still active on both paths — manual Canvas UI is the fallback build method.
+
 ## Open Decisions
 
 - [decisions/calendar-category-sharing.md](decisions/calendar-category-sharing.md) — DECIDED 2026-08-14: one calendar provider at a time, no schema change. Closed.

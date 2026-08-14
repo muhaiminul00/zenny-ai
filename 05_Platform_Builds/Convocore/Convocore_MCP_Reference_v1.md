@@ -1,5 +1,7 @@
 # Convocore MCP Server Reference (v1)
 
+> **DOC PREFERENCE (2026-08-14, BC-057b):** CURRENT — technical backing reference. As of BC-057b (2026-08-14), the MCP server's live calls fail identically to raw REST (`403 Business plan or higher` on `list_agents`) — same underlying block, not an MCP-specific issue. Manual Canvas UI is the fallback build method until this clears. See `Wiki/reference/convocore-doc-status.md`.
+
 > **Companion document to `Convocore_Master_Reference_v3.md`** (dashboard/conceptual) **and `Convocore_API_Reference_v1.md`** (REST/WebSocket API). Those two documents explain what Convocore is and how to control it via the dashboard or raw HTTP. **This document covers a third, narrower surface: the Convocore MCP server** — what it lets an AI coding agent (like Claude Code) do to a Convocore workspace directly from within a coding session, and — just as important — what it does not let you do.
 >
 > **Scope:** This is not a re-explanation of Convocore concepts (agents, nodes, KB, tools, leads, etc.) — see the Master Reference for that. This document's job is narrowly: *what does the MCP server add or change versus the dashboard and the REST API*.

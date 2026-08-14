@@ -1,6 +1,9 @@
 # Convocore Adapter Spec (FINAL — Single Entry Point)
 
 ```
+DOC PREFERENCE (2026-08-14, BC-057b): CURRENT — PRIMARY build reference,
+one of 3. See Wiki/reference/convocore-doc-status.md for the full doc map.
+
 Status:     FINAL. Supersedes Convocore_Adapter_Spec_v1.md (and its v1.1
             Voice addition) entirely.
 Purpose:    This document is the SINGLE ENTRY POINT for how Zenny's

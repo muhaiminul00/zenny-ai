@@ -1,5 +1,7 @@
 # 🎯 Complete ConvoCore Customer Support AI Agent Setup Guide
 
+> **DOC PREFERENCE (2026-08-14, BC-057b):** SUPERSEDED / historical only. This was the first, premature Convocore doc written before this project's own live-tested reference set existed. For any real build work, use `Convocore_Agent_Build_Order_Guide_v2.md`, `Convocore_Canvas_Ground_Truth_FINAL.md`, and `Convocore_Adapter_Spec_FINAL.md` instead. Kept for historical context only. See `Wiki/reference/convocore-doc-status.md`.
+
 > **Last Updated:** June 30, 2026 | **Source:** docs.convocore.ai (Full Documentation Scrape)
 
 ---

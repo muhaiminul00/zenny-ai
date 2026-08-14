@@ -1,5 +1,7 @@
 # Convocore Master Reference (v1)
 
+> **DOC PREFERENCE (2026-08-14, BC-057b):** CURRENT but OPTIONAL/secondary — a simplified conceptual version of `convocore_llms-full.txt`. Not required reading for a real agent build; the 3 primary build docs (`Convocore_Agent_Build_Order_Guide_v2.md`, `Convocore_Canvas_Ground_Truth_FINAL.md`, `Convocore_Adapter_Spec_FINAL.md`) are sufficient and more authoritative (live-verified, not just conceptual). Use this only for quick conceptual orientation. See `Wiki/reference/convocore-doc-status.md`.
+
 > **Purpose of this document:** This is the single source of truth for how Convocore works — for humans, for LLMs (Claude, GPT, etc.) reasoning about our build, and for coding agents (Claude Code) implementing against it. Refer to this instead of re-fetching Convocore's docs site.
 >
 > **Scope:** Usage / conceptual documentation only (how the platform works, how pieces relate). Does NOT cover the REST/WebSocket API field-by-field reference — that is a separate, later document.

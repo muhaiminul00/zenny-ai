@@ -1,5 +1,7 @@
 # Convocore REST API — Direct Live Test (v1)
 
+> **DOC PREFERENCE (2026-08-14, BC-057b):** CURRENT — background evidence. Real, dated (2026-07-27) live-test findings on REST-level bugs; not a build guide. Consult when a REST/MCP discrepancy needs its original evidence trail. See `Wiki/reference/convocore-doc-status.md`.
+
 > **Purpose:** isolate whether three bugs originally found through the Convocore MCP server (documented in `Convocore_MCP_Reference_v1.md` §10–§11) are **MCP-specific** (the MCP wrapper is the problem) or **backend bugs** (Convocore's real REST/WebSocket API has the same issue, independent of MCP entirely).
 >
 > **Method:** raw HTTP (`curl`) and a raw WebSocket connection (plain Node.js script, no libraries), straight against Convocore's real API — **no MCP server involved anywhere in this document.** Every call, exact request, and exact response below is real, captured live on 2026-07-27.

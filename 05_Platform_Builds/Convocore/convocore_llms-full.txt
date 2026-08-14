@@ -1,3 +1,10 @@
+DOC PREFERENCE (2026-08-14, BC-057b): RAW SOURCE, not curated. This is
+Convocore's own full documentation scrape, uncurated. Do not build from
+this directly — it has already been distilled into
+`Convocore_API_Reference_v1.md` and `Convocore_MCP_Reference_v1.md`. Use
+those instead; consult this file only when tracing a claim back to
+Convocore's original wording. See `Wiki/reference/convocore-doc-status.md`.
+
 # Affiliate Program
 Source: https://docs.convocore.ai/Pricing/affiliate
 

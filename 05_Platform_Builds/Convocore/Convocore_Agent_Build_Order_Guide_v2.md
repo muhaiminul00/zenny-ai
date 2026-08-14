@@ -1,6 +1,9 @@
 # Convocore Agent Build Order Guide v2
 
 ```
+DOC PREFERENCE (2026-08-14, BC-057b): CURRENT — PRIMARY build reference,
+one of 3. See Wiki/reference/convocore-doc-status.md for the full doc map.
+
 Status:     v2. Supersedes Convocore_Agent_Build_Order_Guide_v1.md.
 Purpose:    A sequencing and placement guide for whoever (human or Claude
             Code) builds an agent inside Convocore's dashboard — what to

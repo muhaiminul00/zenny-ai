@@ -9,6 +9,54 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-14] session-BC-057b | Convocore reachability recheck (still blocked) + doc-status annotations
+
+**Commander → Execute:** Human set direction for a dual build path —
+Path A (remaining backend), Path B (a real, human-provisioned Convocore
+agent build for a demo business, built by us and shown to that client —
+not client self-onboarding). Path B's first Build Card, BC-057b, was
+scoped deliberately small at the human's direction: two single read
+calls to recheck the 2026-08-04 Convocore billing block, plus annotating
+the whole Convocore doc set with a status/preference map (the human
+separately flagged a doc we'd both missed, `Convocore_Master_Reference_v3.md`).
+
+**Execute:** `GET /v3/agents` (raw REST, real workspace secret) → still
+`403 FORBIDDEN`, identical message to 2026-08-04. `list_agents` via the
+Convocore MCP tool → same `403 FORBIDDEN`, same underlying error
+surfaced through the MCP wrapper — confirms this is one account-level
+block hitting both paths identically, not an MCP-specific quirk, and it
+has not cleared since 2026-08-04. No agent creation attempted, no writes
+made, nothing left behind. Per human's explicit fallback plan, this is
+**not treated as a blocker** — manual build directly in the Convocore
+Canvas UI remains available and is Path B's build method until a real
+client's own Convocore package resolves the plan-tier gap.
+
+Added a `DOC PREFERENCE` line to all 10 current-folder Convocore docs
+(9 previously known + `Convocore_Master_Reference_v3.md`), sorted into
+Primary (3: Build Order Guide v2, Canvas Ground Truth FINAL, Adapter
+Spec FINAL) / Technical backing (API + MCP Reference v1) / Background
+evidence (REST Live Test v1) / Optional (Master Reference v3) /
+Superseded-or-raw (customer_support_agent_guide.md, llms-full.txt) —
+sequencing and split confirmed directly by the human, not inferred.
+Full map: `Wiki/reference/convocore-doc-status.md`.
+
+Also corrected a real, minor doc-metadata staleness noticed in passing:
+`Client_Onboarding_Guide.md`'s header still labels the project
+"Voiceflow" — cosmetic only (its content, the archetype-fit diagnostic,
+is still current and is the source the tested
+`Client_Onboarding_Sequence_Spec.md` cites), not fixed this card, noted
+here so it isn't mistaken for a content conflict.
+
+**Flagged, not yet corrected:** the human separately noted
+`Client_Onboarding_Sequence_Spec.md` was tested against an earlier
+database state — several migrations/fields have landed since (BC-051
+through BC-056 alone added `dashboard_users`, `pending_verifications`,
+`archetype_recovery_defaults`, ownership-release RPCs, etc.). Do not
+treat that doc's literal steps as accurate for any future provisioning
+work; re-derive the live schema via Supabase MCP instead. This will be
+formally logged as a stale-doc finding once a Build Card actually
+touches provisioning (BC-060 in the current plan), not resolved here.
+
 ## [2026-08-14] session-commander-bc054-056 | 3 new Build Cards issued (BC-054/055/056), INT-008 caller mechanism decided
 
 **Commander (/commander):** With BC-051/052/053 all done, presented a

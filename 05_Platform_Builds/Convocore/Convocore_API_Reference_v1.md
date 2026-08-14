@@ -1,5 +1,7 @@
 # Convocore API Reference (Phase 2 — v1)
 
+> **DOC PREFERENCE (2026-08-14, BC-057b):** CURRENT — technical backing reference. Derived from `convocore_llms-full.txt` plus live tests; consult alongside the 3 primary build docs (`Convocore_Agent_Build_Order_Guide_v2.md`, `Convocore_Canvas_Ground_Truth_FINAL.md`, `Convocore_Adapter_Spec_FINAL.md`) when exact field/endpoint detail is needed. As of BC-057b (2026-08-14), REST API access is still blocked workspace-wide (`403 Business plan or higher`) — this doc's endpoints are accurate but currently unreachable for this workspace; manual Canvas UI is the fallback build method. See `Wiki/reference/convocore-doc-status.md`.
+
 > **Companion document to `Convocore_Master_Reference_v2.md`.** That doc covers *what Convocore is and how to use the dashboard*. This doc covers *how to control Convocore programmatically* — every REST resource, the WebSocket protocol, request/response shapes, and worked examples.
 >
 > **Audience:** written for humans, LLMs (Claude/GPT reasoning about integration code), and coding agents (Claude Code) implementing against this API. Every technical term is defined in plain English on first use — no assumed prior API-design vocabulary.

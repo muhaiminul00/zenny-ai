@@ -1,6 +1,10 @@
 # Convocore Findings → Required System Updates (FINAL)
 
 ```
+DOC PREFERENCE (2026-08-14, BC-057b): CURRENT — errata/addendum to the 3
+primary build docs. Read alongside them. See
+Wiki/reference/convocore-doc-status.md for the full doc map.
+
 Status:    FINAL — supersedes Convocore_Findings_Required_Updates_v1.md and
            Convocore_Session_Closeout_v1.md entirely. Both are now folded
            into this single document.

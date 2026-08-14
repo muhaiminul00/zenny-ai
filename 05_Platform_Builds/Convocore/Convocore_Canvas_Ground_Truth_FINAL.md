@@ -1,6 +1,9 @@
 # Convocore Canvas — Ground Truth Build Standard (FINAL)
 
 ```
+DOC PREFERENCE (2026-08-14, BC-057b): CURRENT — PRIMARY build reference,
+one of 3. See Wiki/reference/convocore-doc-status.md for the full doc map.
+
 Status:     FINAL. Supersedes Convocore_Canvas_Ground_Truth_v1.md.
 Purpose:    The authoritative reference for how Convocore's Canvas,
             Nodes, Advanced Settings, Tools, and Variables actually

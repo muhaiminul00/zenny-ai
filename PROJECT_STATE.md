@@ -10,7 +10,23 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-14 (latest) — by /execute — BC-054/055/056 complete, plus the
+2026-08-14 (latest) — by /execute — BC-057b complete: Convocore
+reachability rechecked (still `403`, both REST and MCP, identical to the
+2026-08-04 finding — same account-level billing block, not an MCP
+artifact and not cleared since). Not treated as a blocker per human
+decision: manual build in the Convocore Canvas UI is the agreed fallback
+build method for the upcoming demo-business agent (Path B of the new
+dual-path plan — Path A is remaining backend work, Path B is a real,
+human-provisioned Convocore agent build for a demo business shown to
+that client, doubling as a full-stack integration test). All 10 current
+Convocore docs annotated with a `DOC PREFERENCE` status line; full map
+at `Wiki/reference/convocore-doc-status.md`. Also flagged (not yet
+corrected): `Client_Onboarding_Sequence_Spec.md` predates several recent
+migrations (BC-051-056) and should not be trusted literally for future
+provisioning — re-derive schema live when that work starts. Full
+narrative: `Wiki/log.md`.
+
+2026-08-14 (prior) — by /execute — BC-054/055/056 complete, plus the
 `zenny-notification-sender` credential reconnect live-verified. All 3
 were Commander-issued from the Next Build Card candidates list, human
 approved, executed sequentially in one session. **BC-054** (recovery
@@ -346,16 +362,43 @@ event); BC-056 (INT-008's real ownership-release caller). The residual
 Edge Function client_id-trust gap (BC-052 finding) and Phase 5A/5D/
 SCH-007 remain open — see below.
 
-No Build Card currently issued and un-actioned. Candidates for next
-session, roughly in order of what's most immediately useful:
-1. The residual Edge Function client_id-trust gap (BC-052 finding, low
-   severity today — `oauth-callback`/`shopify-connect`/
-   `woocommerce-connect`/`connection-lifecycle` trust body-supplied
-   `client_id`; `release-lead-ownership` (BC-056) shows the fix pattern
-   — forward the caller's real JWT instead).
+**BC-057b complete (2026-08-14): Convocore reachability rechecked, still
+blocked (both REST and MCP), not a build blocker — manual Canvas UI
+fallback confirmed as the path forward.** Doc set annotated. See Last
+Updated above and `Wiki/reference/convocore-doc-status.md`.
+
+No Build Card currently issued and un-actioned. Dual build path agreed
+with human 2026-08-14:
+
+**Path A — remaining backend**, pulled in only as the demo business
+actually needs it:
+1. Residual Edge Function client_id-trust gap (BC-052 finding, lower
+   priority than previously framed — this is an agency-provisioned
+   build, not client self-signup, so client_id enumeration risk is low
+   until self-serve exists).
 2. Calendly's real calendar-delete path (BC-055 built it to spec but
    could not live-test — no roster Calendly connection).
-3. Phase 5A (Inventory dashboard) / 5D (Onboarding dashboard), SCH-007.
+3. Phase 5A (Inventory dashboard) / SCH-007.
+
+**Path B — real Convocore agent build (test+verify+build for a demo
+business):**
+- BC-057b done (this entry).
+- BC-058 (next): build the master intake checklist — merge the
+  archetype auto-ID logic (from `Client_Onboarding_Guide.md`'s
+  diagnostic) with the 3 primary Convocore build docs' info needs, split
+  into auto-fillable-from-a-website vs. must-ask-directly. This doubles
+  as onboarding-manual v1's seed.
+- BC-059: run BC-058's checklist against a real target business (human
+  to provide link).
+- BC-060: populate Convocore (manual Canvas build, per BC-057b) +
+  Supabase provisioning (live schema, not the stale sequence spec) + n8n
+  wiring from the completed checklist.
+- BC-061: full round-trip test (real conversation → adapter → n8n →
+  Supabase → dashboard).
+
+Phase 5D (Onboarding dashboard) is deliberately sequenced *after* Path B
+completes once for real — human wants the manual written from a lived
+build, not guessed in advance.
 
 ADP-001 (Voiceflow Adapter doc/reality mismatch) dropped from candidates
 per human instruction (2026-08-14) — no longer worth investigating.
@@ -377,10 +420,14 @@ remaining Next-Build-Card candidates also shipped the same session
 (credential reconnect, BC-054/055/056) — see `Wiki/log.md` for full
 narrative of each. Nothing is mid-flight; the next session starts clean.
 
-**What's genuinely open, in priority order:** see Next Build Card
-candidates above (Edge Function client_id-trust gap, Calendly
-calendar-delete, then Phase 5A/5D/SCH-007). `appointments` doc diff
-stays deferred, see Active Blockers.
+**What's genuinely open, in priority order:** dual build path agreed
+2026-08-14 — Path A (Edge Function client_id-trust gap, Calendly
+calendar-delete, Phase 5A/SCH-007, pulled in only as needed) and Path B
+(real Convocore agent build for a demo business; BC-057b done —
+Convocore still `403`-blocked on REST+MCP, manual Canvas UI is the
+agreed fallback; next is BC-058, the master intake checklist). Phase 5D
+(Onboarding dashboard) intentionally waits until after Path B's first
+real build. `appointments` doc diff stays deferred, see Active Blockers.
 
 Nothing requires human acknowledgment before proceeding — all
 self-resolved document-level items from recent sessions are logged in
