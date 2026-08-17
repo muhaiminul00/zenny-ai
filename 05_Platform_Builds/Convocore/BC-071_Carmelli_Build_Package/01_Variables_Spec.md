@@ -77,16 +77,25 @@ code (n8n MCP, 2026-08-17) shows a step this build package hadn't
 surfaced before: WF-001 calls a `client_customer_exists` RPC and
 **responds `CUSTOMER_NOT_FOUND` (not a silent failure) if `customer_id`
 doesn't already belong to an existing customer record for this
-client** — it does not create one. **No document or live-checked workflow in this
-project's current build confirms what creates that customer record for
-a brand-new Carmelli website visitor before their first `create-lead`
-call.** This may already be handled by Convocore's own `user_id`
-system-variable lifecycle, or may be a real gap — Doc-Search-First
-found no answer, so this is disclosed rather than guessed. **Worth
-testing directly** once gate 2's build reaches Test-button verification
-(`Convocore_Agent_Build_Order_Guide_v2.md` Part 4 item 3) — a real test
-call with a fresh `user_id` will show immediately whether this resolves
-cleanly or 400s.
+client** — it does not create one.
+
+**RESOLVED (2026-08-17, real fix, not a workaround):** confirmed via the
+human's own live test that `customer_id` is never a real internal UUID
+when it arrives — it's whatever channel-native identifier the calling
+platform uses (Convocore's own `user_id`/chat-session value, an
+arbitrary string like `user_123456`). WF-001 has been rebuilt to
+resolve this itself: it looks up (or creates + links, if new) the real
+internal customer via `find_client_customer_by_channel`/
+`insert_client_customer`/`insert_client_channel_identity_link` — RPCs
+that already existed but were never wired into any workflow before this
+fix. **Consequence: `customer_id` in `create-lead`'s Variables (§1
+above) should carry Convocore's own `user_id` value directly (via the
+system variable, or this custom var kept in sync with it) — never a
+real UUID, and nothing needs to resolve one before calling this tool.**
+Live-tested both branches (not-found → creates a real customer + link;
+found → resolves the same customer on a repeat call) against real
+Carmelli data, execution ids `30872`/`30876` — see `06_Infrastructure/
+n8n/Workflow_Registry.md` WF-001 entry for full detail.
 
 ---
 
@@ -139,3 +148,12 @@ Carmelli specifically.
   2 new custom Variables (`customer_id`, `source_channel`), `lead_intent`
   renamed to `intent` (WF-001's real required field name). Custom
   Variable count corrected 3 → 5. §1b renumbered from §1a.
+- **v1.3 (2026-08-17)** — §1b's open precondition genuinely RESOLVED,
+  not just disclosed. Human live-tested `create-lead` for real and hit
+  exactly the predicted failure (invalid UUID); root cause confirmed
+  and fixed live in WF-001 itself (find-or-create customer resolution,
+  previously-unwired RPCs assembled into a real flow) — see
+  `06_Infrastructure/n8n/Workflow_Registry.md` WF-001 entry. `customer_id`
+  in this doc's §1 table needed no change — it always correctly said to
+  keep it synced with the system var `user_id`, which is exactly right
+  now that WF-001 resolves it internally.

@@ -10,7 +10,33 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-17 (latest) — by /execute — **BC-071: both real gaps from the
+2026-08-17 (latest) — by /execute — **BC-071 CRITICAL FIX #2: WF-001
+(CreateLead) never had a working customer-resolution path — fixed live,
+tested both branches against real Carmelli data, published.** Human hit
+this testing for real: `Check Customer Exists (RPC)` threw `22P02
+invalid input syntax for type uuid` because `customer_id` arrives as
+Convocore's own chat-session identifier (`user_123456`), never a real
+internal UUID — no caller anywhere in the system ever has that UUID
+before calling `create-lead`. **Real fix, not a workaround:** the
+intended resolution mechanism already existed as 3 standalone, never-
+wired RPCs (`find_client_customer_by_channel`, `insert_client_customer`,
+`insert_client_channel_identity_link`, matching `Agent_Runtime_System_
+v1.md` Module 1 §B's documented "match by contact method" design) —
+assembled them into a real find-or-create chain inside WF-001 itself,
+replacing the old blind existence check. **Live-tested both paths**
+against real Carmelli data (execution `30872` not-found→create,
+`30876` found→success, real lead `6c52b2c6-...` created then cleaned
+up) — published to production. **Second bug found in the same pass:**
+`Validate Input`'s `source_channel` enum had been live-edited to accept
+`web_chat` (a reasonable attempt to match Convocore's raw channel
+value) — the real Postgres enum only accepts `website`, confirmed by
+the very next test failing on exactly that DB error. Reverted to the
+real enum; Carmelli's Convocore build must send the literal string
+`"website"`. Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`
+WF-001 entry, `01_Variables_Spec.md` v1.3, `Wiki/log.md` session-
+BC-071-customer-resolution-fix.
+
+2026-08-17 (prior) — by /execute — **BC-071: both real gaps from the
 prior pass CLOSED for real, live, this session.** Human corrected 2
 wrong assumptions of mine, both resolved cleanly, not blocked:
 **(1) "There is no way to get agent secret from the UI"** — correct;

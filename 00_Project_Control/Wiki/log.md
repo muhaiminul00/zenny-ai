@@ -9,6 +9,92 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-17] session-BC-071-customer-resolution-fix | WF-001's customer-resolution path was never actually wired — found + fixed live, both branches tested
+
+**Trigger:** Human tested `create-lead` for real (n8n test mode, real
+Convocore Custom Tool call captured), pinned the real payload into
+WF-001's own test webhook, and hit: `Check Customer Exists (RPC)` →
+`22P02 invalid input syntax for type uuid: "user_123456"`.
+
+**Root cause:** `customer_id` was arriving as Convocore's own chat-
+session identifier (`user_id`, an arbitrary non-UUID string) — WF-001's
+old logic assumed this field already resolved to a real internal
+`customers.customer_id` UUID and only checked it belonged to the right
+client. **No caller anywhere in the system — not Convocore, not any
+documented flow — ever actually has that internal UUID before calling
+create-lead.** This affects every future client's build, not just
+Carmelli's.
+
+**Real fix, not a workaround, per Document Resolution Authority (real
+search found the actual intended mechanism, mechanical assembly task,
+one obviously correct answer):** live schema investigation found the
+resolution mechanism already existed, fully built, but never wired into
+anything:
+- `client_carmelli_bakery.customers.customer_id` — real internal UUID,
+  `gen_random_uuid()` default.
+- `client_carmelli_bakery.channel_identity_links` — maps a channel-
+  native identifier (`channel_type` enum: email/phone/whatsapp/
+  chat_session/sms, `channel_value` text) to a real `customer_id`.
+- `find_client_customer_by_channel(schema, channel_type, channel_value)`
+  RPC — look up.
+- `insert_client_customer(schema, primary_contact_method)` RPC — create.
+- `insert_client_channel_identity_link(schema, customer_id, channel_type,
+  channel_value, match_confidence)` RPC — link.
+- `INT-001 "Create Customer"` (an existing n8n sub-workflow) only
+  wrapped the create half, never the find-first check or the link step
+  — confirms this whole assembly was designed but never actually
+  finished being wired anywhere.
+
+Matches `Agent_Runtime_System_v1.md` Module 1 §B's documented design
+exactly: "How agent detects existing customer status: Customer Memory
+match by contact method... never matched by name alone."
+
+**Rebuilt live in WF-001** (`fjJkKxA3o6kfeLoz`): removed the old dead
+`Check Customer Exists (RPC)`/`Customer Exists?`/`Respond - Customer
+Not Found` chain; added `Find Customer By Channel (RPC)` (channel_type
+`chat_session`) → `Customer Found?` → found: straight to `Resolve
+Customer ID`; not found: `Create Customer (RPC)` → `Link Customer
+Channel (RPC)` → same `Resolve Customer ID` convergence point → real
+UUID feeds `Insert Lead (RPC)`. Attached the `zenny-vault-suparbase`
+credential explicitly to the 3 new HTTP nodes (auto-assignment skips
+new nodes, per BC-062's own documented finding).
+
+**Second real bug found in the same pass:** `Validate Input`'s
+`source_channel` JS-level enum had been live-edited (by the human,
+mid-troubleshooting) to accept `web_chat`, attempting to match
+Convocore's own raw channel value. The real Postgres `source_channel_enum`
+only accepts `website`/`whatsapp`/`instagram`/`facebook`/`email`/`sms`
+— confirmed live when the very next test failed with exactly that DB
+enum error. Reverted the JS enum to match the real DB enum. This
+confirms BC-071's *original* documented guidance (hardcode the literal
+string `"website"`, never reuse Convocore's `channel` system variable)
+was correct all along — the live edit, while a reasonable
+troubleshooting attempt, was the actual bug.
+
+**Live-tested both branches**, no live data left behind:
+- Not-found → create path (execution `30872`, fresh channel value
+  `test_chat_session_qa_001`): correctly returned `{found:false}`,
+  correctly created a real customer + channel link, correctly resolved
+  the UUID and reached `Insert Lead` (which then correctly failed on
+  the still-broken enum, confirming the enum bug was real, not
+  theoretical, before it was fixed).
+- Found → success path (execution `30876`, same channel value, after
+  the enum fix): correctly matched the existing customer, resolved the
+  same UUID, `Insert Lead` succeeded for real — `lead_id 6c52b2c6-...`,
+  `duplicate: false`.
+- All 3 test rows (`leads`, `channel_identity_links`, `customers`)
+  deleted from `client_carmelli_bakery` after verification.
+
+**Published to production** (`publish_workflow`, new active version
+`1f1687e9-5b16-420a-a4e5-01c38fa6ea20`) — this is now live for real
+Convocore traffic, not just a tested draft.
+
+**Updated:** `06_Infrastructure/n8n/Workflow_Registry.md` WF-001 entry
+(new INPUT description, FIXED BC-071 section, RE-VERIFIED BC-071 test
+record), `01_Variables_Spec.md` v1.3 (§1b's open item marked resolved).
+
+---
+
 ## [2026-08-17] session-BC-071-secret-and-config-closed | Both real gaps from the follow-up session closed, same day
 
 **Trigger:** Human corrected 2 things I got wrong in the prior
