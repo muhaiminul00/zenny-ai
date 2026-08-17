@@ -10,7 +10,46 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-17 (latest) — by /execute — **BC-071 CRITICAL FIX: the real
+2026-08-17 (latest) — by /execute — **BC-071 follow-up: real Convocore
+agent ID received (`1nyXSGBFG1yOj0T9DIPM`), doc placeholders confirmed
+already correct; 2 real gaps found live-verifying Carmelli's schema,
+both stopped at genuine human-input needs, nothing invented.**
+
+**(1) `control.convocore_agent_map` — CREDENTIAL GATE, not built.**
+Live-checked the table's real shape: `convocore_agent_secret_id` is
+`uuid NOT NULL` — a Vault reference to the agent's real Bearer secret
+(the value Convocore auto-sends when a Custom Tool's Secret Key is left
+blank, per `02_Tools_Spec.md` §0.5). No such secret is stored anywhere
+yet, and it can't be invented — same class of item the Credential Gate
+exists to stop. **Human action needed:** find this agent's real secret/
+API key in Convocore's own dashboard (likely under the agent's own
+settings — the value it uses to auto-sign Custom Tool Bearer tokens)
+and provide it, so it can go through `store_credential_secret` before
+this row is inserted.
+
+**(2) `client_carmelli_bakery.client_config` — genuinely empty, and
+this is a platform-wide gap, not just Carmelli's.** BC-060 Step 3
+documented a specific row as built; live-verified it was never actually
+landed — the table has 0 rows. Checked the other 5 clients too:
+**4 of 5 also have an empty `client_config`** (only Client B/emergency
+has a real row). The live table's actual columns have also evolved
+since BC-060's documentation — it now includes `max_booking_horizon`
+(`integer NOT NULL`), which BC-060's Step 3 mapping never covered and
+no intake checklist question maps to. The one existing precedent
+(Client B/emergency uses `0`) isn't confidently transferable to
+Carmelli's commerce-ecom click-and-collect model — genuinely ambiguous
+whether `0` means "no advance limit" or "same-day only," and this is a
+real customer-facing business rule, not a structural default worth
+guessing. **Every other Carmelli field IS already decided** (language_
+mode, language_list, default_country_code, send_window, email_address,
+voice/sms flags, archetype_settings) — only `max_booking_horizon`
+blocks the insert (column is `NOT NULL`, so the row genuinely can't
+land without it). **Human decision needed:** what should Carmelli's
+"advance order/booking horizon" actually be (in days) — or should the
+intake checklist gain a real question for this, given it's now
+apparently missing platform-wide.
+
+2026-08-17 (prior) — by /execute — **BC-071 CRITICAL FIX: the real
 Convocore Adapter had a live bug that would have broken every single
 real Custom Tool call.** Human ran a real `create-lead` test in n8n's
 webhook test mode and captured Convocore's actual outgoing body —
@@ -518,6 +557,22 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
 ```
 
 ## Active Blockers
+- **NEW (2026-08-17): `client_config` empty for 4 of 5 test clients +
+  Carmelli — platform-wide provisioning gap, not just Carmelli's.**
+  Live-verified only Client B (emergency) has a real row. Also:
+  `client_config`'s live schema now has `max_booking_horizon integer
+  NOT NULL` with no intake checklist question covering it. Needs a
+  human decision on Carmelli's real value before her row can be
+  inserted (Credential-Gate-adjacent — not invented); the other 4 empty
+  clients are unaffected in practice (test fixtures, no live traffic)
+  but the same gap should be closed whenever Path A backend work next
+  touches provisioning. See `Wiki/log.md` session-BC-071-followup.
+- **NEW (2026-08-17): Carmelli's `convocore_agent_map` row blocked on
+  Credential Gate.** Real agent ID received (`1nyXSGBFG1yOj0T9DIPM`),
+  but `convocore_agent_secret_id` is `NOT NULL` and no real secret
+  exists in the credential platform yet — needs the agent's real
+  Bearer secret from Convocore's own dashboard. See `Wiki/log.md`
+  session-BC-071-followup.
 - ~~INT-008 (Resume Recovery) has no caller~~ **CLOSED (BC-056,
   2026-08-14).** New dashboard `/paused-leads` action → real
   `dashboard_release_lead_ownership` RPC (clears the flag — a real

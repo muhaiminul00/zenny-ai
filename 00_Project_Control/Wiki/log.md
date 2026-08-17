@@ -9,6 +9,61 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-17] session-BC-071-followup | Real agent ID received; 2 real gaps found live-verifying Carmelli's schema, both stopped at genuine human-input needs
+
+**Trigger:** Human provided Carmelli's real Convocore agent ID
+(`1nyXSGBFG1yOj0T9DIPM`) and asked to "verify database, client schema,
+there are some table not filled, like client config."
+
+**Doc placeholder check:** `02_Tools_Spec.md`'s Server URL rows already
+carried the literal real agent ID (`1nyXSGBFG1yOj0T9DIPM`) in both
+Custom Tool rows — no edit needed, confirmed correct as-is.
+
+**Gap 1 — `control.convocore_agent_map` insert: Credential Gate, not
+built.** Live-checked the table's real columns: `convocore_agent_secret_id
+uuid NOT NULL`. This is a Vault reference to the real secret Convocore
+auto-sends as the Bearer token for this specific agent (per `02_Tools_
+Spec.md` §0.5's "leave Secret Key blank" mechanism) — no such secret
+exists in the credential platform yet, and it can't be invented (same
+class the Credential Gate protects). Stopped, reported, not worked
+around.
+
+**Gap 2 — `client_carmelli_bakery.client_config` is empty, and this is
+NOT Carmelli-specific.** BC-060's own Step 3 documented a specific row
+as already built. Live query found 0 rows. Checked the other 5 clients
+in the roster for comparison: **4 of 5 also have an empty
+`client_config`** (Clients A/002-commerce, C/003-appointment,
+D/004-consultation, E/005-engagement all 0 rows; only Client B/001-
+emergency has a real row). This means the actual provisioning gap is
+platform-wide, surfaced by Carmelli's build, not introduced by it.
+
+**Also found:** the live `client_config` table's real columns have
+evolved since BC-060's documentation was written — it now includes
+`max_booking_horizon` (`integer NOT NULL`), a field no intake checklist
+question covers and BC-060's Step 3 mapping never mentioned. Every
+other field Carmelli needs (`language_mode`, `language_list`,
+`default_country_code`, `send_window_start/end`, `email_address`,
+`voice_agent_enabled`/`sms_agent_enabled`, `archetype_settings`) is
+already decided per BC-060 and could be re-applied mechanically — but
+the `NOT NULL` constraint on `max_booking_horizon` blocks landing the
+row at all without picking something. Checked the one real precedent
+(Client B/emergency: `max_booking_horizon = 0`) — not confidently
+transferable to a commerce-ecom click-and-collect business; `0` could
+mean "no limit" or "same-day only" depending on the emergency
+archetype's own semantics, and this is a real customer-facing business
+rule (how far ahead can someone order), not a mechanical/structural
+fact with one obviously correct answer. Per Document Resolution
+Authority rule 5 ("never invent a plausible-sounding answer to fill a
+gap"), stopped and asked rather than guessed.
+
+**Not done, both genuinely blocked:** `convocore_agent_map` row insert
+(Gap 1), `client_config` row insert for Carmelli (Gap 2) — and, by
+extension, the same gap likely exists for the other 4 empty-row
+clients too, not fixed here (out of this session's scope, flagged for
+whoever picks up Path A's backend work next).
+
+---
+
 ## [2026-08-17] session-BC-071-critical-fix | Live Convocore Adapter bug found + fixed (would have broken every real call)
 
 **Trigger:** Human pushed back on the BC-071-recheck session's own
