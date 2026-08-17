@@ -10,7 +10,55 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-17 (latest) — by /execute — **BC-071: platform-wide `source_channel`
+2026-08-17 (latest) — by /execute — **BC-071: same customer-resolution bug
+found+fixed system-wide (human's explicit "fix this everywhere"
+request), plus a critical, unrelated auth bypass found and fixed along
+the way.** Human hit the exact same `22P02 invalid uuid` error testing
+`UpdateCustomer`'s escalation path. Investigated systematically —
+audited all 13 RPCs taking a real `p_customer_id uuid` parameter and
+traced which workflows call each without resolving identity first.
+**Fixed 3 real, live gaps:**
+1. **WF-017 (NotifyHuman)** — the terminal Fallback-D destination for
+   *every* Tool. Same raw-customer_id bug. Fixing it here once closes
+   the gap for every Tool's escalation path simultaneously, not a
+   per-Tool patch. Live-tested (execution `31127`), published.
+2. **The Convocore Adapter's own separate `human_handoff` branch**
+   (Convocore's native System Tool bypasses WF-017 entirely) — had the
+   identical bug independently. Fixed with the same resolution chain.
+3. **WF-016 (UpdateCustomer)** — its opt-in `queue_pending_verification`
+   branch had the same bug (would affect any client with the
+   verification tier enabled, not just Carmelli's tier-off path). Also
+   found its unpublished draft had regressed `Route To Human Handoff`'s
+   URL to `webhook-test` — fixed before it could ship broken.
+
+**Also found and fixed, unrelated to the original request but too
+severe to leave (same investigation pass):** the Adapter's `Bearer
+Token Valid?` node was completely disconnected — `Read Agent Secret`
+wired straight past it to routing, meaning **auth was never actually
+checked on any real Convocore call**, full stop, since this Adapter was
+first built. Reconnected it; live-verified both a correct token
+(reaches routing) and an incorrect one (now genuinely rejected
+`AUTH_FAILED`) — confirmed neither was true before. Also fixed the
+Adapter's `Forward To Tool` node, found pointed at `webhook-test`
+instead of production `webhook`.
+
+**Checked, confirmed NOT affected:** WF-013 (CancelAppointment) —
+its `customer_id` comes from a real DB lookup (`get_client_appointment_
+with_customer`), not raw Convocore input, so it was never broken this
+way.
+
+**Not exhaustively re-audited** (out of Carmelli's real scope, lower
+priority, flagged not silently skipped): `insert_client_active_issue`,
+`insert_client_waitlist_entry`, `stop_client_recovery_for_customer`,
+`upsert_client_email`, `apply_customer_update` — worth the same check
+whenever a client actually exercises those paths (Restaurant waitlist,
+Recovery Engine, Email Manager, verification-approval execution).
+
+All fixes live-tested and published. Full detail: `06_Infrastructure/
+n8n/Workflow_Registry.md` (WF-017, WF-016, ADP-002 entries), `Wiki/log.md`
+session-BC-071-customer-resolution-everywhere.
+
+2026-08-17 (prior) — by /execute — **BC-071: platform-wide `source_channel`
 enum rename, human's own architecture call.** Following up on the
 `web_chat`/`website` mismatch from the prior fix: human confirmed via
 their original raw webhook capture that Convocore's real `channel`

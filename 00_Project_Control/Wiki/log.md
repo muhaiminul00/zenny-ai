@@ -9,6 +9,87 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-17] session-BC-071-customer-resolution-everywhere | Same bug fixed system-wide + a critical, unrelated auth bypass found
+
+**Trigger:** Human hit the exact same `22P02 invalid input syntax for
+type uuid: "user_123456"` error, this time in `NotifyHuman`'s (WF-017)
+`Insert Escalation Row` node, triggered via `UpdateCustomer`'s Pattern-D
+handoff. Explicit instruction: "fix this issue from everywhere."
+
+**Systematic audit, not guesswork:** queried `pg_proc` for every RPC
+taking a real `p_customer_id uuid` parameter (13 found), then traced
+which live workflow calls each and whether it resolves identity first.
+
+**3 real gaps found and fixed, all live-tested and published:**
+
+1. **WF-017 (NotifyHuman, `pLYEVQ9kto7NTBfk`)** — confirmed as "the
+   terminal Fallback-D destination for every other Tool" (its own live
+   description). Same bug as WF-001 originally had. Fixing here once
+   closes the gap for every Tool's failure path at once — the correct
+   altitude for this fix, not duplicated per-Tool. Wired the same
+   find-or-create chain (`find_client_customer_by_channel`/
+   `insert_client_customer`/`insert_client_channel_identity_link`)
+   between schema resolution and the escalation write. Live-tested
+   (execution `31127`) — real escalation `e64ef64e-...` with a correctly
+   resolved UUID, cleaned up.
+
+2. **The Convocore Adapter's own separate `human_handoff` branch**
+   (`BOxeuH6ehv46FZL0`) — Convocore's native `human-handoff` System Tool
+   routes through the Adapter directly, bypassing WF-017's webhook
+   entirely (writes to `insert_client_escalation` inline). Had the
+   identical bug, independently, in two spots: `Check Existing Open
+   Escalation` and `Insert Escalation Row` both used raw customer_id.
+   Fixed with the same chain, wired between schema resolution and the
+   duplicate-check.
+
+3. **WF-016 (UpdateCustomer, `ogYca9QFCMIEWrWG`)** — its opt-in
+   `queue_pending_verification` branch (BC-053's Verification Approval
+   Queue, per-client toggle) had the same bug — would surface for any
+   client with `verification_tier_enabled=true`, not just via Carmelli's
+   tier-off path which routes through WF-017 (already fixed). Wired the
+   resolution chain once, feeding both branches. **Also found:** this
+   workflow's unpublished draft had `Route To Human Handoff`'s URL
+   regressed to `webhook-test` (the previously-published active version
+   was still correct) — fixed before it could ever ship broken.
+
+**Checked, confirmed genuinely NOT affected — did not touch:** WF-013
+(CancelAppointment) — its `customer_id` comes from a real DB join
+(`get_client_appointment_with_customer` looks it up from the appointment
+row), never from raw Convocore input directly. Correctly left alone.
+
+**Found along the way, unrelated to the original bug report but far
+more severe — fixed in the same pass rather than filed for later:** the
+Adapter's `Bearer Token Valid?` node was completely disconnected from
+the graph. `Read Agent Secret` wired straight to `Route By Tool Type`,
+skipping the auth check node entirely. **This means no real Convocore
+call has ever actually been authenticated by this Adapter, since it was
+first built** — any Bearer token, correct or not, would have been
+processed identically. Reconnected `Read Agent Secret` → `Bearer Token
+Valid?` → (true) routing / (false) `Respond - Auth Failed`. **Live-
+verified both directions**, not assumed: a correct token now reaches
+routing (execution `31147`); an incorrect one is now genuinely rejected
+with `AUTH_FAILED` (execution `31149`) — confirmed neither behavior
+existed before this fix.
+
+**Also fixed while in the Adapter:** `Forward To Tool`'s URL had
+regressed to `webhook-test` instead of production `webhook` — same
+class of regression as WF-016's draft, found and reverted before real
+Convocore traffic could ever hit a test-mode endpoint.
+
+**Not exhaustively re-audited this pass, disclosed not silently
+skipped:** `insert_client_active_issue`, `insert_client_waitlist_entry`,
+`stop_client_recovery_for_customer`, `upsert_client_email`,
+`apply_customer_update` — none is in Carmelli's real Tool scope right
+now (Restaurant waitlist, Recovery Engine, Email Manager's already-
+extensively-tested INT-010 chain, verification-approval execution).
+Worth the same live check whenever a client's real usage first
+exercises one of these paths.
+
+**Updated:** `06_Infrastructure/n8n/Workflow_Registry.md` (WF-017,
+WF-016, ADP-002 entries).
+
+---
+
 ## [2026-08-17] session-BC-071-source-channel-rename | Platform-wide source_channel enum rename, human's own architecture call
 
 **Trigger:** Human pushed back on the previous fix's `web_chat` value:
