@@ -60,6 +60,23 @@ onboarding dashboard + workflow (Phase 5D).
 Full detail: `PROJECT_STATE.md` Last Updated + Path B,
 `Wiki/infra/convocore-agent-provisioning.md` §4.
 
+**Same-day follow-up — gate 1 closed:** human created the real Supabase
+Auth account (Authentication → Users → Add User) for
+`carmelli.zennyai@gmail.com` directly, correctly declining the
+alternative of asking Claude to invent one. Resumed via
+`dashboard_provision_user` RPC (BC-051) — real `auth_user_id
+4473a9b8-0536-4795-8147-745f0a8c1196` mapped to Carmelli's `client_id`.
+**Live-verified**, not assumed: simulated the real authenticated
+session inside a rolled-back transaction and called
+`dashboard_get_my_client()` — returned the correct mapping. Human also
+correctly rejected a suggested shortcut (connecting Gmail via n8n's own
+credential UI instead of the dashboard's real Integrations flow) — that
+path is for Zenny's internal service accounts, not client-facing
+connections; the dashboard OAuth flow is the only correct path and is
+now reachable. 2 gates remain (Convocore manual build, Gmail connect) —
+both genuinely on the human, see
+`BC-060_Onboarding_Process_Reference_v1.md` v1.1.
+
 ---
 
 ## [2026-08-15] session-BC-063 | Edge Function client_id trust — 4 of 6 fixed, 2 intentionally left

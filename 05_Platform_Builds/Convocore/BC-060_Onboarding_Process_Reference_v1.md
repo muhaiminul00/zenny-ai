@@ -150,19 +150,29 @@ usable login (no real password, no invite flow) — it would be
 indistinguishable from inventing a credential. **Real human step
 required**, not worked around.
 
-## Where this stops — 3 real, disclosed gates
+## Where this stopped — 3 real, disclosed gates
 
-**1. Dashboard login (C4).** No `control.dashboard_users` row exists
-yet — it needs a real `auth.users.id`, which needs a real Supabase Auth
-account. **Human action:** Supabase Dashboard → Authentication → Users
-→ Add User (or Invite) → `carmelli.zennyai@gmail.com`. Once that
-account exists, resume with:
+**1. Dashboard login (C4). CLOSED 2026-08-17.** Human created the real
+Supabase Auth account directly (Authentication → Users → Add User,
+`carmelli.zennyai@gmail.com`) — `auth.users.id
+4473a9b8-0536-4795-8147-745f0a8c1196`, confirmed live
+(`email_confirmed_at` set). Resumed with the `dashboard_provision_user`
+RPC (BC-051) rather than a raw insert:
 ```sql
-INSERT INTO control.dashboard_users (auth_user_id, client_id, role)
-VALUES ('<the real auth_user_id>', 'eb27a21f-209d-4b6d-8f6e-cb216411f6c4', 'client_user');
+SELECT public.dashboard_provision_user(
+  '4473a9b8-0536-4795-8147-745f0a8c1196'::uuid,
+  'eb27a21f-209d-4b6d-8f6e-cb216411f6c4'::uuid,
+  'client_user'
+);
 ```
-(or call the `dashboard_provision_user` RPC, BC-051, with the same
-values — either is equivalent).
+**Live-verified**, not assumed: simulated the real auth session
+(`SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claims =
+'{"sub":"4473a9b8-...","role":"authenticated"}'`, inside a rolled-back
+transaction — no session state left behind) and called
+`dashboard_get_my_client()` — returned the correct
+`{client_id, business_name: "Carmelli Bakery", client_schema_name:
+"client_carmelli_bakery", archetype: "commerce_ecom"}`. This user can
+now genuinely log into the dashboard and see only Carmelli's data.
 
 **2. The Convocore agent itself.** REST/MCP both still `403`
 (Step 0) — genuinely can't be built by any tool call this session has
@@ -192,11 +202,23 @@ None of these three can be worked around without inventing a real
 external identity or account — exactly the class of action the
 Credential Gate exists to stop. Everything upstream of them (Steps 1-6)
 is real, live-verified, and already sitting in the database — nothing
-here needs to be redone once the 3 gates clear; BC-060 resumes at
-whichever gate you clear first.
+here needed to be redone once gate 1 cleared.
+
+**Gates 2 and 3 remain open.** Gate 2 (Convocore agent) stays manual —
+human decision, staying on the free tier rather than upgrading to
+unblock the API. Gate 3 (Gmail connection) is now genuinely reachable
+for the first time — the human can log in as Carmelli and use the
+dashboard's real Integrations → Connect flow, no n8n-side workaround
+needed (a n8n-credential shortcut was suggested and correctly rejected
+by the human — that path is for Zenny's own internal service accounts,
+not client-facing connections; the dashboard OAuth flow is the only
+correct path for a client's own inbox).
 
 ---
 
 ## Document Changelog
 - **v1 (2026-08-17)** — first real run, against Carmelli Bakery. Steps
-  1-6 complete and live-verified. Stopped at the 3 gates above.
+  1-6 complete and live-verified. Stopped at 3 gates.
+- **v1.1 (2026-08-17)** — gate 1 (dashboard login) closed same day,
+  live-verified via a simulated real session. Gates 2/3 still open, see
+  above.

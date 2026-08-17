@@ -10,7 +10,23 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-17 (latest) — by /execute — **BC-060 STARTED, real progress,
+2026-08-17 (latest) — by /execute — **BC-060 gate 1 CLOSED (dashboard
+login).** Human created the real Supabase Auth account for
+`carmelli.zennyai@gmail.com` (`auth_user_id
+4473a9b8-0536-4795-8147-745f0a8c1196`). Provisioned via the real
+`dashboard_provision_user` RPC (BC-051), not a raw insert.
+**Live-verified**, not assumed: simulated the real authenticated
+session and called `dashboard_get_my_client()` — returned the correct
+Carmelli mapping. This dashboard login is now genuinely usable.
+**2 of 3 gates remain:** Convocore agent (human decision — staying
+manual/free-tier, not upgrading); Gmail connection (now reachable via
+the dashboard's real Integrations → Connect flow, since login exists —
+an n8n-credential shortcut was suggested and correctly rejected, that
+path is for Zenny's own internal accounts, not client-facing
+connections). Full detail: `BC-060_Onboarding_Process_Reference_v1.md`
+v1.1, `Wiki/log.md` session-BC-060 entry.
+
+2026-08-17 (prior) — by /execute — **BC-060 STARTED, real progress,
 STOPPED at 3 real gates.** Ran the now-fully-answered
 `Convocore_Agent_Intake_Checklist_v1.md` as a real provisioning input
 for the first time — Carmelli Bakery is Zenny's first non-test client
@@ -624,14 +640,13 @@ business):**
   (human-supplied demo decisions). Supabase provisioning (client row,
   schema clone, config, active modules, agent_prompts/email_categories
   seed, Notion KB) is **done and live-verified** — see Last Updated
-  above and `BC-060_Onboarding_Process_Reference_v1.md`. **Stopped at
-  3 real gates, needs human action to resume:** (1) create a real
-  Supabase Auth account for `carmelli.zennyai@gmail.com` (dashboard
-  login); (2) manual Convocore Canvas UI build (still `403`-blocked on
-  REST/MCP, per BC-057b's agreed fallback); (3) real Gmail OAuth
-  connection for the same address (Email Manager needs it to do
-  anything for this client). None of these three can be built by a
-  tool call — genuinely need the human.
+  above and `BC-060_Onboarding_Process_Reference_v1.md`. **Gate 1
+  (dashboard login) CLOSED same day** — real Auth account +
+  `dashboard_users` mapping, live-verified. **2 gates remain, both on
+  the human:** (2) manual Convocore Canvas UI build (staying on the
+  free tier by choice, not `403`-blocked-and-waiting); (3) connect
+  Gmail for `carmelli.zennyai@gmail.com` via the dashboard's real
+  Integrations page, now reachable since login exists.
 - BC-061: full round-trip test (real conversation → adapter → n8n →
   Supabase → dashboard) — waits on BC-060's 3 gates clearing first.
 
