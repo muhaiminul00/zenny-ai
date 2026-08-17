@@ -9,6 +9,64 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-17] session-BC-071-secret-and-config-closed | Both real gaps from the follow-up session closed, same day
+
+**Trigger:** Human corrected 2 things I got wrong in the prior
+follow-up session: "there is no way to get agent secret from ui, what
+is booking-horijon number?"
+
+**Gap 1 resolved — real Bearer secret, not blank.** My prior plan
+("leave Secret Key blank, Convocore auto-sends the agent's own secret")
+assumed that auto-value was inspectable somewhere in Convocore's
+dashboard to confirm/copy. It isn't, per the human's direct check —
+correctly invalidating that plan (an unverifiable auth mechanism isn't
+usable). Real fix, standard practice: generated a genuine 256-bit
+random secret directly in Postgres (`encode(extensions.gen_random_
+bytes(32), 'base64')`, never left the database as a shell argument),
+stored it via `store_credential_secret` (id `a0ca9dc4-c678-46d3-96a3-
+2de8a54b3136`), and inserted Carmelli's real `control.convocore_agent_map`
+row live: `client_id eb27a21f-209d-4b6d-8f6e-cb216411f6c4`, `convocore_
+agent_id 1nyXSGBFG1yOj0T9DIPM` (human-provided, real), `convocore_
+region 'na'` (matches this workspace's `CONVOCORE_API_REGION=na-gcp`,
+confirmed via `.mcp.json`'s convocore MCP server config — read
+structurally, value not reproduced), `agent_display_name 'Carmelli
+Bakery Assistant'`. **This is not a third-party credential being
+invented** — it's a webhook signing secret Zenny controls both ends of;
+Convocore just echoes it back as the Bearer token so the Adapter can
+verify the caller. The plaintext secret was given to the human directly
+in chat, not committed to any file — `02_Tools_Spec.md` was corrected
+to reference the credential-platform id instead of embedding the raw
+value.
+
+**Gap 2 resolved — `max_booking_horizon` was never actually an open
+decision.** A genuine Doc-Search-First miss in the original BC-071
+build: `Agent_Runtime_System_v1.md` line 1078 and Appendix B (line
+11538) already define this field with a documented default — 365
+days, a technical sanity cap on how far ahead a date/booking request
+can be before it's treated as unreasonable, unrelated to Carmelli's
+24–48h advance-order minimum (a different, opposite concept — minimum
+lead time vs. maximum horizon). Landed Carmelli's real `client_config`
+row using BC-060's already-decided fields (`language_mode`,
+`language_list`, `default_country_code`, `send_window_start/end`,
+`email_address`, `voice_agent_enabled`/`sms_agent_enabled`,
+`archetype_settings`) plus `max_booking_horizon = 365`.
+
+**Both live-verified** via the actual `RETURNING *` output of each
+INSERT, not assumed.
+
+**Consequence for BC-060:** gate 2 moved from "not started" to "in
+progress" — the human has already begun the real Canvas UI build (their
+own `create-lead` test call is what surfaced the payload-shape bug
+fixed in session-BC-071-critical-fix). `BC-060_Onboarding_Process_
+Reference_v1.md` bumped to v1.3.
+
+**Updated:** `02_Tools_Spec.md` v1.3 (Secret Key rows corrected to the
+real credential-platform reference), `BC-060_Onboarding_Process_
+Reference_v1.md` v1.3, `PROJECT_STATE.md` (both Active Blockers items
+from the prior session closed).
+
+---
+
 ## [2026-08-17] session-BC-071-followup | Real agent ID received; 2 real gaps found live-verifying Carmelli's schema, both stopped at genuine human-input needs
 
 **Trigger:** Human provided Carmelli's real Convocore agent ID

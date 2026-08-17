@@ -10,7 +10,33 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-17 (latest) — by /execute — **BC-071 follow-up: real Convocore
+2026-08-17 (latest) — by /execute — **BC-071: both real gaps from the
+prior pass CLOSED for real, live, this session.** Human corrected 2
+wrong assumptions of mine, both resolved cleanly, not blocked:
+**(1) "There is no way to get agent secret from the UI"** — correct;
+my earlier plan (leave Secret Key blank, rely on Convocore's own
+auto-Bearer) can't be verified if it can't be inspected. Real fix: a
+256-bit secret generated in Postgres (`gen_random_bytes`, never a
+third-party credential — this is a webhook signing secret we control
+both ends of), stored via `store_credential_secret`, and Carmelli's
+real `control.convocore_agent_map` row inserted live (agent id
+`1nyXSGBFG1yOj0T9DIPM`, region `na`, matching the workspace's
+`CONVOCORE_API_REGION=na-gcp`). **(2) "What is booking-horizon
+number?"** — `max_booking_horizon` isn't a business decision Carmelli
+needs to make; it's a documented technical safety cap
+(`Agent_Runtime_System_v1.md` line 1078/Appendix B: default 365 days,
+how far ahead a date can be requested before being treated as
+unreasonable) — a genuine Doc-Search-First miss in the prior pass, not
+a real open item. Landed Carmelli's `client_config` row (found empty —
+real, disclosed gap from the prior pass) using BC-060's already-decided
+fields + this documented default. **Consequence:** BC-060 gate 2 is now
+IN PROGRESS, not just prepped — human has already started wiring/
+testing the real Canvas UI build (their own `create-lead` test is what
+surfaced the payload-shape bug this session fixed). Full detail:
+`02_Tools_Spec.md` v1.3, `BC-060_Onboarding_Process_Reference_v1.md`
+v1.3, `Wiki/log.md` session-BC-071-secret-and-config-closed.
+
+2026-08-17 (prior) — by /execute — **BC-071 follow-up: real Convocore
 agent ID received (`1nyXSGBFG1yOj0T9DIPM`), doc placeholders confirmed
 already correct; 2 real gaps found live-verifying Carmelli's schema,
 both stopped at genuine human-input needs, nothing invented.**
@@ -557,22 +583,19 @@ Infra (VPS/DNS/Proxy) .. ✅ working — Wiki/infra/
 ```
 
 ## Active Blockers
-- **NEW (2026-08-17): `client_config` empty for 4 of 5 test clients +
-  Carmelli — platform-wide provisioning gap, not just Carmelli's.**
-  Live-verified only Client B (emergency) has a real row. Also:
-  `client_config`'s live schema now has `max_booking_horizon integer
-  NOT NULL` with no intake checklist question covering it. Needs a
-  human decision on Carmelli's real value before her row can be
-  inserted (Credential-Gate-adjacent — not invented); the other 4 empty
-  clients are unaffected in practice (test fixtures, no live traffic)
-  but the same gap should be closed whenever Path A backend work next
-  touches provisioning. See `Wiki/log.md` session-BC-071-followup.
-- **NEW (2026-08-17): Carmelli's `convocore_agent_map` row blocked on
-  Credential Gate.** Real agent ID received (`1nyXSGBFG1yOj0T9DIPM`),
-  but `convocore_agent_secret_id` is `NOT NULL` and no real secret
-  exists in the credential platform yet — needs the agent's real
-  Bearer secret from Convocore's own dashboard. See `Wiki/log.md`
-  session-BC-071-followup.
+- ~~`client_config` empty for Carmelli~~ **CLOSED (2026-08-17, same
+  session).** Real row inserted using BC-060's already-decided fields +
+  `max_booking_horizon = 365` (documented default, not a real open
+  decision — see Last Updated). **Still genuinely open, not this
+  client's problem:** the same table is still empty for 4 of the 5
+  *test* clients (A/002-commerce, C/003-appointment, D/004-consultation,
+  E/005-engagement) — no live traffic depends on it, not fixed this
+  session, revisit whenever Path A backend work next touches
+  provisioning.
+- ~~Carmelli's `convocore_agent_map` row blocked on Credential Gate~~
+  **CLOSED (2026-08-17, same session).** Real secret generated in
+  Postgres (not a third-party credential — a webhook signing secret we
+  control both ends of), stored, row inserted live. See Last Updated.
 - ~~INT-008 (Resume Recovery) has no caller~~ **CLOSED (BC-056,
   2026-08-14).** New dashboard `/paused-leads` action → real
   `dashboard_release_lead_ownership` RPC (clears the flag — a real

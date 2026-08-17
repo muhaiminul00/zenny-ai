@@ -53,17 +53,29 @@ confirmed by reading the Adapter's own `Forward To Tool` node, which
 builds the downstream URL from a hardcoded `builtTools` allow-list that
 includes both `create-lead` and `update-customer`.
 
-**Secret Key field — leave blank, don't invent a credential:** per
-`Convocore_Canvas_Ground_Truth_FINAL.md` §6.2, a blank Secret Key makes
-Convocore automatically send the agent's own secret key as the Bearer
-token — and the Adapter's `Read Agent Secret` → `Bearer Token Valid?`
-nodes are built specifically to check exactly that value against
-`convocore_agent_map.convocore_agent_secret_id` (Vault-referenced, set
-when the agent's `convocore_agent_map` row is created — BC-060 gate
-2's own action). **Leaving Secret Key blank is the correct config, not
-a shortcut** — inventing or reusing some other credential here would
-actually break the Adapter's auth check, which is keyed to the agent's
-own secret specifically.
+**Secret Key field — corrected 2026-08-17, real value, not blank:**
+v1.2's "leave blank" guidance assumed Convocore's own auto-Bearer
+mechanism was inspectable/verifiable through the dashboard. It isn't —
+there's no UI field that surfaces what a blank Secret Key actually
+sends, so it can't be confirmed or matched against anything on our
+side. Standard fix instead: **we generate our own secret and you paste
+it into this field.** A real 256-bit random secret has been generated
+and stored in the credential platform (`convocore_agent_map` row for
+Carmelli now live, secret_id `a0ca9dc4-c678-46d3-96a3-2de8a54b3136`,
+region `na`). **Paste that exact value into the Secret Key field of
+BOTH Custom Tools** (`create-lead` and `update-customer`) — the
+plaintext value was given directly in chat when this was generated, not
+committed here (never store a real secret in a git-tracked file, per
+CLAUDE.md's standing repo rule); retrieve it again anytime via
+`SELECT public.read_credential_secret('a0ca9dc4-c678-46d3-96a3-2de8a54b3136'::uuid)`
+if needed.
+
+This is not a third-party credential being invented — it's a webhook
+signing secret we control both ends of (we generated it, we store it,
+Convocore just echoes it back as the Bearer token on every call so the
+Adapter can confirm it's really this agent). The Adapter's `Read Agent
+Secret` → `Bearer Token Valid?` nodes check the caller's Bearer token
+against this exact stored value.
 
 **Real doc-vs-reality gap resolved (Document Resolution Authority):**
 `n8n_Workflow_Specification_v1.md` §13.1/§13.16 label `CreateLead` and
@@ -184,8 +196,8 @@ correct Instructions against, which doesn't exist yet.
 | **Owning module** | Growth Agent (creates); Conversion Engine executes downstream — Growth Agent never calls an action tool itself beyond this handoff | `Tool_Naming_Convention.md` "Mapping to the Module Responsibility Contract" |
 | **Description** (paste into Convocore) | "Call this once a customer has shown genuine interest in a specific bakery item but hasn't yet committed to getting the product link, OR when handing off an open interest to a human/lead record. Do not call this for every message — only when a real, specific interest exists." | Derived from Module 2 §B "Tier 2 data collection trigger point" + §3 "What data must be ready before handoff" |
 | **Method** | POST | `Convocore_Canvas_Ground_Truth_FINAL.md` §6.2 (Custom Tool fields) |
-| **Server URL** | `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter?agent_id=<this agent's real convocore_agent_id>&key=create-lead` — see §0.5/§0.6 for why the query string is now mandatory, not optional | n8n MCP live read, ADP-002 (`BOxeuH6ehv46FZL0`), fixed and live-tested this pass |
-| **Secret Key** | Leave **blank** — Convocore then auto-sends the agent's own secret as the Bearer token, which the Adapter validates against `convocore_agent_map`. Do not invent a separate credential — see §0.5 | n8n MCP live read (Adapter's `Read Agent Secret`/`Bearer Token Valid?` nodes) + `Convocore_Canvas_Ground_Truth_FINAL.md` §6.2 |
+| **Server URL** | `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter?agent_id=1nyXSGBFG1yOj0T9DIPM&key=create-lead` — see §0.5/§0.6 for why the query string is now mandatory, not optional | n8n MCP live read, ADP-002 (`BOxeuH6ehv46FZL0`), fixed and live-tested this pass |
+| **Secret Key** | Paste the real generated secret (credential platform id `a0ca9dc4-c678-46d3-96a3-2de8a54b3136`) — NOT blank, corrected 2026-08-17 — see §0.5 | n8n MCP live read (Adapter's `Read Agent Secret`/`Bearer Token Valid?` nodes) + real Supabase insert this pass |
 | **Parameters (attach as Variables)** | `customer_id` → custom var `customer_id` (NOT the system var `user_id` directly — Convocore sends a Variable's own Key as the field name, no renaming on attachment; `01_Variables_Spec.md` §0/§1); `archetype` → hardcode `"commerce_ecom"` (static, not LLM-decided); `intent` → custom var `intent` (renamed from `lead_intent` this pass — must match WF-001's real field name exactly); `source_channel` → custom var `source_channel`, always `"website"` (NOT the system var `channel`, which sends Convocore's own value `"web-chat"` — not a valid enum value for this field); `conversation_summary` → custom var `conversation_summary` | `n8n_Workflow_Specification_v1.md` §13.1 payload schema + `01_Variables_Spec.md` v1.2, confirmed against WF-001's live `Normalize Contract`/`Validate Input` nodes AND a live-captured real Convocore call (§0.6) |
 | **Test before wiring** | Fire the Test button with a realistic payload before referencing it in any node's Instructions | `Convocore_Agent_Build_Order_Guide_v2.md` Part 4 item 3 |
 
@@ -197,8 +209,8 @@ correct Instructions against, which doesn't exist yet.
 | **Owning module** | Core Agent | `n8n_Workflow_Specification_v1.md` §7.6 |
 | **Description** | "Call this only when a customer explicitly corrects previously-given information (e.g., a misspelled name, wrong email). Do not call this speculatively." | Derived from Module 1's general low-risk-action framing (§B Customer Verification Rule) |
 | **Method** | POST | n8n MCP live read (WF-016's real webhook trigger) |
-| **Server URL** | Same shared Adapter URL as `create-lead`, own query string — `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter?agent_id=<this agent's real convocore_agent_id>&key=update-customer` | See §0.5/§0.6 |
-| **Secret Key** | Leave blank, same as `create-lead` | See §0.5 |
+| **Server URL** | Same shared Adapter URL as `create-lead`, own query string — `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter?agent_id=1nyXSGBFG1yOj0T9DIPM&key=update-customer` | See §0.5/§0.6 |
+| **Secret Key** | Same real generated secret as `create-lead` (§0.5) | See §0.5 |
 | **Parameters** | `customer_id` → same `customer_id` custom var as `create-lead` uses (not the system var `user_id` directly — same reasoning as §1.1); `fields` → open object, composed by the LLM from the specific correction stated in-conversation, not a stored Variable (the field being corrected varies per use) | `n8n_Workflow_Specification_v1.md` §13.16 payload schema |
 | **Priority for this build** | Low, and lower than v1 stated — WF-016's own live description confirms it **always** routes to human-handoff right now (no verification mechanism exists yet), so it currently behaves identically to calling `human-handoff` directly. Build if time permits; not blocking BC-071's Definition of Done. See §0.5. | n8n MCP live read (WF-016 description) |
 
@@ -296,3 +308,18 @@ and_Nodes_Spec.md`, not here. (`Convocore_Canvas_Ground_Truth_FINAL.md`
   itself was wrong (System Variables can't be renamed on attachment) —
   see `01_Variables_Spec.md` v1.2 for the paired fix; this doc's §1.1/1.2
   Parameters rows corrected to match.
+- **v1.3 (2026-08-17)** — human reported "there is no way to get agent
+  secret from the UI," correctly invalidating v1.2's "leave Secret Key
+  blank" guidance (that mechanism can't be verified against anything if
+  it can't be inspected). Real fix: generated a real 256-bit secret via
+  Postgres (`gen_random_bytes`), stored it in the credential platform,
+  and inserted Carmelli's real `convocore_agent_map` row (agent id
+  `1nyXSGBFG1yOj0T9DIPM`, region `na`, secret id `a0ca9dc4-c678-46d3-
+  96a3-2de8a54b3136`) — live, not a placeholder. Secret Key field now
+  correctly says "paste this specific real value," plaintext given in
+  chat only, never committed to this file (repo standing rule). Also
+  landed Carmelli's `client_config` row (was empty — real gap, see
+  `Wiki/log.md` session-BC-071-followup) using BC-060's already-decided
+  fields plus `max_booking_horizon = 365`, the documented default
+  (`Agent_Runtime_System_v1.md` line 1078/Appendix B) — a Doc-Search-
+  First miss in the original BC-071 pass, not a real open decision.

@@ -201,6 +201,22 @@ triggered). This does not close gate 2 — the human still has to
 actually build it in the Canvas UI — it removes the "what do I even
 type into each field" gap.
 
+**Gate 2 IN PROGRESS (2026-08-17):** the agent now genuinely exists —
+human provided its real `convocore_agent_id` (`1nyXSGBFG1yOj0T9DIPM`).
+`control.convocore_agent_map` row inserted live (region `na`, matching
+the workspace's `CONVOCORE_API_REGION=na-gcp`). A real Bearer secret
+was generated (Postgres `gen_random_bytes`, not invented/borrowed —
+Convocore has no UI path to retrieve its own auto-Bearer value, so this
+is the standard fix: we generate and control both ends), stored in the
+credential platform, and must be pasted into both Custom Tools' Secret
+Key fields (`02_Tools_Spec.md` §0.5, plaintext given in chat, never
+committed to any file). Carmelli's `client_config` row — found empty
+during this same pass, a real gap BC-060 v1.1 had incorrectly reported
+as already built — is now live too. Still open: the actual Canvas UI
+Tools/Nodes wiring itself (human confirmed testing `create-lead`
+already, per the payload-shape bug this surfaced and fixed — session-
+BC-071-critical-fix).
+
 **3. Email inbox connection.** `carmelli.zennyai@gmail.com` has no
 Gmail OAuth credential anywhere yet (`control.client_connections` has
 no row for this client) — SCH-003's hourly INT-009 fan-out will simply
@@ -240,3 +256,7 @@ correct path for a client's own inbox).
   `BC-071_Carmelli_Build_Package/` (Variables/Tools/Global Prompt+Nodes,
   3 docs). Gate 2 itself still open — the human still does the manual
   Canvas UI build; this only supplies the sourced content.
+- **v1.3 (2026-08-17)** — gate 2 now IN PROGRESS, not just prepped: real
+  `convocore_agent_id` received, `convocore_agent_map` row live, real
+  Bearer secret generated/stored, and `client_config` (found empty —
+  real gap) now live too. See the new "Gate 2 IN PROGRESS" note above.
