@@ -187,6 +187,20 @@ time, not a checklist answer). Once built, its real `convocore_agent_id`
 + region need a `control.convocore_agent_map` row — cannot be
 inserted with an invented ID.
 
+**Gate 2's actual copy-paste-ready content (2026-08-17, BC-071):** the
+Variables/Tools/Global-Prompt+Nodes sequencing above is now filled in
+for real — `BC-071_Carmelli_Build_Package/` (3 docs) gives the human
+exact Keys, Descriptions, and Instructions to paste into the Canvas UI,
+Doc-Search-First-sourced from `Agent_Runtime_System_v1.md`,
+`INTEGRATION_CONTRACT_v1.md`, and `n8n_Workflow_Specification_v1.md`.
+Two real findings surfaced there: Carmelli's real conversion mode is B
+(Guided to Product Link), not A (no cart-creation API exists — D2), and
+only 3 of the 5 active modules need a Convocore node at all (Recovery
+Engine and Email Manager are both entirely n8n-side, never chat-
+triggered). This does not close gate 2 — the human still has to
+actually build it in the Canvas UI — it removes the "what do I even
+type into each field" gap.
+
 **3. Email inbox connection.** `carmelli.zennyai@gmail.com` has no
 Gmail OAuth credential anywhere yet (`control.client_connections` has
 no row for this client) — SCH-003's hourly INT-009 fan-out will simply
@@ -222,3 +236,7 @@ correct path for a client's own inbox).
 - **v1.1 (2026-08-17)** — gate 1 (dashboard login) closed same day,
   live-verified via a simulated real session. Gates 2/3 still open, see
   above.
+- **v1.2 (2026-08-17)** — gate 2's real content package built (BC-071):
+  `BC-071_Carmelli_Build_Package/` (Variables/Tools/Global Prompt+Nodes,
+  3 docs). Gate 2 itself still open — the human still does the manual
+  Canvas UI build; this only supplies the sourced content.

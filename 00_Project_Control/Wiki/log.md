@@ -9,6 +9,70 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-17] session-BC-071 | Carmelli Convocore Build Package (Variables/Tools/Global Prompt+Nodes) built
+
+**Trigger:** Human decision to pause the own-stack/BC-070 evaluation and
+finish the real Convocore build for Carmelli first — "complete convcore
+build, test our wf's & build demo, then think about our own stack."
+Asked for the build to be sequenced Variables → Tools → Global Prompt →
+Nodes, each as its own doc, organized so it can later seed onboarding
+automation.
+
+**Found:** `Convocore_Agent_Build_Order_Guide_v2.md` already specifies
+exactly this sequencing (Parts 3–6) with a Doc-Search-First discipline —
+what was missing was the actual filled content for Carmelli specifically.
+Issued as Build Card BC-071, executed same session.
+
+**Built:** 3 docs under `05_Platform_Builds/Convocore/BC-071_Carmelli_
+Build_Package/`, each field sourced and cited (`Agent_Runtime_System_
+v1.md` Modules 1–4, `INTEGRATION_CONTRACT_v1.md`, `n8n_Workflow_
+Specification_v1.md`, `Convocore_Canvas_Ground_Truth_FINAL.md`,
+`Tool_Naming_Convention.md`):
+1. `01_Variables_Spec.md` — 3 custom Variables (`selected_product`,
+   `lead_intent`, `conversation_summary`); found Convocore's 9 System
+   Variables already cover customer name/email/phone, so no duplicate
+   custom Variables were created for those.
+2. `02_Tools_Spec.md` — `create-lead` + `update-customer` Custom Tools,
+   `human-handoff` System Tool.
+3. `03_GlobalPrompt_and_Nodes_Spec.md` — Global Prompt (persona/tone
+   from the Universal Persona Rule + Commerce archetype psychology) +
+   3 node specs.
+
+**2 real findings, both disclosed in the docs rather than built
+around:**
+1. **Carmelli's real `conversion_mode` is B (Guided to Product Link),
+   not A.** `Agent_Runtime_System_v1.md` Module 3 §2: Mode A requires a
+   cart-creation API; Carmelli's real intake answer (D2) is no
+   ecommerce platform connected (static site, demo decision). So
+   `CreateCart` and, downstream, `GetOrderStatus` (nothing to look up
+   without a cart write) are explicitly not wired this pass — flagged
+   as future scope once a real platform connects, not invented against
+   a backend that doesn't exist.
+2. **Only 3 of Carmelli's 5 active modules need a Convocore node.**
+   Recovery Engine (WF-018/INT-006-008/SCH-001) and Email Manager
+   (INT-009-012/SCH-003/004) are both entirely n8n-side —
+   scheduled/webhook-triggered, never chat-triggered — confirmed
+   against `n8n_Workflow_Specification_v1.md` §7.4/7.5. This corrects
+   `Convocore_Agent_Build_Order_Guide_v2.md` Part 0.2's generic
+   "one node per active module" default for this specific client shape.
+
+**Also found (live platform mechanism corrects a Runtime-doc detail):**
+`Convocore_Canvas_Ground_Truth_FINAL.md` §6.3 confirms the
+`human-handoff` System Tool's escalation fields are Convocore's own
+built-in `team_key`/`issue_summary` — not the `escalation_type`/
+`escalation_reason`/`escalation_priority`/`origin_module`/
+`trigger_condition` fields `Agent_Runtime_System_v1.md` Module 1 §D
+describes as "planned for Integration Contract v2." The live, confirmed
+platform fact wins per Doc-Search-First — noted in `01_Variables_Spec.md`
+§2 so a future builder doesn't try to create those as custom Variables.
+
+**Not done:** the actual Canvas UI build (still the human's manual gate
+2, unblocked by this package but not closed by it) and BC-061's
+round-trip test (waits on gate 2 clearing). `BC-060_Onboarding_Process_
+Reference_v1.md` bumped to v1.2 cross-referencing this package.
+
+---
+
 ## [2026-08-17] session-Convocore-alternative | n8n-native conversation runtime designed, full outline written
 
 **Trigger:** Convocore's pricing at the API-access tier the platform

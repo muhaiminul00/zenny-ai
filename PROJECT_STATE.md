@@ -10,7 +10,34 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-17 (latest) — by /execute — **BC-060 gate 1 CLOSED (dashboard
+2026-08-17 (latest) — by /execute — **BC-071 COMPLETE: Carmelli
+Convocore Build Package (Variables → Tools → Global Prompt → Nodes).**
+Human decision: pause the own-stack/BC-070 question, finish the real
+Convocore build for Carmelli first. Built 3 sourced docs under
+`05_Platform_Builds/Convocore/BC-071_Carmelli_Build_Package/` — every
+Variable/Tool Key and node Instruction traces to a cited source
+(`Agent_Runtime_System_v1.md`, `INTEGRATION_CONTRACT_v1.md`,
+`n8n_Workflow_Specification_v1.md`, `Convocore_Canvas_Ground_Truth_
+FINAL.md`), no invented names, per `Convocore_Agent_Build_Order_Guide_
+v2.md`'s Doc-Search-First discipline. **2 real findings surfaced (not
+built around silently):** (1) Carmelli's real `conversion_mode` is B
+(Guided to Product Link), not A — no cart-creation API exists (D2:
+static site, no ecommerce platform) — so `CreateCart`/`GetOrderStatus`
+are explicitly not wired this pass; (2) only 3 of the 5 active modules
+need a Convocore node at all — Recovery Engine and Email Manager are
+both entirely n8n-side (scheduled/webhook workflows), never chat-
+triggered, confirmed against `n8n_Workflow_Specification_v1.md` §7.4/
+7.5. Also found (live Canvas ground truth, corrects the Runtime doc):
+the `human-handoff` System Tool's escalation fields are Convocore's own
+built-in `team_key`/`issue_summary`, not the Runtime doc's "planned
+Integration Contract v2" field names — the live platform mechanism
+wins. **Gate 2 itself (BC-060) is not closed** — the human still does
+the manual Canvas UI build; this supplies the content, not the build.
+Convocore not touched (still `403`, unchanged, no MCP call needed for
+this card). Full detail: `BC-060_Onboarding_Process_Reference_v1.md`
+v1.2, `Wiki/log.md` session-BC-071 entry.
+
+2026-08-17 (prior) — by /execute — **BC-060 gate 1 CLOSED (dashboard
 login).** Human created the real Supabase Auth account for
 `carmelli.zennyai@gmail.com` (`auth_user_id
 4473a9b8-0536-4795-8147-745f0a8c1196`). Provisioned via the real
@@ -683,8 +710,65 @@ business):**
   free tier by choice, not `403`-blocked-and-waiting); (3) connect
   Gmail for `carmelli.zennyai@gmail.com` via the dashboard's real
   Integrations page, now reachable since login exists.
+- **BC-071 COMPLETE (2026-08-17): Carmelli Convocore Build Package —
+  Variables → Tools → Global Prompt → Nodes.** Human decision: stop
+  deferring the own-stack question (BC-070/outline), finish the real
+  Convocore build for Carmelli first — test the workflows, get a working
+  demo, then revisit the platform-runtime decision. This card produces
+  the actual copy-paste-ready content the human types into Convocore's
+  Canvas UI for gate 2 (still manual — `403` unchanged, staying on free
+  tier by choice), sequenced exactly per `Convocore_Agent_Build_Order_
+  Guide_v2.md` Parts 3-6 (Doc-Search-First discipline: every value
+  pulled from Zenny's own system docs, never invented) and structured so
+  it can later seed the Phase 5D onboarding-dashboard automation, same
+  intent as `BC-060_Onboarding_Process_Reference_v1.md`.
+  **Target — 3 new docs under `05_Platform_Builds/Convocore/BC-071_Carmelli_Build_Package/`:**
+  1. `01_Variables_Spec.md` — every Variable Carmelli's agent needs to
+     capture: Key (sourced from `INTEGRATION_CONTRACT_v1.md` payload
+     field names / `Tool_Naming_Convention.md`, never invented),
+     type (Local/Global/ENV), Description (written for the LLM, with a
+     few-shot example where useful), source module.
+  2. `02_Tools_Spec.md` — every Custom Tool: Key (from
+     `INTEGRATION_CONTRACT_v1.md` Part 4's Tool Name Registry /
+     `n8n_Workflow_Specification_v1.md` Part 7 — exact match, not
+     freely named), Description (when the LLM should call it),
+     attached Variables (from doc 1, Keys matching expected payload
+     fields), which module owns it, plus which System Tools to enable
+     (`human-handoff` — team_key routing from `Agent_Runtime_System_
+     v1.md`'s Human Handoff Handler section; `shopify`/`forward-call`/
+     `end-call` only if applicable to Carmelli's real config).
+  3. `03_GlobalPrompt_and_Nodes_Spec.md` — Global Prompt content
+     (identity/persona/tone from `customer_psychology_principles_v1.md`
+     + the Evidence Foundation doc, universal hard rules) + one section
+     per node: Start Node and one Module Node per Carmelli's active
+     modules (`core_agent`, `growth_agent`, `conversion_engine`,
+     `recovery_engine`, `email_manager` — per BC-060 Step 4's real
+     `client_active_modules` row), each with Instructions sourced from
+     that module's actual section in `Agent_Runtime_System_v1.md`
+     (never re-derived from general judgment), routing-trigger field,
+     Default-vs-Global toggle, and the Tools/KB scoped to that module.
+  **Explicitly NOT in this card's scope:** actually clicking through
+  the Convocore Canvas UI (that's the human's gate-2 action, this card
+  only produces the content they paste in), voice configuration
+  (Carmelli's B3/B4 answers are both `false`), and any new registry
+  entries — if Doc-Search-First finds a genuine gap (a Tool Key with no
+  registry entry, a module section `Agent_Runtime_System_v1.md` doesn't
+  cover in enough depth), stop and ask per the guide's own escalation
+  rule, don't invent.
+  **Acceptance Criteria:** all 3 docs exist, every Variable/Tool Key is
+  traceable to a cited source document (no invented names), every
+  node's Instructions cites its source section in `Agent_Runtime_
+  System_v1.md`, human confirms the package is usable for a real
+  Canvas-UI build session.
+  **Definition of Done:** 3 docs written + `BC-060_Onboarding_Process_
+  Reference_v1.md` cross-referenced (points to this package for gate
+  2's actual content) + `PROJECT_STATE.md`/`Wiki/log.md` updated + git
+  commit/push. Convocore itself is not touched (no MCP calls needed —
+  `list_agents` still `403`, unchanged; nothing here requires
+  re-verifying that).
 - BC-061: full round-trip test (real conversation → adapter → n8n →
-  Supabase → dashboard) — waits on BC-060's 3 gates clearing first.
+  Supabase → dashboard) — waits on BC-060's 3 gates clearing first,
+  including the human's manual build using BC-071's package.
 
 Phase 5D (Onboarding dashboard) is deliberately sequenced *after* Path B
 completes once for real — human wants the manual written from a lived
@@ -710,19 +794,23 @@ remaining Next-Build-Card candidates also shipped the same session
 (credential reconnect, BC-054/055/056) — see `Wiki/log.md` for full
 narrative of each. Nothing is mid-flight; the next session starts clean.
 
-**What's genuinely open, in priority order:** Path A now has 3 closed
-items (client_id-trust 4/6, agent_prompts, Security Advisor) plus
-Calendly calendar-delete / Phase 5A-SCH-007 (open) and the newly queued
-BC-065-069 catalog-sync-to-KB Build Cards (queued, not started — see
-Path A #6). Path B is mid-flight for real: BC-060 provisioned Carmelli
-Bakery's Supabase side live and stopped at 3 human-only gates (Auth
-account, Convocore Canvas UI build, Gmail OAuth) — see Last Updated and
-`BC-060_Onboarding_Process_Reference_v1.md`. Convocore is still
-`403`-blocked on REST+MCP (re-verified live this session, unchanged).
-Phase 5D (Onboarding dashboard) intentionally waits until Path B's
-first real build actually completes — BC-060 is that build, currently
-paused, not done. `appointments` doc diff stays deferred, see Active
-Blockers.
+**What's genuinely open, in priority order:** Human priority as of
+2026-08-17: finish Path B's real Convocore build for Carmelli before
+returning to the own-stack/BC-070 evaluation (BC-065-069, BC-070 are
+queued, deliberately paused, not dropped). Path B is mid-flight for
+real: BC-060 provisioned Carmelli Bakery's Supabase side live and gate 1
+(dashboard login) closed same day; BC-071 (this session) delivered gate
+2's real build content — see Last Updated,
+`BC-060_Onboarding_Process_Reference_v1.md` v1.2, and
+`BC-071_Carmelli_Build_Package/`. **2 gates remain, both on the human:**
+gate 2 (manual Convocore Canvas UI build, now with exact content to
+paste in) and gate 3 (Gmail OAuth via the dashboard's real Integrations
+flow). Convocore is still `403`-blocked on REST+MCP (unchanged, no
+re-check needed this session — no MCP call was required for BC-071's
+pure doc-authorship scope). Once gate 2/3 clear, BC-061 (full
+round-trip test) is next. Phase 5D (Onboarding dashboard) intentionally
+waits until Path B's first real build actually completes. `appointments`
+doc diff stays deferred, see Active Blockers.
 
 Nothing requires human acknowledgment before proceeding — all
 self-resolved document-level items from recent sessions are logged in
