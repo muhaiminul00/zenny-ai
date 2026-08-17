@@ -9,6 +9,63 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-17] session-BC-071-recheck | Real Adapter webhook URL added, doc-vs-reality gap found+resolved
+
+**Trigger:** Human review of BC-071's package: "add exact server url or
+webhook to attach in the tools... give a recheck on variable's & tools
+list & details you provided."
+
+**Live-verified via n8n MCP** (not assumed from docs): the real
+Convocore Adapter workflow (ADP-002, id `BOxeuH6ehv46FZL0`, `active:
+true`) and the actual `create-lead`/`update-customer` n8n workflows
+(WF-001 `fjJkKxA3o6kfeLoz`, WF-016 `ogYca9QFCMIEWrWG`, both `active:
+true`).
+
+**Corrected in `02_Tools_Spec.md` (v1.1):**
+1. Real Server URL for every Custom Tool: `https://n8n-cbzu.srv1881104.
+   hstgr.cloud/webhook/convocore-adapter` — one shared Adapter endpoint,
+   not per-tool as v1 implied. Confirmed by reading the Adapter's own
+   `Forward To Tool` node, which internally resolves the real per-tool
+   webhook from a hardcoded `builtTools` allow-list after auth-checking
+   and contract-building.
+2. Secret Key field: leave blank (Convocore auto-sends the agent's own
+   secret as Bearer, which the Adapter's `Read Agent Secret`/`Bearer
+   Token Valid?` nodes check against `convocore_agent_map`) — corrects
+   v1's overcautious "invent a credential per the platform" framing.
+
+**Doc-vs-reality gap found + resolved (Document Resolution Authority —
+mechanical/structural fact, live-verified, not requiring a human
+decision):** `n8n_Workflow_Specification_v1.md` §13.1/§13.16 label
+`CreateLead` and `UpdateCustomer` "Status: Planned." Both are actually
+built and active. The registry doc itself is not corrected this pass
+(out of BC-071's scope) — noted here per the standing logging
+discipline.
+
+**New findings, both disclosed rather than resolved by invention:**
+- `update-customer` (WF-016) currently *always* routes to human-handoff
+  — no verification mechanism exists yet in the system, so calling it
+  never actually updates a field today. Sharpens (doesn't change)
+  `02_Tools_Spec.md`'s existing Low-priority note.
+- WF-001 requires `customer_id` to already resolve to an existing
+  customer record (`client_customer_exists` RPC, `CUSTOMER_NOT_FOUND`
+  otherwise) — no document or live-checked workflow in this project
+  confirms what creates that record for a brand-new website visitor
+  before their first `create-lead` call. Flagged in `01_Variables_
+  Spec.md` §1a for live testing at gate 2, not guessed at here.
+- `human-handoff`'s own webhook-wiring mechanism in Convocore's
+  dashboard (how it reaches the Adapter, per `Convocore_Adapter_Spec_
+  FINAL.md` Part 7's own "requires a trigger path" note) remains
+  genuinely open — no document confirms which dashboard field does
+  this; flagged for live verification when building, not invented.
+
+**Not done:** correcting `n8n_Workflow_Specification_v1.md`'s stale
+"Planned" labels (out of scope); resolving either of the two new open
+items above (neither has a real answer available without live testing
+inside Convocore itself, which is still `403`-blocked for any tool
+here).
+
+---
+
 ## [2026-08-17] session-BC-071 | Carmelli Convocore Build Package (Variables/Tools/Global Prompt+Nodes) built
 
 **Trigger:** Human decision to pause the own-stack/BC-070 evaluation and

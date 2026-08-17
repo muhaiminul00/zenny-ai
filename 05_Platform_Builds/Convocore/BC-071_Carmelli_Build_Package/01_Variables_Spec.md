@@ -11,7 +11,9 @@ Purpose:    Every Variable to create in Convocore's Canvas Variables panel
 Sourced:    n8n_Workflow_Specification_v1.md Part 13 (payload schemas),
             Convocore_Canvas_Ground_Truth_FINAL.md Part 7 (Variable
             mechanics — this is what actually overrides the generic
-            Runtime doc's abstract field names below).
+            Runtime doc's abstract field names below). Recheck pass
+            (2026-08-17) additionally verified `customer_id`'s real
+            precondition against WF-001's live code — see §1a.
 ```
 
 ---
@@ -53,6 +55,25 @@ full Mode A→B consequence.
 none collides with a System Variable or the auto-captured `email`/
 `name`/`address` keys.
 
+### 1a. Real finding, recheck pass (2026-08-17) — `customer_id`'s real precondition
+
+`create-lead`'s payload maps `customer_id` to Convocore's system var
+`user_id` (`02_Tools_Spec.md` §1.1). Live-reading WF-001's actual code
+(n8n MCP, 2026-08-17) shows a step this build package hadn't surfaced
+before: WF-001 calls a `client_customer_exists` RPC and **responds
+`CUSTOMER_NOT_FOUND` (not a silent failure) if `customer_id` doesn't
+already belong to an existing customer record for this client** — it
+does not create one. **No document or live-checked workflow in this
+project's current build confirms what creates that customer record for
+a brand-new Carmelli website visitor before their first `create-lead`
+call.** This may already be handled by Convocore's own `user_id`
+system-variable lifecycle, or may be a real gap — Doc-Search-First
+found no answer, so this is disclosed rather than guessed. **Worth
+testing directly** once gate 2's build reaches Test-button verification
+(`Convocore_Agent_Build_Order_Guide_v2.md` Part 4 item 3) — a real test
+call with a fresh `user_id` will show immediately whether this resolves
+cleanly or 400s.
+
 ---
 
 ## 2. NOT a Variable you create — the human-handoff System Tool's own fields
@@ -88,3 +109,8 @@ Carmelli specifically.
   Ground_Truth_FINAL.md` Part 7. Real finding: System Variables cover
   all customer-identity capture already; only 3 custom Variables are
   genuinely needed for this deployment's real scope.
+- **v1.1 (2026-08-17)** — recheck pass, human-requested. Live n8n MCP
+  read of WF-001's actual code surfaced a genuine open precondition on
+  `customer_id` (§1a) — disclosed, not resolved (no document answers
+  it). No other inaccuracies found in this doc's 3 Variables on
+  recheck.

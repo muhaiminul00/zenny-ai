@@ -10,7 +10,33 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-17 (latest) — by /execute — **BC-071 COMPLETE: Carmelli
+2026-08-17 (latest) — by /execute — **BC-071 recheck pass (human-
+requested): real Adapter webhook URL added, doc-vs-reality gap found +
+resolved.** Live n8n MCP-verified the real Adapter workflow (ADP-002,
+`BOxeuH6ehv46FZL0`, `active: true`) and both `create-lead`/`update-
+customer`'s actual n8n workflows (WF-001 `fjJkKxA3o6kfeLoz`, WF-016
+`ogYca9QFCMIEWrWG`, both `active: true`). **Real corrections to
+`02_Tools_Spec.md`:** every Custom Tool's Server URL is the SAME shared
+Adapter URL (`https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/
+convocore-adapter`), not per-tool as v1 implied; Secret Key should be
+left blank (Convocore's own auto-Bearer mechanism, matches the
+Adapter's real auth check) rather than "invent a credential" as v1
+overcautiously said. **Doc-vs-reality gap resolved:** `n8n_Workflow_
+Specification_v1.md` §13.1/13.16 label both tools "Status: Planned" —
+stale; both are live and active. **New finding:** `update-customer`
+(WF-016) currently *always* routes to human-handoff (no verification
+mechanism exists yet) — functionally identical to calling human-handoff
+directly right now. **New open item, disclosed not guessed:** WF-001
+requires `customer_id` to already exist as a real customer record
+(`CUSTOMER_NOT_FOUND` otherwise) — no document/workflow in this
+project confirms what creates that record for a brand-new website
+visitor; flagged for live testing at gate 2's Test-button step, not
+resolved here. `human-handoff`'s own webhook-wiring field in Convocore's
+dashboard also remains a genuinely open, disclosed question (not
+resolved by any doc). Full detail: `02_Tools_Spec.md` v1.1,
+`01_Variables_Spec.md` v1.1, `Wiki/log.md` session-BC-071 follow-up.
+
+2026-08-17 (prior) — by /execute — **BC-071 COMPLETE: Carmelli
 Convocore Build Package (Variables → Tools → Global Prompt → Nodes).**
 Human decision: pause the own-stack/BC-070 question, finish the real
 Convocore build for Carmelli first. Built 3 sourced docs under
