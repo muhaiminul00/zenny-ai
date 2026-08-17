@@ -9,6 +9,84 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-17] session-BC-071-critical-fix | Live Convocore Adapter bug found + fixed (would have broken every real call)
+
+**Trigger:** Human pushed back on the BC-071-recheck session's own
+Server URL guidance: "in convcore tools, there is only option to put
+varaible's a payload, no option to add payload -> set a variable for
+that. I tested a create-lead tool call in n8n test mode, I have pinned
+the input in that workflow, check that, I think there is a big
+mismatch in the normalize input node." The human then pasted the real
+JSON body Convocore actually sent, captured directly from n8n's webhook
+node in test mode.
+
+**Real body Convocore sends (never independently verified before this
+session, despite being assumed in this Adapter's code since it was
+first built):**
+```json
+{
+  "convo_id": "...", "session_id": "...",
+  "tool_metadata": { "tool_id": "" },
+  "tool_payload": { "channel": "web-chat", "lead_intent": "...", "conversation_summary": "...", "archetype": "...", "user_id": "..." }
+}
+```
+
+**vs. what `Normalize Incoming Payload` (Adapter workflow
+`BOxeuH6ehv46FZL0`) assumed:** `body.agentId`, `body.conversation_id`,
+`body.tool_name`/`body.key`, `body.variables`/`body.payload`. **None of
+these fields exist in the real body.** Most critically, `agentId` is
+absent entirely — the Adapter's very first step (resolve the calling
+agent → `client_id`) had no data to work with. **Every real Convocore
+Custom Tool call, since this Adapter was first built, would have failed
+`UNKNOWN_AGENT` before reaching any tool logic.** This had never been
+caught because every prior test of this Adapter (BC-028, BC-032,
+BC-035) used curl calls built against this same never-verified assumed
+shape — the human's real Convocore test today is the first time actual
+Convocore traffic ever hit this workflow's logic.
+
+**Fixed (live, this session):** `Normalize Incoming Payload` corrected
+to read `agent_id`/`key` from the webhook URL's own query string
+(since Convocore never sends either in the body, and each Custom Tool
+has its own separately-configured Server URL, we can embed both there),
+`convo_id` for the conversation ID, `tool_payload` for the actual
+parameters. **Live-tested** via `test_workflow` against the human's
+real captured shape with query params added (execution `30214`):
+`Normalize Incoming Payload` now correctly outputs `agentId`,
+`tool_name: "create-lead"`, `conversation_id`, and the real `variables`
+object; the flow correctly proceeded to a real (unpinned) Supabase
+lookup and correctly returned `Unknown Agent` for the placeholder test
+ID — no real Carmelli agent exists yet (gate 2 not built), no live data
+touched.
+
+**Second real bug found, in this project's own docs, not the
+workflow:** the create-lead Variable-attachment guidance in
+`BC-071_Carmelli_Build_Package/01_Variables_Spec.md`/`02_Tools_Spec.md`
+told the human to attach the System Variables `user_id`/`channel`
+directly as `customer_id`/`source_channel` parameters — but Convocore
+has no mechanism to rename a Variable on attachment; the outgoing field
+name is always the Variable's own Key. Confirmed by the same live test:
+the captured `tool_payload` carried `user_id`/`channel` literally, not
+`customer_id`/`source_channel`. Fixed: 2 new custom Variables
+(`customer_id`, `source_channel`, kept in sync via capture
+instructions), `lead_intent` renamed to `intent` (WF-001's real
+required field name, also caught during this recheck).
+
+**Also updated:** `06_Infrastructure/n8n/Workflow_Registry.md`'s
+ADP-002 entry — corrected INPUT shape (old assumption struck through
+and kept for history, not deleted), new FIXED BC-071 section, LAST
+VERIFIED extended with execution `30214`. **Consequence flagged as
+platform-wide, not Carmelli-specific:** every Custom Tool this project
+configures in any Convocore agent going forward needs
+`?agent_id=...&key=...` on its Server URL — this bug would have hit
+every future client's build the same way, not just Carmelli's.
+
+**Not done:** end-to-end re-verification against a real Convocore agent
+(still `403`-blocked, gate 2 not built) — this fix is verified correct
+against the real captured shape, not yet against a live production
+Convocore call.
+
+---
+
 ## [2026-08-17] session-BC-071-recheck | Real Adapter webhook URL added, doc-vs-reality gap found+resolved
 
 **Trigger:** Human review of BC-071's package: "add exact server url or

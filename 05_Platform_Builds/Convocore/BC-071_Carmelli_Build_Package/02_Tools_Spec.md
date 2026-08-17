@@ -31,8 +31,12 @@ URL for WF-001... get from the human") — the URL is real, live, and the
 same for every Custom Tool, not per-tool:
 
 ```
-Server URL (paste into EVERY Custom Tool's Server URL / "Final URL" field):
-  https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter
+Server URL (paste into EVERY Custom Tool's Server URL / "Final URL" field,
+appending each tool's own query string per §0.6 below):
+  https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter?agent_id=<this-agent's-real-convocore-agent-id>&key=<tool-key>
+
+  create-lead:      ...convocore-adapter?agent_id=<real-id>&key=create-lead
+  update-customer:  ...convocore-adapter?agent_id=<real-id>&key=update-customer
 
 Method: POST (all tools)
 ```
@@ -84,6 +88,57 @@ for Carmelli's launch until real customer verification exists.
 
 ---
 
+## 0.6 CRITICAL — a real live bug the human's own test found and this pass fixed (2026-08-17)
+
+**The Adapter's live code, as it stood through v1.1 of this doc, would
+have 401'd on every single real Custom Tool call.** The human ran a real
+create-lead test in n8n and captured Convocore's actual outgoing request
+body directly from the webhook node. It looks nothing like what the
+Adapter's `Normalize Incoming Payload` node assumed:
+
+```json
+// Convocore's REAL body shape (live-captured, human test):
+{
+  "convo_id": "<conversation-id>",
+  "session_id": "<session-id>",
+  "tool_metadata": { "tool_id": "" },
+  "tool_payload": { "channel": "web-chat", "lead_intent": "...", "conversation_summary": "...", "archetype": "...", "user_id": "..." }
+}
+```
+
+**vs. what the Adapter code expected:** `body.agentId`, `body.conversation_id`,
+`body.tool_name`/`body.key`, `body.variables`/`body.payload` — **none of
+which exist in the real body.** Most critically, **`agentId` is not
+present anywhere** — the Adapter's very first step (resolve the calling
+agent → `client_id`) had no data to work with, meaning every real call
+would have failed with `UNKNOWN_AGENT` before reaching any tool logic.
+
+**Root cause, and the fix actually applied (live, this session):**
+Convocore's Custom Tool call body genuinely never carries which agent or
+which tool is calling — that information has to come from the URL
+itself. Fixed `Normalize Incoming Payload` (workflow `BOxeuH6ehv46FZL0`)
+to read `agent_id`/`key` from the **URL query string** (hence §0.5's
+Server URL now including `?agent_id=...&key=...`), `convo_id` for the
+conversation ID, and `tool_payload` for the actual parameters. **Live-
+tested against the human's real captured shape** (with query params
+added): `Normalize Incoming Payload` now correctly outputs `agentId`,
+`tool_name: "create-lead"`, `conversation_id`, and the real `variables`
+object — verified via a real n8n test execution (id `30214`), which
+correctly reached `Get Convocore Agent Map` and correctly stopped at
+"Unknown Agent" only because no real Carmelli agent exists yet (expected
+— gate 2 isn't built). No live data was touched; the Supabase lookup
+ran for real and correctly found nothing.
+
+**What this means for you, building in Convocore's dashboard:** every
+Custom Tool's Server URL **must** include its own `?agent_id=...&key=...`
+query string (§0.5) — this is not optional decoration, it's now the
+only way the Adapter can identify the caller at all. The literal
+`agent_id` value is your agent's own real `convocore_agent_id`, which
+only exists once you've created the agent in Canvas UI (gate 2) — fill
+this field in after that step, not before.
+
+---
+
 ## 0. Real finding — Carmelli's conversion mode is B, not A (read this first)
 
 `Agent_Runtime_System_v1.md` Module 3 §2 states plainly: Commerce (Ecom)'s
@@ -129,9 +184,9 @@ correct Instructions against, which doesn't exist yet.
 | **Owning module** | Growth Agent (creates); Conversion Engine executes downstream — Growth Agent never calls an action tool itself beyond this handoff | `Tool_Naming_Convention.md` "Mapping to the Module Responsibility Contract" |
 | **Description** (paste into Convocore) | "Call this once a customer has shown genuine interest in a specific bakery item but hasn't yet committed to getting the product link, OR when handing off an open interest to a human/lead record. Do not call this for every message — only when a real, specific interest exists." | Derived from Module 2 §B "Tier 2 data collection trigger point" + §3 "What data must be ready before handoff" |
 | **Method** | POST | `Convocore_Canvas_Ground_Truth_FINAL.md` §6.2 (Custom Tool fields) |
-| **Server URL** | `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter` — the shared Adapter URL, **the same for every Custom Tool**, live-verified — see §0.5 | n8n MCP live read, ADP-002 (`BOxeuH6ehv46FZL0`) |
+| **Server URL** | `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter?agent_id=<this agent's real convocore_agent_id>&key=create-lead` — see §0.5/§0.6 for why the query string is now mandatory, not optional | n8n MCP live read, ADP-002 (`BOxeuH6ehv46FZL0`), fixed and live-tested this pass |
 | **Secret Key** | Leave **blank** — Convocore then auto-sends the agent's own secret as the Bearer token, which the Adapter validates against `convocore_agent_map`. Do not invent a separate credential — see §0.5 | n8n MCP live read (Adapter's `Read Agent Secret`/`Bearer Token Valid?` nodes) + `Convocore_Canvas_Ground_Truth_FINAL.md` §6.2 |
-| **Parameters (attach as Variables)** | `customer_id` → system var `user_id`; `archetype` → hardcode `"commerce_ecom"` (static, not LLM-decided); `intent` → custom var `lead_intent`; `source_channel` → hardcode `"website"` (Carmelli is web-only, B2/B3/B4 all false); `conversation_summary` → custom var `conversation_summary` | `n8n_Workflow_Specification_v1.md` §13.1 payload schema + `01_Variables_Spec.md`, confirmed against WF-001's live `Normalize Contract`/`Validate Input` nodes (same field names, same required set) |
+| **Parameters (attach as Variables)** | `customer_id` → custom var `customer_id` (NOT the system var `user_id` directly — Convocore sends a Variable's own Key as the field name, no renaming on attachment; `01_Variables_Spec.md` §0/§1); `archetype` → hardcode `"commerce_ecom"` (static, not LLM-decided); `intent` → custom var `intent` (renamed from `lead_intent` this pass — must match WF-001's real field name exactly); `source_channel` → custom var `source_channel`, always `"website"` (NOT the system var `channel`, which sends Convocore's own value `"web-chat"` — not a valid enum value for this field); `conversation_summary` → custom var `conversation_summary` | `n8n_Workflow_Specification_v1.md` §13.1 payload schema + `01_Variables_Spec.md` v1.2, confirmed against WF-001's live `Normalize Contract`/`Validate Input` nodes AND a live-captured real Convocore call (§0.6) |
 | **Test before wiring** | Fire the Test button with a realistic payload before referencing it in any node's Instructions | `Convocore_Agent_Build_Order_Guide_v2.md` Part 4 item 3 |
 
 ### 1.2 `update-customer`
@@ -142,9 +197,9 @@ correct Instructions against, which doesn't exist yet.
 | **Owning module** | Core Agent | `n8n_Workflow_Specification_v1.md` §7.6 |
 | **Description** | "Call this only when a customer explicitly corrects previously-given information (e.g., a misspelled name, wrong email). Do not call this speculatively." | Derived from Module 1's general low-risk-action framing (§B Customer Verification Rule) |
 | **Method** | POST | n8n MCP live read (WF-016's real webhook trigger) |
-| **Server URL** | Same shared Adapter URL as `create-lead` — `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter` | See §0.5 |
+| **Server URL** | Same shared Adapter URL as `create-lead`, own query string — `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter?agent_id=<this agent's real convocore_agent_id>&key=update-customer` | See §0.5/§0.6 |
 | **Secret Key** | Leave blank, same as `create-lead` | See §0.5 |
-| **Parameters** | `customer_id` → system var `user_id`; `fields` → open object, composed by the LLM from the specific correction stated in-conversation, not a stored Variable (the field being corrected varies per use) | `n8n_Workflow_Specification_v1.md` §13.16 payload schema |
+| **Parameters** | `customer_id` → same `customer_id` custom var as `create-lead` uses (not the system var `user_id` directly — same reasoning as §1.1); `fields` → open object, composed by the LLM from the specific correction stated in-conversation, not a stored Variable (the field being corrected varies per use) | `n8n_Workflow_Specification_v1.md` §13.16 payload schema |
 | **Priority for this build** | Low, and lower than v1 stated — WF-016's own live description confirms it **always** routes to human-handoff right now (no verification mechanism exists yet), so it currently behaves identically to calling `human-handoff` directly. Build if time permits; not blocking BC-071's Definition of Done. See §0.5. | n8n MCP live read (WF-016 description) |
 
 ---
@@ -223,3 +278,21 @@ and_Nodes_Spec.md`, not here. (`Convocore_Canvas_Ground_Truth_FINAL.md`
   in Convocore's dashboard remains a genuinely open, disclosed question
   — not resolved by any doc, flagged for live verification rather than
   guessed.
+- **v1.2 (2026-08-17)** — second recheck, same day, triggered by the
+  human's own real test: pinned a live Convocore Custom Tool call in
+  n8n's webhook test mode and captured the actual body Convocore sends.
+  **Found and FIXED a critical live bug (§0.6):** the Adapter's real
+  body shape (`convo_id`/`session_id`/`tool_metadata.tool_id`/
+  `tool_payload`) never matched what `Normalize Incoming Payload`
+  expected (`agentId`/`conversation_id`/`tool_name`/`variables`) —
+  `agentId` in particular was never present in the body at all, meaning
+  every real call would have failed `UNKNOWN_AGENT`. Fixed the Adapter's
+  live n8n node (workflow `BOxeuH6ehv46FZL0`) to read `agent_id`/`key`
+  from the Server URL's own query string instead, and `tool_payload` for
+  parameters — live-tested against the human's real captured shape,
+  confirmed working (execution id `30214`). Server URL guidance (§0.5)
+  updated to require `?agent_id=...&key=...` on every Custom Tool — not
+  optional. Also found: the create-lead Variable-attachment guidance
+  itself was wrong (System Variables can't be renamed on attachment) —
+  see `01_Variables_Spec.md` v1.2 for the paired fix; this doc's §1.1/1.2
+  Parameters rows corrected to match.

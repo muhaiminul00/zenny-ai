@@ -187,8 +187,11 @@ Once the customer responds positively to a recommendation, or states a
 specific item they're ready to get — hand off to the ordering step.
 Before handing off, save the item they've confirmed to the
 `selected_product` variable. If you're creating a lead record for this
-interest, summarize it in one sentence into `lead_intent` and keep
-`conversation_summary` current.
+interest, summarize it in one sentence into `intent` and keep
+`conversation_summary` current. As soon as the customer's identity is
+known this conversation, keep `customer_id` set to the same value as
+the built-in `user_id`, and keep `source_channel` set to the fixed
+value "website" — both are required before `create-lead` can be called.
 
 Never introduce an upsell in the same turn as your first
 recommendation, and offer at most one upsell per conversation, only
@@ -285,3 +288,10 @@ conversation (BC-061, not this card) once built.
   for Mode B (guided link), matching `02_Tools_Spec.md` §0's real
   finding — not Mode A, which has no backend to call for this client
   yet.
+- **v1.1 (2026-08-17)** — Node 2's capture instructions corrected to
+  match `01_Variables_Spec.md` v1.2 / `02_Tools_Spec.md` v1.2's real
+  fixes: `lead_intent` renamed to `intent`, added capture instructions
+  for the 2 new required Variables (`customer_id`, `source_channel`) —
+  both needed before `create-lead` can be called, per the human's own
+  live test finding that System Variables can't be reused as
+  differently-named payload fields.

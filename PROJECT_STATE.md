@@ -10,7 +10,41 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-17 (latest) — by /execute — **BC-071 recheck pass (human-
+2026-08-17 (latest) — by /execute — **BC-071 CRITICAL FIX: the real
+Convocore Adapter had a live bug that would have broken every single
+real Custom Tool call.** Human ran a real `create-lead` test in n8n's
+webhook test mode and captured Convocore's actual outgoing body —
+`{ convo_id, session_id, tool_metadata: { tool_id }, tool_payload:
+{...} }`, nothing like what the Adapter's `Normalize Incoming Payload`
+node assumed (`agentId`, `conversation_id`, `tool_name`, `variables`/
+`payload`). **`agentId` was never present in the real body at all** —
+every real call would have 401'd as `UNKNOWN_AGENT` before reaching any
+tool logic; this had never been caught because no real Convocore call
+had ever hit this Adapter before (prior BC-028/032/035 tests all used
+curl calls built against this same never-verified assumed shape). Fixed
+the live Adapter workflow (`BOxeuH6ehv46FZL0`) to read `agent_id`/`key`
+from the webhook URL's own query string instead of the body, and
+`tool_payload`/`convo_id` for the real field names. **Live-tested**
+against the human's real captured shape (execution `30194`... `30214`) —
+confirmed correct field extraction, correctly reached live Supabase,
+correctly stopped at `Unknown Agent` for a placeholder test ID (no
+real Carmelli agent exists yet — expected, no live data touched).
+**Second real bug found and fixed:** the create-lead Variable-attachment
+guidance in `01_Variables_Spec.md`/`02_Tools_Spec.md` was itself wrong
+— Convocore has no mechanism to attach a System Variable "as" a
+differently-named payload field (a Variable's Key IS the outgoing field
+name), so reusing `user_id`/`channel` directly would have sent the
+wrong field names to WF-001. Fixed: 2 new custom Variables
+(`customer_id`, `source_channel`), `lead_intent` renamed to `intent`
+(WF-001's real required field name). **Consequence beyond Carmelli:**
+every Custom Tool's Server URL must now include `?agent_id=...&key=...`
+— a platform-wide correction, not client-specific, even though it
+surfaced during Carmelli's build. Full detail: `02_Tools_Spec.md` v1.2,
+`01_Variables_Spec.md` v1.2, `03_GlobalPrompt_and_Nodes_Spec.md` v1.1,
+`06_Infrastructure/n8n/Workflow_Registry.md` ADP-002 entry, `Wiki/log.md`
+session-BC-071-critical-fix entry.
+
+2026-08-17 (prior) — by /execute — **BC-071 recheck pass (human-
 requested): real Adapter webhook URL added, doc-vs-reality gap found +
 resolved.** Live n8n MCP-verified the real Adapter workflow (ADP-002,
 `BOxeuH6ehv46FZL0`, `active: true`) and both `create-lead`/`update-

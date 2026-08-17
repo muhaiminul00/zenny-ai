@@ -11,9 +11,11 @@ Purpose:    Every Variable to create in Convocore's Canvas Variables panel
 Sourced:    n8n_Workflow_Specification_v1.md Part 13 (payload schemas),
             Convocore_Canvas_Ground_Truth_FINAL.md Part 7 (Variable
             mechanics — this is what actually overrides the generic
-            Runtime doc's abstract field names below). Recheck pass
+            Runtime doc's abstract field names below). Recheck passes
             (2026-08-17) additionally verified `customer_id`'s real
-            precondition against WF-001's live code — see §1a.
+            precondition against WF-001's live code (§1b) and, via the
+            human's own live-captured test call, that System Variables
+            can't be reused as differently-named payload fields (§0/§1).
 ```
 
 ---
@@ -29,13 +31,23 @@ FINAL.md` §7.5): `phone_number`, `channel`, `timestamp`, `conversation_id`,
 phone — `user_name`/`user_email`/`phone_number` already exist and are
 already what Convocore's own lead system keys off (confirming
 `Convocore_Agent_Build_Order_Guide_v2.md` Part 3.4's note: "`email`,
-`name`, `address` as exact Keys are auto-captured"). Reference these
-system variables directly in tool payloads and Instructions — creating
-a duplicate custom Variable with the same data is wasted structure.
+`name`, `address` as exact Keys are auto-captured").
+
+**Correction (recheck pass, 2026-08-17) — do NOT attach System
+Variables directly as a Custom Tool's payload parameters if the target
+field needs a different name.** A live-captured real Convocore Custom
+Tool call (human test, `02_Tools_Spec.md` §0.5) proved a Variable's
+outgoing JSON field name is always its own `Key` — Convocore has no
+mechanism to attach a Variable "as" a differently-named payload field.
+Attaching the system variable `user_id` to `create-lead` sends a field
+literally named `user_id`; WF-001 needs `customer_id` and gets nothing.
+§1a below is the real fix: a genuinely new custom Variable whose Key
+already matches the target field name, kept in sync via a capture
+instruction, not a reused System Variable.
 
 ---
 
-## 1. Custom Variables to create (3 total — genuinely minimal)
+## 1. Custom Variables to create (5 total — corrected count, recheck pass)
 
 Carmelli has no cart-creation API and no order-tracking backend yet
 (Intake D2: static site, no ecommerce platform connected — human
@@ -47,23 +59,25 @@ full Mode A→B consequence.
 | Key | Type | Global? | Description (paste into Convocore's Description field) | Capture instruction (must be echoed in node Instructions — Convocore does NOT auto-infer, `Ground_Truth` §7.4) | Used by |
 |---|---|---|---|---|---|
 | `selected_product` | String | No (Local) | "The specific product or item the customer has shown real interest in — a named bakery item (e.g. 'sourdough loaf', 'kosher challah'), not a category. Set only once genuine interest is confirmed, per Recommendation Confidence Requirement (`Agent_Runtime_System_v1.md` Module 2 §2.B)." | "When the customer confirms interest in a specific item, save it to `selected_product` using the exact item name they responded positively to." | Conversion Engine node — carries the item across the Growth→Conversion handoff so Conversion Engine never re-asks (`Agent_Runtime_System_v1.md` Module 2 §3). |
-| `lead_intent` | String | No (Local) | "One short sentence naming what the customer is interested in or needs — used to create a Lead record, not shown to the customer verbatim." | "Before handing off to the ordering step, or if the customer disengages with open interest, summarize their need in one sentence and save it to `lead_intent`." | `CreateLead` tool's `intent` payload field (`n8n_Workflow_Specification_v1.md` §13.1). |
-| `conversation_summary` | String | No (Local) | "A brief, factual summary of what's been discussed so far in this conversation — used to hand context to a human or to a Lead record, never shown to the customer." | "Keep `conversation_summary` updated with a brief factual recap whenever you hand off to a human or create a lead." | `CreateLead` tool's `conversation_summary` field; supplements (does not replace) the `human-handoff` System Tool's own built-in `issue_summary` field (§2 below). |
+| `intent` | String | No (Local) | "One short sentence naming what the customer is interested in or needs — used to create a Lead record, not shown to the customer verbatim." | "Before handing off to the ordering step, or if the customer disengages with open interest, summarize their need in one sentence and save it to `intent`." | `create-lead` tool's `intent` payload field (`n8n_Workflow_Specification_v1.md` §13.1). **Renamed from `lead_intent` (recheck pass) — WF-001's real code requires the exact field name `intent`; a different Key produces a missing-field validation error.** |
+| `conversation_summary` | String | No (Local) | "A brief, factual summary of what's been discussed so far in this conversation — used to hand context to a human or to a Lead record, never shown to the customer." | "Keep `conversation_summary` updated with a brief factual recap whenever you hand off to a human or create a lead." | `create-lead` tool's `conversation_summary` field; supplements (does not replace) the `human-handoff` System Tool's own built-in `issue_summary` field (§2 below). |
+| `customer_id` | String | No (Local) | **NEW (recheck pass).** "Always kept equal to this conversation's built-in `user_id` value — exists only because Convocore Custom Tools send a Variable's own Key as the outgoing field name, and `create-lead`'s required field is `customer_id`, not `user_id`." | "As soon as the conversation's `user_id` is available, save the same value into `customer_id` — keep them in sync for the rest of the conversation." | `create-lead` tool's `customer_id` payload field. Cannot reuse the system variable `user_id` directly — see §0's correction above. |
+| `source_channel` | String | No (Local) | **NEW (recheck pass).** "Always `website` for this deployment — Carmelli is web-chat only (B2/B3/B4 all false)." | "Always set `source_channel` to the literal value `website` before calling create-lead." | `create-lead` tool's `source_channel` payload field — must be one of WF-001's enum values (`website\|whatsapp\|instagram\|facebook\|email\|sms`); the system variable `channel` sends Convocore's own value (`web-chat`), which is not in that enum, so it cannot be reused directly either. |
 
-**Naming discipline applied:** all three Keys are `snake_case`, per
+**Naming discipline applied:** all five Keys are `snake_case`, per
 `Convocore_Canvas_Ground_Truth_FINAL.md` §7.6's stated convention, and
 none collides with a System Variable or the auto-captured `email`/
 `name`/`address` keys.
 
-### 1a. Real finding, recheck pass (2026-08-17) — `customer_id`'s real precondition
+### 1b. Real finding, recheck pass (2026-08-17) — `customer_id`'s real precondition
 
-`create-lead`'s payload maps `customer_id` to Convocore's system var
-`user_id` (`02_Tools_Spec.md` §1.1). Live-reading WF-001's actual code
-(n8n MCP, 2026-08-17) shows a step this build package hadn't surfaced
-before: WF-001 calls a `client_customer_exists` RPC and **responds
-`CUSTOMER_NOT_FOUND` (not a silent failure) if `customer_id` doesn't
-already belong to an existing customer record for this client** — it
-does not create one. **No document or live-checked workflow in this
+`create-lead`'s payload needs `customer_id` (§1's new `customer_id`
+Variable, kept in sync with `user_id`). Live-reading WF-001's actual
+code (n8n MCP, 2026-08-17) shows a step this build package hadn't
+surfaced before: WF-001 calls a `client_customer_exists` RPC and
+**responds `CUSTOMER_NOT_FOUND` (not a silent failure) if `customer_id`
+doesn't already belong to an existing customer record for this
+client** — it does not create one. **No document or live-checked workflow in this
 project's current build confirms what creates that customer record for
 a brand-new Carmelli website visitor before their first `create-lead`
 call.** This may already be handled by Convocore's own `user_id`
@@ -114,3 +128,14 @@ Carmelli specifically.
   `customer_id` (§1a) — disclosed, not resolved (no document answers
   it). No other inaccuracies found in this doc's 3 Variables on
   recheck.
+- **v1.2 (2026-08-17)** — second recheck, same day, prompted by the
+  human's own live test capture of a real Convocore Custom Tool call
+  (`02_Tools_Spec.md` §0.5). **Real bug found and fixed:** v1's guidance
+  to reuse System Variables (`user_id`, `channel`) directly as
+  `create-lead` payload parameters was wrong — Convocore has no
+  mechanism to rename a Variable's Key on attachment, so reusing them
+  sends fields literally named `user_id`/`channel`, not the
+  `customer_id`/`source_channel` WF-001 actually requires. Fixed:
+  2 new custom Variables (`customer_id`, `source_channel`), `lead_intent`
+  renamed to `intent` (WF-001's real required field name). Custom
+  Variable count corrected 3 → 5. §1b renumbered from §1a.
