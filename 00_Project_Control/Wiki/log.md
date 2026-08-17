@@ -9,6 +9,59 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-17] session-BC-060 | First real client provisioned (Carmelli Bakery), stopped at 3 human-only gates
+
+**Commander → Execute:** human filled the remaining ASK rows of
+`Convocore_Agent_Intake_Checklist_v1.md` directly (demo-build decisions,
+not the real business) — dashboard login, ecommerce platform (deferred
+to static-site-only for this demo), email inbox. Commander closed the
+checklist out as the real BC-060 build input, then handed off.
+
+**Live-verified first:** Convocore REST/MCP re-checked — still `403`,
+unchanged since BC-057b. `control.clients` queried — all 5 existing
+rows are test fixtures; Carmelli is the first real client record ever
+provisioned on this platform.
+
+**Built and live-verified:** `control.clients` row
+(`eb27a21f-209d-4b6d-8f6e-cb216411f6c4`, archetype `commerce_ecom`,
+`client_carmelli_bakery` schema); client schema cloned via
+`create_client_schema_from_template`; `client_config`;
+`client_active_modules` (5 modules per checklist B1); `agent_prompts`
+(2 rows) + `email_categories` (16 rows) seeded from their real master
+sources (clone is structure-only); a real Notion KB page built from
+BC-059's already-fetched site content + `client_kb_source` row.
+
+**2 real bugs found in `create_client_schema_from_template`, not
+previously documented:** (1) `p_archetype` must be the template schema
+suffix (`commerce`), not the `archetype_enum` value
+(`commerce_ecom`) — `tpl_commerce` covers both Ecom and Restaurant
+sub-types; (2) the function force-adds a `conversion_id` FK for every
+`p_specific_tables` entry, but `waitlist_entries` has no such column —
+including it threw a clean, fully-rolled-back error on first attempt,
+fixed by removing it from the list. Both documented in
+`Wiki/infra/convocore-agent-provisioning.md` §4.
+
+**Deliberately not done:** no `auth.users` row was created directly via
+SQL for the dashboard login, even though technically possible — matches
+the Credential Gate's spirit (never invent a real login/credential) and
+the already-documented GoTrue direct-insert trap
+(`Wiki/platform-quirks/supabase-auth-quirks.md`).
+
+**Stopped at 3 real, disclosed gates**, none worked around: (1) no real
+Supabase Auth account exists yet for the dashboard login
+(`carmelli.zennyai@gmail.com`); (2) the Convocore agent itself needs a
+human's manual Canvas UI build (`403`-blocked for any tool, BC-057b's
+already-agreed fallback); (3) no Gmail OAuth connection exists for
+Email Manager to use. Exact resume steps for each: `05_Platform_Builds/
+Convocore/BC-060_Onboarding_Process_Reference_v1.md` — the actual
+deliverable of this pass, a lived step-by-step reference for the future
+onboarding dashboard + workflow (Phase 5D).
+
+Full detail: `PROJECT_STATE.md` Last Updated + Path B,
+`Wiki/infra/convocore-agent-provisioning.md` §4.
+
+---
+
 ## [2026-08-15] session-BC-063 | Edge Function client_id trust — 4 of 6 fixed, 2 intentionally left
 
 **Commander → Execute:** the originally-scoped card from the prior

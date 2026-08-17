@@ -10,7 +10,39 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-15 (latest) — by /execute — **BC-063 COMPLETE (4 of 6 fixed,
+2026-08-17 (latest) — by /execute — **BC-060 STARTED, real progress,
+STOPPED at 3 real gates.** Ran the now-fully-answered
+`Convocore_Agent_Intake_Checklist_v1.md` as a real provisioning input
+for the first time — Carmelli Bakery is Zenny's first non-test client
+record (`client_id eb27a21f-209d-4b6d-8f6e-cb216411f6c4`,
+`client_carmelli_bakery` schema). **Live-verified before assuming
+anything:** Convocore REST/MCP still `403` (unchanged since BC-057b) —
+manual Canvas UI build remains the only path. **Built and live-verified:**
+`control.clients` row; client schema cloned via
+`create_client_schema_from_template` (2 real findings along the way —
+`p_archetype` is `commerce` not `commerce_ecom`, template schemas
+merge Ecom+Restaurant; `waitlist_entries` can't go in `p_specific_tables`,
+it has no `conversion_id` column, the function assumes one and the
+first attempt correctly rolled back clean); `client_config`;
+`client_active_modules` (5 rows per B1); `agent_prompts` + `email_categories`
+seeded from the real master sources (clone is structure-only, same
+BC-062 pattern); a real Notion KB page built from BC-059's already-fetched
+site content (honest about the still-unknown hours/refund-policy/
+platform gaps) + `client_kb_source` row. **Stopped, correctly, at 3
+real Credential-Gate-class items — none worked around:** (1) dashboard
+login needs a real Supabase Auth account for
+`carmelli.zennyai@gmail.com`, not created directly via SQL (known
+GoTrue trap, `platform-quirks/supabase-auth-quirks.md`); (2) the
+Convocore agent itself needs the human's manual Canvas UI build,
+`403`-blocked for any tool; (3) Email Manager needs a real Gmail OAuth
+connection for the same inbox, none exists. Full step-by-step process —
+the actual deliverable of this pass — written up as the first real
+onboarding-process reference: `05_Platform_Builds/Convocore/
+BC-060_Onboarding_Process_Reference_v1.md`. Resume at whichever gate
+clears first; Steps 1-6 need no rework. Full detail: `Wiki/log.md`
+session-BC-060 entry, `Wiki/infra/convocore-agent-provisioning.md`.
+
+2026-08-15 (prior) — by /execute — **BC-063 COMPLETE (4 of 6 fixed,
 2 intentionally left).** Live-verified all 6 connect/lifecycle Edge
 Functions' real source + how the dashboard frontend actually calls
 each before changing anything. **Fixed:** `shopify-connect`,
@@ -546,6 +578,36 @@ actually needs it:
    above and `Wiki/log.md` session-BC-062 redesign entry.
 5. ~~Security Advisor authenticated-grant gap~~ **CLOSED (BC-064,
    2026-08-15).** 117 warnings → 11. See Last Updated above.
+6. **QUEUED, not started (2026-08-17): Live Product Catalog Sync →
+   Convocore KB**, for clients whose catalog isn't in a system we
+   already sync (Shopify/WooCommerce order/lifecycle wiring exists but
+   no catalog-sync workflow does yet). Human-approved shape, from an
+   advisor-mode discussion — reuses Email Manager's proven Notion+
+   Pinecone KB pattern (INT-011/INT-012) instead of storing the catalog
+   in Supabase:
+   - **BC-065** — shared sub-workflow "Upsert Product to Client KB":
+     normalized product row (`sku, name, price, stock_qty, category,
+     description, image_url, updated_at`) in → upserts to that client's
+     Notion product DB (the human-editable "sheet db") + embeds/upserts
+     to that client's Pinecone namespace (same mechanism as
+     INT-012). Build this first — everything else depends on it.
+   - **BC-066** — Shopify-sync (webhook-triggered on `products/update`,
+     normalize, call BC-065's sub-workflow).
+   - **BC-067** — WooCommerce-sync (same pattern; WooCommerce's webhook
+     support may be more limited — verify live before assuming parity
+     with Shopify's).
+   - **BC-068** — Sheets-sync (Google Sheets/Excel, scheduled poll, not
+     webhook-triggered — no live-update signal from a spreadsheet).
+   - **BC-069** — `search_sheet_kb` fallback Convocore tool (n8n
+     webhook-backed): structured Notion-table query (exact SKU/price/
+     stock lookups) for cases semantic KB search handles poorly; native
+     Convocore KB search stays the default path.
+   Custom inventory systems and static-only sites were explicitly
+   discussed and are NOT queued as generic Build Cards — no common API
+   shape exists to build a reusable workflow against; each is a
+   client-specific card if/when a real client needs it (or, for a
+   static site with nothing to sync from, a Sheet-as-source-of-truth
+   fallback using BC-068's own sync path).
 
 **Path B — real Convocore agent build (test+verify+build for a demo
 business):**
@@ -558,14 +620,20 @@ business):**
   All AUTO rows filled; a short real ASK list is now ready to send to
   the business (hours, refund policy, ecommerce platform, plus the
   standard module/channel/integration questions).
-- BC-060 (next): once Carmelli's ASK answers come back, build the real
-  Convocore agent (manual Canvas UI, per BC-057b) + Supabase
-  provisioning + n8n/credential wiring from the completed checklist.
-- BC-060: populate Convocore (manual Canvas build, per BC-057b) +
-  Supabase provisioning (live schema, not the stale sequence spec) + n8n
-  wiring from the completed checklist.
+- BC-060 (in progress, 2026-08-17): Carmelli's ASK answers came back
+  (human-supplied demo decisions). Supabase provisioning (client row,
+  schema clone, config, active modules, agent_prompts/email_categories
+  seed, Notion KB) is **done and live-verified** — see Last Updated
+  above and `BC-060_Onboarding_Process_Reference_v1.md`. **Stopped at
+  3 real gates, needs human action to resume:** (1) create a real
+  Supabase Auth account for `carmelli.zennyai@gmail.com` (dashboard
+  login); (2) manual Convocore Canvas UI build (still `403`-blocked on
+  REST/MCP, per BC-057b's agreed fallback); (3) real Gmail OAuth
+  connection for the same address (Email Manager needs it to do
+  anything for this client). None of these three can be built by a
+  tool call — genuinely need the human.
 - BC-061: full round-trip test (real conversation → adapter → n8n →
-  Supabase → dashboard).
+  Supabase → dashboard) — waits on BC-060's 3 gates clearing first.
 
 Phase 5D (Onboarding dashboard) is deliberately sequenced *after* Path B
 completes once for real — human wants the manual written from a lived
@@ -591,14 +659,19 @@ remaining Next-Build-Card candidates also shipped the same session
 (credential reconnect, BC-054/055/056) — see `Wiki/log.md` for full
 narrative of each. Nothing is mid-flight; the next session starts clean.
 
-**What's genuinely open, in priority order:** dual build path agreed
-2026-08-14 — Path A (Edge Function client_id-trust gap, Calendly
-calendar-delete, Phase 5A/SCH-007, pulled in only as needed) and Path B
-(real Convocore agent build for a demo business; BC-057b done —
-Convocore still `403`-blocked on REST+MCP, manual Canvas UI is the
-agreed fallback; next is BC-058, the master intake checklist). Phase 5D
-(Onboarding dashboard) intentionally waits until after Path B's first
-real build. `appointments` doc diff stays deferred, see Active Blockers.
+**What's genuinely open, in priority order:** Path A now has 3 closed
+items (client_id-trust 4/6, agent_prompts, Security Advisor) plus
+Calendly calendar-delete / Phase 5A-SCH-007 (open) and the newly queued
+BC-065-069 catalog-sync-to-KB Build Cards (queued, not started — see
+Path A #6). Path B is mid-flight for real: BC-060 provisioned Carmelli
+Bakery's Supabase side live and stopped at 3 human-only gates (Auth
+account, Convocore Canvas UI build, Gmail OAuth) — see Last Updated and
+`BC-060_Onboarding_Process_Reference_v1.md`. Convocore is still
+`403`-blocked on REST+MCP (re-verified live this session, unchanged).
+Phase 5D (Onboarding dashboard) intentionally waits until Path B's
+first real build actually completes — BC-060 is that build, currently
+paused, not done. `appointments` doc diff stays deferred, see Active
+Blockers.
 
 Nothing requires human acknowledgment before proceeding — all
 self-resolved document-level items from recent sessions are logged in

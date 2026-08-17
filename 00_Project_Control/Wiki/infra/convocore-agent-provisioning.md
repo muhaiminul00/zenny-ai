@@ -142,9 +142,51 @@ published, live.
 Full detail: `Wiki/log.md` session-BC-062 redesign entry (2026-08-15),
 `Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`.
 
+## 4. BC-060 (2026-08-17) — first real client provisioned, real findings on `create_client_schema_from_template`
+
+Ran the completed intake checklist for real against Carmelli Bakery —
+Zenny's first non-test `control.clients` row
+(`eb27a21f-209d-4b6d-8f6e-cb216411f6c4`, `client_carmelli_bakery`
+schema). Full step-by-step process (the actual point of this card):
+`05_Platform_Builds/Convocore/BC-060_Onboarding_Process_Reference_v1.md`.
+
+**Two real bugs/gaps in `create_client_schema_from_template` found live,
+not previously documented:**
+- `p_archetype` must be the **template schema suffix**
+  (`commerce`/`emergency`/`appointment`/`consultation`/`engagement`),
+  not the `archetype_enum` value — `tpl_commerce` is one shared
+  template covering both `commerce_ecom` and `commerce_restaurant`.
+  Passing `commerce_ecom` raises "source template schema
+  tpl_commerce_ecom does not exist."
+- The function assumes every table in `p_specific_tables` has a
+  `conversion_id` column and force-adds a `<table>_conversion_id_fkey`
+  constraint for each. `waitlist_entries` doesn't (`customer_id`/
+  `lead_id` instead) — including it throws a clean, fully-rolled-back
+  DDL error. Correct `p_specific_tables` for a commerce-archetype
+  client: `['conversions_ecom', 'conversions_restaurant', 'orders']`
+  only; `waitlist_entries` isn't auto-added by anything and needs its
+  own handling if a future client actually needs it (this demo doesn't,
+  `waitlist_enabled = false`).
+
+**Confirmed (not previously stated this explicitly):** the clone is
+structure-only — `agent_prompts`/`email_categories` land empty and must
+be seeded from their real master sources (`control.agent_prompts WHERE
+module='email_manager'`, `control.email_categories WHERE client_id IS
+NULL`) every time a new client is provisioned, same as BC-062's
+backfill pattern. This isn't automatic anywhere yet — a real candidate
+for `create_client_schema_from_template` itself to absorb once a second
+real client makes the pattern worth generalizing.
+
+**Stopped at 3 real gates** (dashboard-login Auth account, Convocore
+Canvas UI build — still `403` on REST/MCP, re-verified live this
+session — and a real Gmail OAuth connection) — see the process
+reference doc for exact resume steps on each.
+
 ## Related
 
 - [[../reference/convocore-doc-status]] — which Convocore docs are
   current/primary/superseded.
 - `05_Platform_Builds/Convocore/Convocore_Agent_Intake_Checklist_v1.md`
   — the checklist these findings feed into (BC-058).
+- `05_Platform_Builds/Convocore/BC-060_Onboarding_Process_Reference_v1.md`
+  — the lived step-by-step provisioning process (BC-060).
