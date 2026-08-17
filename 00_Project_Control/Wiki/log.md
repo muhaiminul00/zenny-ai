@@ -9,6 +9,62 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-17] session-BC-071-source-channel-rename | Platform-wide source_channel enum rename, human's own architecture call
+
+**Trigger:** Human pushed back on the previous fix's `web_chat` value:
+"how do you expect convocore send website instead of 'web_chat'?...
+Convocore channel self 'web_chat'... the solution should be replace all
+'website' channel option to 'web_chat' from our database & all WFs."
+
+**Real ambiguity resolved first, before touching anything live:** the
+session had 2 conflicting captures — the human's very first raw webhook
+capture showed Convocore's real `channel` value as `web-chat` (hyphen),
+but their most recent message said `web_chat` (underscore, what they'd
+manually typed into a test). Asked directly rather than guess a second
+time; human confirmed **`web-chat` (hyphen)** is the real value.
+
+**Real architecture decision, human's own call, correctly better than
+my original design:** rather than keep instructing the Convocore
+agent's LLM to override `source_channel` with a hardcoded literal
+(`website`) that never matched Convocore's real `channel` value, make
+the platform's own enum match reality instead — removes an unnecessary
+translation step entirely, `source_channel` becomes a direct passthrough
+of Convocore's own `channel` value.
+
+**Executed:**
+1. Checked for real usage before touching the enum: no RPC referenced
+   the literal string `website` in source (`pg_proc` search); 25
+   existing rows across the 5-client test roster used it as real data
+   (from earlier BC-029/031 test runs).
+2. `ALTER TYPE public.source_channel_enum RENAME VALUE 'website' TO
+   'web-chat'` — live-verified all 25 existing rows automatically now
+   read `web-chat`, zero data loss, zero rows needing manual migration
+   (a rename preserves the underlying enum OID, only the label changes).
+3. Fixed `Validate Input` (WF-001) to match the real enum.
+4. Re-tested end to end with the real value (execution `30978`) — full
+   success, real lead `b910001c-...` created via the complete
+   find-or-create chain, cleaned up after (`leads`/`channel_identity_
+   links`/`customers` all deleted).
+5. Published to production (`fjJkKxA3o6kfeLoz`, active version
+   `90491bc2-d4c3-488e-b389-45fcf15b099b`).
+6. Fixed the one stale `"website"` example in `INTEGRATION_CONTRACT_v1.md`
+   Part 20.1 — the only doc reference found (`Tool_Naming_Convention.md`,
+   `n8n_Workflow_Specification_v1.md` had none).
+
+**Updated `BC-071_Carmelli_Build_Package`:** `01_Variables_Spec.md` v1.4
+(`source_channel`'s capture instruction simplified from "hardcode
+website" to "mirror the built-in `channel` value" — still needs its own
+custom Variable, since Convocore can't rename a Variable's Key on
+attachment, but no more override judgment call for the LLM), `02_Tools_
+Spec.md` v1.4, `03_GlobalPrompt_and_Nodes_Spec.md` v1.2.
+
+**Noted, not acted on (not urgent — Carmelli is web-only):** other
+channels (WhatsApp/Instagram/SMS) may have the same real-vs-assumed
+value risk once wired for any future client — flagged as a pattern to
+verify live when that work starts, not preemptively guessed here.
+
+---
+
 ## [2026-08-17] session-BC-071-customer-resolution-fix | WF-001's customer-resolution path was never actually wired — found + fixed live, both branches tested
 
 **Trigger:** Human tested `create-lead` for real (n8n test mode, real

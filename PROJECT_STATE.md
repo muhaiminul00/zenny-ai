@@ -10,7 +10,27 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-17 (latest) — by /execute — **BC-071 CRITICAL FIX #2: WF-001
+2026-08-17 (latest) — by /execute — **BC-071: platform-wide `source_channel`
+enum rename, human's own architecture call.** Following up on the
+`web_chat`/`website` mismatch from the prior fix: human confirmed via
+their original raw webhook capture that Convocore's real `channel`
+value is `web-chat` (hyphen) — not `web_chat` (their own live-edited
+guess) and not `website` (this project's original assumption). Rather
+than keep instructing the Convocore agent's LLM to override
+`source_channel` with a hardcoded literal that never matched reality,
+made the platform-wide fix instead: `public.source_channel_enum`'s
+`website` value renamed to `web-chat` via `ALTER TYPE ... RENAME VALUE`
+— **25 existing rows across the 5-client test roster migrated
+automatically, zero data loss**, confirmed live. `source_channel` is
+now a direct passthrough of Convocore's own `channel` value — no more
+override instruction needed. Re-tested WF-001 end to end with the real
+value (execution `30978`, real lead created + cleaned up), published to
+production. Fixed the one stale `"website"` example in `INTEGRATION_
+CONTRACT_v1.md` Part 20.1. Full detail: `06_Infrastructure/n8n/
+Workflow_Registry.md` WF-001 entry, `01_Variables_Spec.md` v1.4,
+`Wiki/log.md` session-BC-071-source-channel-rename.
+
+2026-08-17 (prior) — by /execute — **BC-071 CRITICAL FIX #2: WF-001
 (CreateLead) never had a working customer-resolution path — fixed live,
 tested both branches against real Carmelli data, published.** Human hit
 this testing for real: `Check Customer Exists (RPC)` threw `22P02

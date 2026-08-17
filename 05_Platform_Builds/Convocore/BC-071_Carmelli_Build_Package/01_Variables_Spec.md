@@ -62,7 +62,7 @@ full Mode A→B consequence.
 | `intent` | String | No (Local) | "One short sentence naming what the customer is interested in or needs — used to create a Lead record, not shown to the customer verbatim." | "Before handing off to the ordering step, or if the customer disengages with open interest, summarize their need in one sentence and save it to `intent`." | `create-lead` tool's `intent` payload field (`n8n_Workflow_Specification_v1.md` §13.1). **Renamed from `lead_intent` (recheck pass) — WF-001's real code requires the exact field name `intent`; a different Key produces a missing-field validation error.** |
 | `conversation_summary` | String | No (Local) | "A brief, factual summary of what's been discussed so far in this conversation — used to hand context to a human or to a Lead record, never shown to the customer." | "Keep `conversation_summary` updated with a brief factual recap whenever you hand off to a human or create a lead." | `create-lead` tool's `conversation_summary` field; supplements (does not replace) the `human-handoff` System Tool's own built-in `issue_summary` field (§2 below). |
 | `customer_id` | String | No (Local) | **NEW (recheck pass).** "Always kept equal to this conversation's built-in `user_id` value — exists only because Convocore Custom Tools send a Variable's own Key as the outgoing field name, and `create-lead`'s required field is `customer_id`, not `user_id`." | "As soon as the conversation's `user_id` is available, save the same value into `customer_id` — keep them in sync for the rest of the conversation." | `create-lead` tool's `customer_id` payload field. Cannot reuse the system variable `user_id` directly — see §0's correction above. |
-| `source_channel` | String | No (Local) | **NEW (recheck pass).** "Always `website` for this deployment — Carmelli is web-chat only (B2/B3/B4 all false)." | "Always set `source_channel` to the literal value `website` before calling create-lead." | `create-lead` tool's `source_channel` payload field — must be one of WF-001's enum values (`website\|whatsapp\|instagram\|facebook\|email\|sms`); the system variable `channel` sends Convocore's own value (`web-chat`), which is not in that enum, so it cannot be reused directly either. |
+| `source_channel` | String | No (Local) | "Always kept equal to this conversation's built-in `channel` value — exists only because Convocore Custom Tools send a Variable's own Key as the outgoing field name, and `create-lead`'s required field is `source_channel`, not `channel`." | "Keep `source_channel` set to the same value as the built-in `channel` variable." | `create-lead` tool's `source_channel` payload field — real enum now `web-chat\|whatsapp\|instagram\|facebook\|email\|sms` (corrected 2026-08-17, platform-wide migration — `web-chat` matches Convocore's own `channel` value exactly, no override needed). |
 
 **Naming discipline applied:** all five Keys are `snake_case`, per
 `Convocore_Canvas_Ground_Truth_FINAL.md` §7.6's stated convention, and
@@ -157,3 +157,15 @@ Carmelli specifically.
   in this doc's §1 table needed no change — it always correctly said to
   keep it synced with the system var `user_id`, which is exactly right
   now that WF-001 resolves it internally.
+- **v1.4 (2026-08-17)** — platform-wide fix, human's own architecture
+  call: rather than keep instructing the LLM to override `source_channel`
+  with a hardcoded literal that didn't match Convocore's real `channel`
+  value, `public.source_channel_enum`'s `website` value was renamed to
+  `web-chat` (live-confirmed exact string via the human's original raw
+  webhook capture) everywhere in the database — existing rows migrated
+  automatically, no data loss. `source_channel`'s capture instruction
+  simplified to a direct passthrough of the built-in `channel` value
+  (no more override) — still a distinct custom Variable, same reasoning
+  as `customer_id` (Convocore can't rename a Variable's Key on
+  attachment, so a Key literally named `source_channel` is still
+  required even though its value now just mirrors `channel` exactly).

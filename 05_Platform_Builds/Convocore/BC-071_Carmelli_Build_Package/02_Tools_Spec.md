@@ -196,9 +196,9 @@ correct Instructions against, which doesn't exist yet.
 | **Owning module** | Growth Agent (creates); Conversion Engine executes downstream — Growth Agent never calls an action tool itself beyond this handoff | `Tool_Naming_Convention.md` "Mapping to the Module Responsibility Contract" |
 | **Description** (paste into Convocore) | "Call this once a customer has shown genuine interest in a specific bakery item but hasn't yet committed to getting the product link, OR when handing off an open interest to a human/lead record. Do not call this for every message — only when a real, specific interest exists." | Derived from Module 2 §B "Tier 2 data collection trigger point" + §3 "What data must be ready before handoff" |
 | **Method** | POST | `Convocore_Canvas_Ground_Truth_FINAL.md` §6.2 (Custom Tool fields) |
-| **Server URL** | `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter?agent_id=1nyXSGBFG1yOj0T9DIPM&key=create-lead` — see §0.5/§0.6 for why the query string is now mandatory, not optional | n8n MCP live read, ADP-002 (`BOxeuH6ehv46FZL0`), fixed and live-tested this pass |
+| **Server URL** | `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter?agent_id=88k7NMEPY59vDEG4Jk90&key=create-lead` — see §0.5/§0.6 for why the query string is now mandatory, not optional | n8n MCP live read, ADP-002 (`BOxeuH6ehv46FZL0`), fixed and live-tested this pass |
 | **Secret Key** | Paste the real generated secret (credential platform id `a0ca9dc4-c678-46d3-96a3-2de8a54b3136`) — NOT blank, corrected 2026-08-17 — see §0.5 | n8n MCP live read (Adapter's `Read Agent Secret`/`Bearer Token Valid?` nodes) + real Supabase insert this pass |
-| **Parameters (attach as Variables)** | `customer_id` → custom var `customer_id` (NOT the system var `user_id` directly — Convocore sends a Variable's own Key as the field name, no renaming on attachment; `01_Variables_Spec.md` §0/§1); `archetype` → hardcode `"commerce_ecom"` (static, not LLM-decided); `intent` → custom var `intent` (renamed from `lead_intent` this pass — must match WF-001's real field name exactly); `source_channel` → custom var `source_channel`, always `"website"` (NOT the system var `channel`, which sends Convocore's own value `"web-chat"` — not a valid enum value for this field); `conversation_summary` → custom var `conversation_summary` | `n8n_Workflow_Specification_v1.md` §13.1 payload schema + `01_Variables_Spec.md` v1.2, confirmed against WF-001's live `Normalize Contract`/`Validate Input` nodes AND a live-captured real Convocore call (§0.6) |
+| **Parameters (attach as Variables)** | `customer_id` → custom var `customer_id` (NOT the system var `user_id` directly — Convocore sends a Variable's own Key as the field name, no renaming on attachment; `01_Variables_Spec.md` §0/§1); `archetype` → hardcode `"commerce_ecom"` (static, not LLM-decided); `intent` → custom var `intent` (renamed from `lead_intent` this pass — must match WF-001's real field name exactly); `source_channel` → custom var `source_channel`, kept in sync with the built-in `channel` value (**corrected 2026-08-17**: the DB enum was renamed platform-wide from `website` to the real Convocore value `web-chat`, so this is now a direct passthrough — no more override/hardcode instruction needed, same reasoning as `customer_id`/`user_id`); `conversation_summary` → custom var `conversation_summary` | `n8n_Workflow_Specification_v1.md` §13.1 payload schema + `01_Variables_Spec.md` v1.4, confirmed against WF-001's live `Normalize Contract`/`Validate Input` nodes AND a live-captured real Convocore call (§0.6) |
 | **Test before wiring** | Fire the Test button with a realistic payload before referencing it in any node's Instructions | `Convocore_Agent_Build_Order_Guide_v2.md` Part 4 item 3 |
 
 ### 1.2 `update-customer`
@@ -209,7 +209,7 @@ correct Instructions against, which doesn't exist yet.
 | **Owning module** | Core Agent | `n8n_Workflow_Specification_v1.md` §7.6 |
 | **Description** | "Call this only when a customer explicitly corrects previously-given information (e.g., a misspelled name, wrong email). Do not call this speculatively." | Derived from Module 1's general low-risk-action framing (§B Customer Verification Rule) |
 | **Method** | POST | n8n MCP live read (WF-016's real webhook trigger) |
-| **Server URL** | Same shared Adapter URL as `create-lead`, own query string — `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter?agent_id=1nyXSGBFG1yOj0T9DIPM&key=update-customer` | See §0.5/§0.6 |
+| **Server URL** | Same shared Adapter URL as `create-lead`, own query string — `https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter?agent_id=88k7NMEPY59vDEG4Jk90&key=update-customer` | See §0.5/§0.6 |
 | **Secret Key** | Same real generated secret as `create-lead` (§0.5) | See §0.5 |
 | **Parameters** | `customer_id` → same `customer_id` custom var as `create-lead` uses (not the system var `user_id` directly — same reasoning as §1.1); `fields` → open object, composed by the LLM from the specific correction stated in-conversation, not a stored Variable (the field being corrected varies per use) | `n8n_Workflow_Specification_v1.md` §13.16 payload schema |
 | **Priority for this build** | Low, and lower than v1 stated — WF-016's own live description confirms it **always** routes to human-handoff right now (no verification mechanism exists yet), so it currently behaves identically to calling `human-handoff` directly. Build if time permits; not blocking BC-071's Definition of Done. See §0.5. | n8n MCP live read (WF-016 description) |
@@ -314,7 +314,7 @@ and_Nodes_Spec.md`, not here. (`Convocore_Canvas_Ground_Truth_FINAL.md`
   it can't be inspected). Real fix: generated a real 256-bit secret via
   Postgres (`gen_random_bytes`), stored it in the credential platform,
   and inserted Carmelli's real `convocore_agent_map` row (agent id
-  `1nyXSGBFG1yOj0T9DIPM`, region `na`, secret id `a0ca9dc4-c678-46d3-
+  `88k7NMEPY59vDEG4Jk90`, region `na`, secret id `a0ca9dc4-c678-46d3-
   96a3-2de8a54b3136`) — live, not a placeholder. Secret Key field now
   correctly says "paste this specific real value," plaintext given in
   chat only, never committed to this file (repo standing rule). Also
@@ -323,3 +323,16 @@ and_Nodes_Spec.md`, not here. (`Convocore_Canvas_Ground_Truth_FINAL.md`
   fields plus `max_booking_horizon = 365`, the documented default
   (`Agent_Runtime_System_v1.md` line 1078/Appendix B) — a Doc-Search-
   First miss in the original BC-071 pass, not a real open decision.
+- **v1.4 (2026-08-17)** — human live-tested `create-lead` for real,
+  found WF-001's customer-resolution path was never actually wired
+  (fixed — see `Wiki/log.md` session-BC-071-customer-resolution-fix and
+  `06_Infrastructure/n8n/Workflow_Registry.md`'s WF-001 entry), then
+  made a platform-wide architecture call on `source_channel`: instead of
+  instructing the LLM to override it with a hardcoded literal that
+  didn't match Convocore's real `channel` value, renamed
+  `public.source_channel_enum`'s `website` value to the real Convocore
+  value `web-chat` everywhere in the database (existing rows migrated
+  automatically). §1.1's Parameters row corrected — `source_channel` is
+  now a direct passthrough of the built-in `channel` value, no more
+  override instruction needed. Also fixed the one stale example in
+  `INTEGRATION_CONTRACT_v1.md` Part 20.1 (`"website"` → `"web-chat"`).

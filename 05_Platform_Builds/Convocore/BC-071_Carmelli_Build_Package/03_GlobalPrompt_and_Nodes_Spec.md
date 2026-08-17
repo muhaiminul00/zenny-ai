@@ -190,8 +190,9 @@ Before handing off, save the item they've confirmed to the
 interest, summarize it in one sentence into `intent` and keep
 `conversation_summary` current. As soon as the customer's identity is
 known this conversation, keep `customer_id` set to the same value as
-the built-in `user_id`, and keep `source_channel` set to the fixed
-value "website" — both are required before `create-lead` can be called.
+the built-in `user_id`, and keep `source_channel` set to the same value
+as the built-in `channel` — both are required before `create-lead` can
+be called.
 
 Never introduce an upsell in the same turn as your first
 recommendation, and offer at most one upsell per conversation, only
@@ -295,3 +296,8 @@ conversation (BC-061, not this card) once built.
   both needed before `create-lead` can be called, per the human's own
   live test finding that System Variables can't be reused as
   differently-named payload fields.
+- **v1.2 (2026-08-17)** — Node 2's `source_channel` instruction
+  simplified from "hardcode website" to "mirror the built-in `channel`
+  value" — the platform-wide enum rename (`website` → real Convocore
+  value `web-chat`, see `01_Variables_Spec.md` v1.4) means no more
+  override is needed, just a direct passthrough.

@@ -789,7 +789,7 @@ Before any Tool is production-ready, test:
     "customer_id": "uuid",
     "archetype": "commerce_ecom",
     "intent": "product inquiry, sizing question",
-    "source_channel": "website",
+    "source_channel": "web-chat",
     "conversation_summary": "Customer asking about jacket sizing."
   }
 }
