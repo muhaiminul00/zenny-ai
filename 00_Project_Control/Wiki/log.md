@@ -9,6 +9,58 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-17] session-Convocore-alternative | n8n-native conversation runtime designed, full outline written
+
+**Trigger:** Convocore's pricing at the API-access tier the platform
+actually needs went up; human asked for a real alternatives evaluation
+(advisor mode), not just "build our own" assumed.
+
+**Zapier ruled out** with evidence, not assumption: no multi-tenant/
+agency workspace model, Chatbots product is basic FAQ/notification-
+triggered not a real conversation engine, no native voice, channel
+integrations are shallow message-in/out triggers. Structurally can't
+do what this platform needs regardless of price.
+
+**n8n-native recommended over a dedicated LangGraph/FastAPI service**
+(the approach `Zenny_SaaS_Architecture_Plan_v2.1.md` had proposed) —
+n8n's AI Agent node is itself LangChain-based, so staying in n8n isn't
+a quality downgrade, it removes a second system and the integration
+seam (webhook contract, HMAC signing, separate observability stack)
+that system would require.
+
+**Real design problem found and solved through direct pushback from
+the human, not accepted on the first pass:** a naive "route once per
+conversation" design ignores that n8n has no persistent execution
+position — every inbound message is a fresh execution, so some dispatch
+step runs every single turn, unavoidably. Fixed by splitting dispatch
+(a Postgres lookup of `session.active_agent`, not an LLM call) from the
+actual routing judgment (the currently-active specialized agent
+self-reports a `handoff` field in its own structured response, instead
+of a dedicated classifier running every turn). Net steady-state cost:
+1 DB read + 1 LLM call per turn — the multi-agent structure adds ~zero
+LLM overhead over what a single-agent design would cost anyway.
+
+**Runtime choice is not assumed, it's gated:** BC-070's own Definition
+of Done includes an explicit output-quality test (tool-call accuracy,
+multi-turn context retention, escalation correctness, latency) against
+real conversations. Pass → continue n8n-native. Genuine failure on a
+specific dimension → swap only the brain layer (router + specialized
+agents) for a dedicated runtime — the database, tools, dashboard, and
+channel adapters don't change either way, by design.
+
+**Full outline written**, covering the eventual customer-facing
+dashboard spec (chat history, agent settings, revenue metrics, email
+approve/edit/delete, inventory) and admin dashboard, mapped against
+what already exists vs. genuinely new, with an explicit sequencing
+order (BC-070 → wire to Carmelli → new dashboard tabs → BC-065-069 →
+Phase 5D → multi-channel → voice last):
+`05_Platform_Builds/.Future_Custom/Zenny_Own_Conversation_Runtime_Outline_v1.md`.
+Roadmap only — human explicit: not v1-mandatory, step by step.
+
+Full detail: `PROJECT_STATE.md` Path A #7 (BC-070).
+
+---
+
 ## [2026-08-17] session-BC-060 | First real client provisioned (Carmelli Bakery), stopped at 3 human-only gates
 
 **Commander → Execute:** human filled the remaining ASK rows of

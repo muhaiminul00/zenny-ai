@@ -624,6 +624,42 @@ actually needs it:
    client-specific card if/when a real client needs it (or, for a
    static site with nothing to sync from, a Sheet-as-source-of-truth
    fallback using BC-068's own sync path).
+7. **QUEUED, not started (2026-08-17): BC-070 — n8n-native conversation
+   runtime prototype (Convocore-cost-alternative spike).** Trigger:
+   Convocore's pricing for the API-access tier we actually need
+   (Business plan+) is high enough the human is evaluating alternatives.
+   Researched Zapier first, ruled out: no multi-tenant/agency workspace
+   model, Chatbots product is basic FAQ/notification-triggered, no
+   native voice, channel integrations are shallow message-in/out
+   triggers not a real conversation engine — structurally can't do what
+   this platform needs regardless of cost. **Real finding: n8n (already
+   running, already paid for) natively supports a Chat Trigger + AI
+   Agent node with tool-calling — the same underlying mechanism INT-010/
+   011 already prove live (`chainLlm`+`lmChatOpenRouter`).** Scope for
+   BC-070: a **web-chat-only prototype** (matches Carmelli's real B2
+   answer, no channel/voice scope creep) proving an n8n-hosted
+   conversation runtime end-to-end against one real client, before
+   committing to a full rebuild. New pieces needed: embeddable chat
+   widget (small React component), n8n Chat Trigger wiring, session/
+   context handling. Explicitly NOT in scope for BC-070: WhatsApp/
+   Instagram/Telegram ingress, voice (Twilio schema exists, unused,
+   `Wiki/credentials/twilio.md`) — de-risk on one channel first, expand
+   only with real data. Cost shape: near-zero new recurring licensing
+   (n8n/Supabase already paid, LLM token cost unchanged either way);
+   real cost is build time + newly-owned maintenance surface, not a
+   free lunch — disclosed, not oversold.
+   **Design finalized 2026-08-17** (follow-up session): router +
+   per-turn session-state dispatch (Postgres lookup, not an LLM call
+   every message) + specialized sub-workflow agents (product
+   recommendation/lead conversation/booking/support/escalation) that
+   self-report a `handoff` field in their normal structured response
+   instead of a dedicated classifier running every turn — steady-state
+   cost is 1 DB read + 1 LLM call per turn. Runtime choice (n8n-native
+   vs. a dedicated LangGraph/FastAPI service) is decided by an explicit
+   output-quality gate in BC-070's own Definition of Done, not assumed
+   either way. Full outline, including the customer/admin dashboard
+   spec this eventually feeds:
+   `05_Platform_Builds/.Future_Custom/Zenny_Own_Conversation_Runtime_Outline_v1.md`.
 
 **Path B — real Convocore agent build (test+verify+build for a demo
 business):**
