@@ -2,13 +2,17 @@
 
 **Purpose:** what the technical stack costs to run build, test, and
 production frictionlessly. Two phases: 0 clients, and 0+ clients (any
-number of paying clients — production is one mode, not a per-client
-special case).
+number of paying clients).
 
 **Pricing references (for the team's own review):**
 - Public pricing page: https://convocore.ai/pricing
-- Convocore's in-app Billing → Plans screen (our own workspace's real
-  entitlements — the source used to correct this doc's numbers)
+- Convocore's in-app Billing → Plans screen (our own workspace's real entitlements)
+
+**⭐ Before finalizing any plan choice below: book a call with Moe
+Ayman, Convocore's founder.** Convocore's own support AI directly
+offered this when asked about our multi-client scaling needs — worth
+taking them up on it, especially since White Label is now a real
+$199+/mo commitment from client 1, not a someday upgrade.
 
 ---
 
@@ -17,7 +21,7 @@ special case).
 | Phase | What's running |
 |---|---|
 | **0 clients** (build/test) | Claude Pro, Hostinger VPS, Convocore (tier — open decision below), Supabase/Notion/Pinecone free |
-| **0+ clients** (production) | Same base, all features available; cost scales with what each client actually needs (seat, voice, agent count) |
+| **0+ clients** (production) | Same base + **Convocore White Label, required from the first paying client** (see Section 3 — this is the single biggest change from earlier drafts) |
 
 ---
 
@@ -38,52 +42,64 @@ special case).
 | Pros | $0 cost pre-revenue | Tests run on GPT-5.6 Luna, the model we actually ship — trustworthy results, real per-conversation cost data |
 | Cons | Free tier can't run Luna at all — findings may not transfer to production. Also a hard **500-credit cap that's one-time, not monthly** — a real build/test sprint can burn through it mid-way and stop testing dead until it's gone. | $59/mo burn with no revenue |
 
-**Our recommendation:** Pro, but only during active build sprints; step down to Free between them (credits don't roll over either way).
+**Our recommendation:** Pro, but only during active build sprints; step down to Free between them. This build-phase question is unaffected by the White Label finding below — testing one agent under one workspace doesn't need multi-client management yet.
 
 ---
 
 ## 3. Phase 2 — 0+ clients (production)
 
-**Base plan.** Pick the lowest tier that covers what the roster actually needs today; upgrade only when a real client requires more.
+### Resolved: White Label is required from the first paying client, not an eventual upgrade
 
-| | **Pro ($59/mo)** | **Business ($99/mo)** |
-|---|---|---|
-| Chat channels | Web, Telegram, WhatsApp, Instagram, Messenger, Discord, Email — full set | Same, plus voice/phone |
-| Voice | ❌ Not available | ✅ Included — 2 Twilio numbers + 3 concurrent call lines bundled free |
-| **Watermark removal** | ❌ **Cannot remove** — Convocore branding stays on the widget | ✅ **Removed** — Business is the actual removal threshold, not White Label |
-| AI agents included | 10 | 20 |
-| Cons | No voice, watermark stays | $40/mo extra if voice/branding removal genuinely isn't needed yet |
+Directly confirmed by Convocore's own support AI (asked specifically
+about the $15/mo Client Seat add-on):
 
-**Our recommendation:** Start on Pro. Upgrade to Business the moment either (a) a client needs voice, (b) you want the watermark gone, or (c) the roster is approaching 10 agents on Pro — whichever comes first. Note (b) means Business is worth more than it looked before: it buys voice *and* branding removal in the same upgrade, not two separate purchases.
+> "While we don't have a standard '$15/mo client seat add-on' for the
+> Pro plan in our current self-serve pricing... Our native multi-client
+> management system — which allows you to create separate organizations
+> for each client, manage their individual billing, and control their
+> access from a single dashboard — is a feature exclusive to our White
+> Label and White Label Elite plans. On the Pro plan, the account is
+> designed for a single organization. If you need to manage multiple
+> clients professionally under your own brand, the White Label plans
+> are the intended path."
 
-**Agent-count ceiling (new finding, not previously in this doc):** each base plan caps total AI agents, independent of voice/branding needs — Free 2, Starter 3, **Pro 10**, **Business 20**, White Label/Elite unlimited. If one client = one agent, Pro tops out at 10 clients and Business at 20 regardless of any other consideration; White Label becomes the real trigger once the roster approaches that count, not just the ~10-paying-client rule of thumb below.
+This overturns the earlier draft's assumption (a $15/mo seat stacking
+on Pro or Business). **There is no per-client add-on path below White
+Label** — managing more than one client business under one Convocore
+account requires White Label ($199/mo) or White Label Elite ($349/mo),
+starting with client #1, not at some later client-count threshold.
 
-**Per-client variable costs — only pay for what a given client needs:**
+### Base plan for production
 
-| Item | Cost | When it applies |
-|---|---|---|
-| Client Seat | $15/mo per client (see flag below) | Always, per client company |
-| Voice — platform + provider (all-in) | ~$0.03/min (Gemini Live) to ~$0.09/min (Ultravox/Grok) | Only clients using voice |
-| Voice — Twilio number | $0 to Zenny if client's own account; if Zenny provisions it: included free (first 2 numbers on Business), then $3/mo each beyond that | Only if a client needs a number and doesn't bring their own |
-| Extra concurrent call line | Included free (first 3 on Business), then $5/mo each beyond that | Only past the bundled 3 |
-| **Chat channels (WhatsApp, Messenger, Instagram, Telegram, Discord, Email)** | **$0** | Included in Pro+ — no per-channel fee, usage draws from the same credit pool as web chat |
+| | **White Label ($199/mo)** |
+|---|---|
+| Multi-client management | ✅ Separate org + billing per client, one dashboard |
+| Watermark | ✅ Removed |
+| Voice | ✅ Included (3 Twilio numbers + 10 concurrent call lines bundled) |
+| AI agents | Unlimited |
+| Client sub-accounts included | 20 (Client Seat add-on likely covers extra beyond this — **confirm with Moe**, not independently verified) |
+| Credits/mo | 60,000 |
 
-**⚠ Open flag — checked, still genuinely unresolved:**
-The feature-comparison table shows **"Client sub-accounts" as unavailable
-(—) on both Pro and Business**, only appearing starting at White Label
-(20 included) and Elite (unlimited) — casting doubt on whether the
-$15/mo Client Seat add-on can be purchased/used below White Label at
-all. There's no billing/add-on-catalog API to check this directly, and
-our own account is currently on Free tier — below Pro — so even a
-read-only check of agency/client-account endpoints 403s with "API
-access requires the Business plan or higher." One clarifying data
-point did surface from that error: **Business gets read-only Agency API
-access, White Label gets full write access** — suggesting Business,
-not Pro, is the more likely real floor for any client-seat/sub-account
-capability, though this doesn't confirm purchasability either way.
-**Recommend either a real Business-tier upgrade to test the purchase UI
-directly, or asking Convocore support**, before treating the $15/client
-figure as certain at Pro or Business.
+Business ($99/mo) and Pro ($59/mo) are **not viable production base
+plans** for Zenny's actual model (one Convocore account serving many
+separate client businesses) — they cap out at a single organization
+regardless of price, per Convocore's own confirmation above. Business
+and Pro's individual features (voice, watermark removal, agent counts)
+are moot once White Label is the floor, since White Label already
+includes all of them.
+
+**Our recommendation:** budget for White Label ($199/mo) starting with
+client #1. Talk to Moe before committing — Convocore's own AI flagged
+this as a "specific scaling needs" conversation worth having, and there
+may be a custom/negotiated arrangement worth knowing about before
+locking in list price.
+
+**Still to confirm on that call, not resolved by this doc:**
+- Does the $15/mo Client Seat add-on apply on top of White Label's 20
+  included sub-accounts, or is a different mechanism used past 20?
+- Is there a lower entry cost for a genuinely small (1–3 client) agency
+  just starting out, or is $199/mo list price the real floor regardless
+  of scale?
 
 **Supabase / Notion / Pinecone:** see Section 5 — free tier holds for a real range of production usage, not unconditionally forever.
 
@@ -91,17 +107,21 @@ figure as certain at Pro or Business.
 
 ## 4. Example monthly cost
 
-One paying client, chat-only (no voice), client's own Twilio, Client Seat pricing assumed to hold on Pro (see flag above):
+One paying client, White Label required for multi-client management:
 
 | Item | Cost/mo |
 |---|---|
 | Claude Pro | $20 |
 | Hostinger VPS | $19.49 |
-| Convocore Pro | $59 |
-| Client Seat | $15 |
-| **Total** | **$113.49/mo** |
+| Convocore White Label | $199 |
+| **Total** | **$238.49/mo** |
 
-Each additional chat-only client: **+$15/mo** (seat only, if the seat flag above resolves in Pro's favor) — up to 10 total agents before Pro itself becomes the ceiling. A client needing voice, or a decision to remove the watermark, moves the whole account to Business (+$40/mo base, once, platform-wide), which also raises the agent ceiling to 20 and bundles 2 numbers + 3 call lines.
+Up to 20 clients: no further Convocore cost increase (sub-accounts
+included). Beyond 20, or beyond bundled voice capacity (3 numbers/10
+call lines), extra costs apply per the add-on rates in Convocore's
+pricing table — worth re-confirming with Moe once the roster
+approaches that range, since exact behavior above the included quota
+isn't independently verified here.
 
 ---
 
@@ -120,8 +140,7 @@ as trigger points to watch, not a guarantee:
 | Pinecone | ~2GB storage, ~2M write units/mo, ~1M read units/mo, up to 5 indexes | Write/read units approaching the cap as KB pages × clients × sync frequency grows — first upgrade step if needed is Builder ($20/mo flat) |
 
 **Recommendation:** stay on free tier for all three now; revisit only when
-real usage data shows a metric above genuinely approaching its cap, not
-on a client-count schedule alone.
+real usage data shows a metric above genuinely approaching its cap.
 
 ---
 
@@ -131,14 +150,12 @@ on a client-count schedule alone.
 |---|---|
 | Domain + DNS | Already owned (sunk) |
 | VPS initial setup | Already done (sunk) |
-| Twilio phone number (only if Zenny provisions it, not the client) | ~$1 one-time + ongoing per Section 3's Voice — Twilio row |
+| Twilio phone number (only if Zenny provisions it, not the client) | ~$1 one-time + ongoing usage — covered by White Label's bundled numbers/lines up to the included quota |
 
 ---
 
 ## 7. Decisions needed
 
-All options, pros/cons, and our recommendation are laid out above for each — final call is the team's:
-
 1. **Build-phase Convocore tier** — Free or Pro ($59/mo, sprint-scoped)?
-2. **Production base tier** — Pro ($59/mo) or Business ($99/mo — now also the watermark-removal tier, not just the voice tier)?
-3. **Client Seat verification** — checked via MCP; still genuinely unresolved (no billing/add-on API exists, our account's Free tier blocks even a read-only check). Needs either a real Business-tier upgrade to test the purchase UI, or a direct question to Convocore support, before the $15/client figure is trusted at Pro/Business (see flag in Section 3).
+2. **Call with Moe** — book before finalizing; confirm the two open questions in Section 3 (Client Seat mechanics past 20 sub-accounts, and whether a lower-cost entry path exists for a small starting agency).
+3. **Production base plan** — resolved: White Label ($199/mo), required from client #1. Not an open option anymore, pending only the confirmations above.

@@ -9,6 +9,53 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-25] session-technical-budget-proposal-v1-whitelabel-resolution | Human asked Convocore's own AI directly; White Label is required from client #1, not an eventual upgrade
+
+**Trigger:** The previous session ended with a genuinely open flag: does
+the $15/mo Client Seat add-on work on Pro/Business, or only from White
+Label up? MCP couldn't resolve it (no billing/add-on-catalog tool, our
+account is Free tier so even a read-only agency check 403s). Human took
+the initiative to ask Convocore's own support AI directly and provided
+the screenshot.
+
+**Direct answer, verbatim:** "While we don't have a standard '$15/mo
+client seat add-on' for the Pro plan in our current self-serve
+pricing... Our native multi-client management system... is a feature
+exclusive to our White Label and White Label Elite plans. On the Pro
+plan, the account is designed for a single organization." Convocore's
+AI also proactively offered a call with Moe Ayman, their founder, to
+discuss Zenny's specific scaling needs.
+
+**Resolution:** There is no standalone per-client seat purchasable
+below White Label. Since Zenny's actual model is one Convocore account
+serving many separate client businesses, **White Label ($199/mo) is
+required starting with the first paying client** — not a threshold
+reached at ~10 clients, not an optional upgrade for voice/branding
+(which White Label already includes anyway). This overturns the
+Pro/Business-based production-tier framing from the two prior
+correction passes the same week.
+
+**What changed:**
+- `Zenny_Technical_Budget_Proposal_v1.md` rewritten: Section 3 now
+  states White Label as the resolved required base plan; example
+  monthly cost (Section 4) is now $238.49/mo for 1 client (Claude Pro +
+  VPS + Convocore White Label); explicit recommendation to book a call
+  with Moe before finalizing; two things flagged as still needing that
+  call (Client Seat mechanics past White Label's 20 included
+  sub-accounts; whether a lower-cost entry path exists for a small
+  starting agency).
+- `Wiki/reference/convocore-pricing-live-facts.md` corrected in place:
+  the "$15/mo Client Seat is current pricing" framing from 2026-08-24 is
+  now marked superseded; the "checked via MCP, still unresolved" section
+  is marked RESOLVED with the direct quote as source; the agent-count
+  cap section is marked no-longer-operative for Zenny's actual
+  multi-tenant model (Pro/Business can't run it at all, regardless of
+  agent count).
+
+Committed + pushed to `zenny-sync`.
+
+---
+
 ## [2026-08-24] session-technical-budget-proposal-v1-watermark-fix | Human's screenshot caught a real MCP-data error; Execute corrected + tried (and couldn't fully close) one live check
 
 **Trigger:** Human reviewed the previous correction pass and provided a

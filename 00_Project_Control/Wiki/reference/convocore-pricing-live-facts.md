@@ -1,22 +1,24 @@
 # Convocore Pricing — Live-Verified Facts
 
-**Status:** current as of 2026-08-24. Original pass verified via the
+**Status:** current as of 2026-08-25. Original pass verified via the
 Convocore MCP's `get_pricing_info` and `get_channel_integration_spec`
 tools (static knowledge tools, not billing calls); a same-day
 correction pass then cross-checked against a real screenshot of our
-own workspace's live Billing → Plans screen, which is more
-authoritative than the MCP's static knowledge blob where the two
-disagree — see the watermark correction below. Source of truth for
+own workspace's live Billing → Plans screen; a second correction pass
+the next day (2026-08-25) got a direct answer from Convocore's own
+support AI, which is the highest-authority source in this whole chain
+and **fully resolves the Client Seat question below** — see that
+section. Source of truth for
 `01_Strategy/Marketing/Zenny_Technical_Budget_Proposal_v1.md`.
 
-## Client Seat add-on — $15/mo is current, not a stale pricing-page bug
+## Client Seat add-on — CORRECTED AGAIN: does not exist as a standalone Pro/Business add-on at all
 
-Re-pulled fresh on 2026-08-24 and matches the 2026-08-14 figure exactly:
-**$15/month per client seat** (one client company account, up to 10 of
-that client's own users included). Two independent pulls a week+ apart
-returning the identical number is enough confidence to treat this as
-real current pricing, not a one-off page glitch. No reason found to
-choose a different plan/pricing path because of this figure.
+**Superseded by the 2026-08-25 finding below.** The $15/mo figure
+itself is real (it's White Label's per-seat rate beyond the included
+20), but the original framing here — "current pricing, choose whichever
+plan you want and add $15/client" — was wrong. It does not stack onto
+Pro or Business as a standalone purchase. See "Client Seat / multi-
+client management — RESOLVED" below for the real mechanism.
 
 ## Channels (WhatsApp / Messenger / Instagram) — no separate Convocore charge
 
@@ -51,16 +53,16 @@ Practical effect: upgrading to Business for voice also removes the
 watermark in the same purchase — they're not two separate cost
 decisions anymore.
 
-## AI-agent count cap per tier (new finding, from the same screenshot)
+## AI-agent count cap per tier (from the same 2026-08-24 screenshot; superseded in relevance by the White Label finding below)
 
 Each plan caps the total number of Convocore agents a workspace can
-run, independent of any voice/branding consideration: Free 2, Starter
-3, **Pro 10**, **Business 20**, White Label/Elite unlimited. If one
-Zenny client maps to one agent, this is a real ceiling on how many
-clients a given base plan can serve — Pro tops out at 10 clients,
-Business at 20, before White Label becomes necessary purely on agent
-count, separate from the ~10-paying-client White Label guidance
-elsewhere.
+run: Free 2, Starter 3, Pro 10, Business 20, White Label/Elite
+unlimited. **Note: this cap is no longer the operative constraint for
+Zenny's production tier decision** — the 2026-08-25 finding below
+establishes that Pro/Business can't run Zenny's multi-client model at
+all regardless of agent count, since they're single-organization
+accounts. This cap only matters if Zenny ever ran a single-org,
+single-brand deployment (not the actual model).
 
 ## Twilio number / concurrent call line bundling on Business
 
@@ -78,25 +80,61 @@ earlier: **Gemini Live ≈ $0.03/min all-in** (cheapest), up to
 Convocore's own credit system: $0.015/min + $0.02/min platform =
 $0.035/min total.
 
-## Client Seat / sub-account gating — checked via MCP, still genuinely unresolved
+## Client Seat / multi-client management — RESOLVED 2026-08-25
 
-The same screenshot's feature table shows **"Client sub-accounts" as
-unavailable (—) on both Pro and Business**, only appearing from White
-Label (20 included) up — casting real doubt on whether the $15/mo
-Client Seat add-on is purchasable below White Label at all. Attempted
-to resolve via MCP: no billing/add-on-catalog tool exists in this
-toolset, and our own workspace is currently on the **Free tier** —
-below Pro — so even a read-only check of agency/client-account
-endpoints (`agency_read`) 403s: `"API access requires the Business plan
-or higher (read-only). White Label unlocks full API write access."`
-Same underlying blocker as `convocore-doc-status.md`'s existing
-403 finding, re-confirmed live 2026-08-24. One clarifying detail did
-surface: **Business gets read-only Agency API access, White Label gets
-full write** — suggesting Business, not Pro, is the more likely real
-floor for any client-seat/sub-account capability, but this doesn't
-confirm purchasability either way. Genuinely open — resolving it for
-real needs either a temporary Business-tier upgrade to test the
-purchase UI directly, or a direct question to Convocore support.
+The MCP live-check (agency_read 403, below) couldn't fully close this
+on 2026-08-24, so the human asked Convocore's own support AI directly.
+Direct quote, verbatim:
+
+> "While we don't have a standard '$15/mo client seat add-on' for the
+> Pro plan in our current self-serve pricing... Our native multi-client
+> management system — which allows you to create separate organizations
+> for each client, manage their individual billing, and control their
+> access from a single dashboard — is a feature exclusive to our White
+> Label and White Label Elite plans. On the Pro plan, the account is
+> designed for a single organization. If you need to manage multiple
+> clients professionally under your own brand, the White Label plans
+> are the intended path."
+
+**Definitive answer: there is no standalone $15/mo Client Seat add-on
+purchasable on Pro or Business.** Managing more than one client
+business under one Convocore account — separate org, separate billing,
+one dashboard — requires **White Label ($199/mo) or White Label Elite
+($349/mo)**, full stop. The earlier "Business gets read-only Agency API
+access" clue from the MCP check was a red herring for this specific
+question — read access to the agency endpoint isn't the same as being
+able to purchase multi-client management. This is why the earlier
+"Business is the more likely real floor" guess undersold it: **White
+Label, not Business, is the real floor.**
+
+**Consequence for Zenny specifically:** since Zenny's whole model is
+one platform account serving many separate client businesses, **White
+Label is required starting with the first paying client**, not an
+upgrade to reach at ~10 clients or on a per-feature trigger. This is
+now reflected as the production base plan in
+`Zenny_Technical_Budget_Proposal_v1.md`.
+
+**Still not confirmed, flagged for a call with Moe Ayman (Convocore's
+founder — offered directly by their own support AI):**
+- Whether the $15/mo Client Seat add-on rate applies to sub-accounts
+  purchased beyond White Label's 20 included, or a different mechanism
+  is used.
+- Whether a lower-cost entry path exists for a small (1–3 client)
+  starting agency, or $199/mo list price is the real floor regardless
+  of scale.
+
+## MCP live-check, 2026-08-24 (superseded by the direct answer above, kept for the record)
+
+Attempted to resolve via MCP before the direct answer existed: no
+billing/add-on-catalog tool exists in this toolset, and our own
+workspace is currently on the **Free tier** — below Pro — so even a
+read-only check of agency/client-account endpoints (`agency_read`)
+403s: `"API access requires the Business plan or higher (read-only).
+White Label unlocks full API write access."` Same underlying blocker as
+`convocore-doc-status.md`'s existing 403 finding. This check was
+inconclusive on its own (see correction above) — the real answer came
+from asking Convocore's support AI directly the next day, not from any
+further MCP attempt.
 
 ## Related, already-documented finding (not new, cross-referenced)
 
