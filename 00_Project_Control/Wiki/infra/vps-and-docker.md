@@ -1,6 +1,23 @@
 # VPS & Docker Setup
 
-**Status:** current as of 2026-08-07 (BC-033)
+**Status:** current as of 2026-08-24 (billing figure live-verified;
+architecture facts below current as of 2026-08-07, BC-033)
+
+## Real monthly cost (live-verified 2026-08-24)
+
+`srv1881104`'s real Hostinger subscription (`AzZLVKVRPDrqtJm0`, KVM 1)
+renews at **$19.49/month**, auto-renewing, confirmed via the Hostinger
+Billing MCP's subscription list cross-referenced by `created_at`
+against the VPS list (`VPS_getVirtualMachinesV1`) — not assumed from a
+catalog price. **A second, identical KVM 1 subscription exists on the
+same Hostinger account** (`AzqaxbVLV4cfLCsx`, also $19.49/mo) — it
+belongs to `1729215`, the VPS this page already documents as explicitly
+out of scope for Zenny; confirmed by matching that subscription's
+`created_at` to `1729215`'s own `created_at`, not by name (both
+subscriptions are named identically, "KVM 1"). Do not double-count both
+subscriptions as Zenny's cost. Source: `01_Strategy/Marketing/
+Zenny_Technical_Budget_Proposal_v1.md` Section 5, live-verified during
+that Build Card.
 
 ## What's true now
 

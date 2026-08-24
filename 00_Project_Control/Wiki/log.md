@@ -9,6 +9,41 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-24] session-technical-budget-proposal-v1 | Commander drafted v1, Execute closed the one live-data gap
+
+**Trigger:** Marketing team asked for a fresh technical budget proposal
+(0-client and 1st-client phases), given Convocore's pricing had
+restructured since the old `Zenny_Infra_Cost_Breakdown.docx`.
+
+**Commander pass:** cross-checked the old cost doc against live
+Convocore pricing (MCP `get_pricing_info`) and the project's own Wiki —
+found the old doc's "$20/mo n8n" line was stale (n8n is self-hosted on
+the VPS, no separate cost), the old "Supabase Pro for branded domain"
+justification was already solved for free via the VPS Traefik proxy,
+and Notion/Pinecone (real Email Manager KB dependencies, not on the
+original list) both check out fine on free tiers at current scale.
+Drafted `01_Strategy/Marketing/Zenny_Technical_Budget_Proposal_v1.md`
+with genuinely open decisions (Convocore tier for build phase, Convocore
+tier for 1st client, Supabase tier) presented as options with pros/cons
+and a recommendation each, per explicit human instruction to not
+pre-decide those.
+
+**Execute pass:** live-verified the one remaining placeholder (Hostinger
+VPS renewal rate) via the Hostinger Billing + VPS MCP — `srv1881104`'s
+real subscription (`AzZLVKVRPDrqtJm0`) renews at $19.49/month. Found a
+real double-count risk while verifying: a second, identically-named
+KVM 1 subscription exists on the same account, `AzqaxbVLV4cfLCsx` —
+matched its `created_at` to VM `1729215` (the already-documented
+out-of-scope VPS), confirmed it is NOT Zenny's cost, excluded it
+explicitly rather than silently. Updated the proposal's Sections 5/7
+with the real figure and documented the finding in
+`Wiki/infra/vps-and-docker.md`. No Build Card scaffolding used (this is
+a strategy document, not an infra/code change) — no Workflow_Registry
+or PROJECT_STATE entry needed, per PROJECT_STATE.md's own scope (build
+phases/blockers only, not marketing docs).
+
+---
+
 ## [2026-08-17] session-BC-071-customer-resolution-everywhere | Same bug fixed system-wide + a critical, unrelated auth bypass found
 
 **Trigger:** Human hit the exact same `22P02 invalid input syntax for

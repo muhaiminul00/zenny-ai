@@ -25,7 +25,7 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
 
 ## Infrastructure
 
-- [infra/vps-and-docker.md](infra/vps-and-docker.md) — the single VPS (srv1881104), its Docker Compose projects, Traefik's base config, and the dashboard's self-healing container pattern.
+- [infra/vps-and-docker.md](infra/vps-and-docker.md) — the single VPS (srv1881104), its Docker Compose projects, Traefik's base config, and the dashboard's self-healing container pattern. Real monthly cost live-verified 2026-08-24: $19.49/mo (Hostinger subscription `AzZLVKVRPDrqtJm0`) — a second, identically-named KVM 1 subscription on the account belongs to the already-documented out-of-scope VPS (`1729215`), not Zenny.
 - [infra/dns-ownership.md](infra/dns-ownership.md) — Netlify (not Hostinger) is zeromanuals.com's real authoritative DNS control plane — the standing correction to a real early misdiagnosis.
 - [infra/traefik-proxies.md](infra/traefik-proxies.md) — the dashboard.zeromanuals.com and auth.zeromanuals.com Traefik routers and the real Host-header-rewrite mechanism that makes the OAuth proxy work.
 - [infra/supabase-tier-limits.md](infra/supabase-tier-limits.md) — the Supabase org is still on the free tier; the branded-domain need was solved by a VPS-side proxy instead of a Pro upgrade.
