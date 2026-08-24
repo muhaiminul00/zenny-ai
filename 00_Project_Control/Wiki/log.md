@@ -9,6 +9,43 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-24] session-technical-budget-proposal-v1-correction | Human corrected v1's framing, Execute rewrote it standalone + verified 3 open items
+
+**Trigger:** Human reviewed v1 and flagged it as too tied to Carmelli
+and to a "1st client" special case, missing channel costs (WhatsApp/
+Messenger/IG), and carrying an unverified $15/mo Client Seat figure
+that might have been a stale pricing-page bug. Asked for a simpler,
+standalone two-phase doc (0 clients / 0+ clients) with per-client
+variable costs stacked on top of a flat base, and explicit clarifying
+questions before handing to Execute.
+
+**Commander pass:** Asked 2 clarifying questions (channel scope: pull
+whatever Convocore's pricing tool actually lists, don't presume a set
+list; versioning: overwrite v1 in place, no v2 file). Shared understanding
+back to the human, then issued a Build Card and handed to Execute.
+
+**Execute pass — live verification via Convocore MCP (`get_pricing_info`,
+`get_channel_integration_spec`):**
+1. **Client Seat $15/mo confirmed current**, not a stale bug — identical
+   figure on a fresh pull vs. the 2026-08-14 pull a week+ earlier.
+2. **No separate Convocore charge for WhatsApp/Messenger/Instagram** —
+   channels are config-only, usage bills from the same credit pool as
+   web chat at the same per-message rate. Only voice carries real
+   channel-adjacent add-on costs (Twilio number $3/mo, Concurrent Call
+   Line $5/mo).
+3. **Chat-widget watermark only removable via White Label plan ($199/mo)
+   or Whitelabel add-on ($200/mo)** — no cheaper standalone toggle;
+   this was never checked in v1.
+
+All three logged as new facts in
+`Wiki/reference/convocore-pricing-live-facts.md` (cross-referenced in
+`index.md`). `Zenny_Technical_Budget_Proposal_v1.md` fully rewritten in
+place: standalone (no references to Carmelli or prior docs), two phases
+(0 clients / 0+ clients, no "1st client" special-casing), base plan +
+stackable per-client costs (seat/voice only — channels confirmed free),
+White Label/watermark guidance unified under the same ~10-client
+threshold. Committed + pushed to `zenny-sync`.
+
 ## [2026-08-24] session-technical-budget-proposal-v1 | Commander drafted v1, Execute closed the one live-data gap
 
 **Trigger:** Marketing team asked for a fresh technical budget proposal
