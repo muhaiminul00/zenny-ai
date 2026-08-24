@@ -9,6 +9,54 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-24] session-technical-budget-proposal-v1-watermark-fix | Human's screenshot caught a real MCP-data error; Execute corrected + tried (and couldn't fully close) one live check
+
+**Trigger:** Human reviewed the previous correction pass and provided a
+real screenshot of our own Convocore workspace's live Billing → Plans
+screen. It directly contradicted the doc's watermark claim: branding
+removal actually starts at **Business ($99/mo)**, not White Label as
+the Convocore MCP's static `get_pricing_info` tool had implied. Also
+asked for pricing-page links for team review and a re-check of whether
+free-tier Supabase/Notion/Pinecone genuinely holds at production scale.
+
+**Commander pass:** Read the full screenshot (cropped into 11 vertical
+segments to actually see it — original was 1920×25498px). Confirmed the
+watermark error directly against the feature-comparison table. Also
+found, unprompted, two things not previously in the doc: a per-tier
+AI-agent count cap (Pro=10, Business=20, White Label+=unlimited) and
+Business's bundled 2 free Twilio numbers + 3 free concurrent call
+lines. Corrected voice provider cost to the account's own real
+calculator figures (Gemini Live ≈$0.03/min all-in vs. Ultravox/Grok
+≈$0.09/min). Flagged, rather than silently resolved, a new discrepancy:
+the same feature table shows "Client sub-accounts" unavailable on both
+Pro and Business, casting doubt on whether the $15/mo Client Seat
+add-on is even purchasable below White Label — asked the human whether
+to live-check this before finalizing.
+
+**Execute pass — Task 1 (live check, no purchase):** Attempted
+`agency_read` via the Convocore MCP to probe agency/sub-account API
+behavior. Confirmed our workspace is still on the **Free tier** — below
+Pro — so the call 403s: `"API access requires the Business plan or
+higher (read-only). White Label unlocks full API write access."` Same
+underlying blocker as the pre-existing `convocore-doc-status.md` 403
+finding (re-confirmed, not new). No billing/add-on-catalog MCP tool
+exists to check Client Seat purchasability directly. **Reported
+honestly as unresolved** rather than guessing — the one clarifying
+detail (Business gets read-only Agency API access, White Label gets
+write) suggests Business is the more likely real floor, but doesn't
+confirm it.
+
+**Task 2/3:** Updated `Zenny_Technical_Budget_Proposal_v1.md`'s
+watermark section, added the agent-count-cap and Twilio/call-line
+bundling findings, corrected voice provider rates, added pricing-page
+links (public + our own account's Billing→Plans as the higher-authority
+source), added a Supabase/Notion/Pinecone production-scale section with
+published free-tier caps and real upgrade triggers, and updated the
+Client-Seat flag to reflect the live-check result. Logged all of this
+in `Wiki/reference/convocore-pricing-live-facts.md` (corrected in
+place, not duplicated) and `index.md`. Committed + pushed to
+`zenny-sync`.
+
 ## [2026-08-24] session-technical-budget-proposal-v1-correction | Human corrected v1's framing, Execute rewrote it standalone + verified 3 open items
 
 **Trigger:** Human reviewed v1 and flagged it as too tied to Carmelli
