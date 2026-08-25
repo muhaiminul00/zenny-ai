@@ -7352,3 +7352,56 @@ right now."
 ---
 
 ---
+
+## [2026-08-25] session-own-infra-raw-definition | Own-infra planning: raw product definition drafted
+Human-led /commander session, pricing pressure (Convocore's White Label
+requirement) prompted a "structure what we're building before deciding
+how" pass. Produced `05_Platform_Builds/.Future_Custom/
+Zenny_Raw_Product_Definition_v1.md` — a deliberately jargon-free
+description of Zenny's channels, customer-facing capabilities,
+owner-facing capabilities, and underlying reliability requirements,
+written without reference to current-stack vocabulary (no "modules",
+"archetypes", Convocore/n8n/Supabase names). Companion to the
+already-existing `Zenny_Own_Conversation_Runtime_Outline_v1.md`
+roadmap. Working draft only — not yet promoted to Wiki/index.md as a
+durable fact, since the own-infra plan itself (structure + budget) is
+still in progress this same conversation.
+
+## [2026-08-26] session-role-modes-plugin | Mode system extracted into a portable plugin (BC-TOOL-001)
+Human-led session, following on from the own-infra evaluation: reviewed
+Garry Tan's gstack (a Claude Code workflow toolkit), decided not to adopt it
+wholesale (Zenny's existing Commander/Execute/Build-Card loop already covers
+the same ground; GBrain memory rejected in favor of keeping the Wiki, for
+now — GBrain's architecture flagged separately as prior art worth studying
+for the still-separate ZeroManual "Company Brain" product idea, not for
+Zenny's own memory). That led to a concrete ask: package Zenny's existing
+advisor/commander/execute mode system as a real, portable Claude Code
+plugin, usable in any project, not just Zenny.
+
+Commander planned it (BC-TOOL-001), flagged git-write as requiring handoff
+per CLAUDE.md, and handed to Execute. Execute built a new standalone repo at
+`E:\Programming\role-modes-plugin` (sibling to this repo, not a subfolder —
+chosen so other projects can add it as a plugin source via plain git URL):
+genericized commands/hooks (Zenny's protocol-doc name, PROJECT_STATE/Wiki,
+and n8n/Supabase/VPS/DNS infra list replaced with project-defined-or-fallback
+language), a Node.js SessionStart hook (cross-platform, unlike Zenny's own
+PowerShell hooks) that reads/creates per-project `mode.json` and idempotently
+seeds a starter block into the installing project's own CLAUDE.md (including
+a note recommending a future companion Wiki-style memory plugin, deferred).
+
+Ran `/simplify` (4 parallel review angles) before committing. Fixed: two
+write-only/never-consumed state fields (`effort`, `permission_mode`) dropped
+entirely; a check-then-act filesystem race collapsed into try/catch; CLAUDE.md
+seeding changed from reading the whole file every session to a cheap
+sentinel-file stat; README's "bounded auto-handoff" claim corrected to state
+plainly only the four hard-stop conditions are built into the generic core,
+not a numeric handoff cap. Verified against a fresh dummy project after each
+fix (default state, one-time non-duplicating seed, all three mode-instruction
+paths). Explicitly skipped as out-of-scope for v1.0.0: a machine-parsed
+project-config file, a shared mode-state writer script.
+
+Committed to the new repo (not this one) — `8133565`. Logged as a durable
+fact: `Wiki/reference/role-modes-plugin.md`, cross-referenced in `index.md`.
+Zenny's own `.claude/commands/*.md` and `.claude/hooks/session-start.ps1`
+are untouched; whether/when to migrate Zenny itself onto the plugin instead
+of maintaining both is an open, not-yet-made decision.
