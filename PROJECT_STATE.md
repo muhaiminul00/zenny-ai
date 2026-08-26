@@ -10,7 +10,17 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-26 (latest) — by /execute — **BC-TOOL-002 complete: Zenny now runs
+2026-08-26 (latest) — by /execute — **BC-TOOL-003: new sibling plugin
+`project-memory` (github.com/muhaiminul00/project-memory) built,
+`/simplify`-reviewed, live-verified against scratch test projects — NOT
+installed anywhere, Zenny NOT migrated (built first, migration decided
+later, per explicit human instruction).** Human action needed next:
+`/plugin marketplace add https://github.com/muhaiminul00/project-memory`
++ `/plugin install project-memory@project-memory`. Full detail:
+`Wiki/reference/project-memory-plugin.md`, `Wiki/log.md`
+session-BC-TOOL-003.
+
+2026-08-26 (prior) — by /execute — **BC-TOOL-002 complete: Zenny now runs
 on the `role-modes` Claude Code plugin for its /advisor, /commander,
 /execute mode system.** Local `.claude/commands/*.md` + `session-start.ps1`
 archived (not deleted), redundant hook entry removed from

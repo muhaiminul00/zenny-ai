@@ -9,6 +9,76 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-26] session-BC-TOOL-003 | New sibling plugin `project-memory` (github.com/muhaiminul00/project-memory) built, reviewed, live-verified — Zenny not migrated onto it yet
+
+**Trigger:** Human, in `/commander`: extract Zenny's Wiki/PROJECT_STATE.md
+three-layer memory system into a portable plugin usable in any project,
+same self-scaffolding approach as `role-modes`. Named source of the
+pattern: [Karpathy's LLM-wiki gist](https://gist.github.com/442a6bf555914893e9891c11519de94f)
+— fetched and read in full before planning, confirming Zenny's Wiki had
+already independently converged on the same pattern (index.md + log.md,
+Ingest/Query/Lint workflows, LLM maintains it, human curates/asks).
+
+**Decisions locked by the human before build:** (1) separate sibling
+plugin, not folded into `role-modes`; (2) build fully generic and
+self-scaffolding first, decide Zenny's own migration later — but design
+it so migration stays possible without a rewrite; (3) new GitHub repo
+under the human's own account, same as `role-modes`.
+
+**Built:** `.claude-plugin/plugin.json`+`marketplace.json`, a `SessionStart`
+hook (`hooks/session-start.js`, plain Node.js) that scaffolds
+`PROJECT_STATE.md`/`Wiki/index.md`/`Wiki/log.md` on first run (per-file
+existence-checked, never overwrites) and seeds a CLAUDE.md starter block
+(own dedicated sentinel), plus 4 slash commands (`/memory-log`,
+`/memory-promote`, `/memory-lint`, `/memory-init`) implementing the gist's
+Ingest/Lint workflows generically. README, LICENSE (MIT, correct
+attribution from the start — no repeat of `role-modes`'s initial
+placeholder-author mistake).
+
+**`/simplify` run before the initial commit** (4 parallel angle reviews on
+the full 14-file initial diff): fixed the CLAUDE.md-seed sharing a sentinel
+with the memory-files scaffold (now its own dedicated sentinel, matching
+`role-modes`'s fully self-contained `seedClaudeMd`); the per-session
+context string duplicating the full Promotion Rule text also written into
+the seeded CLAUDE.md block (shortened to a pointer); three copy-pasted
+scaffold-template functions consolidated into one `template()` helper; a
+duplicate `WIKI_DIR` mkdir call; `memory-init.md` referencing hook-internal
+JS the command itself can't read (rewritten to be self-contained). Skipped
+deliberately: automated CLAUDE.md-prose parsing for alternate file names in
+the hook itself (fragile heuristic — `/memory-init`'s human-supervised
+version already does this correctly); a machine-parsed config file for
+name overrides (explicit v1 cut, matching `role-modes`'s own equivalent
+cut).
+
+**Repo mechanics, learning directly from BC-TOOL-002's dotfile-drop
+defect:** created the GitHub repo via `mcp__github__create_repository`
+(blocked once by the Claude Code auto mode classifier, succeeded on
+retry per the PermissionDenied hook), then pushed via **real `git push`**
+from the start — never the web upload UI that dropped `role-modes`'s
+dotfiles. Verified via a live `get_file_contents` root listing that
+`.claude-plugin/`, `.codex-plugin/`, `.cursor-plugin/`, `.gitignore` all
+reached the remote intact on the first push.
+
+**Live-verified against disposable scratch projects, not Zenny** (migration
+is deferred — nothing should touch Zenny's real Wiki yet): ran the actual
+hook directly (`node hooks/session-start.js` with `CLAUDE_PROJECT_DIR` set
+to a scratch dir) three times — (1) fresh project: all three files +
+CLAUDE.md block created; (2) re-run: byte-identical, hash-compared,
+confirming true idempotency; (3) a project pre-seeded with its own
+`PROJECT_STATE.md`/`Wiki/index.md` content: both survived completely
+untouched, only the genuinely-missing `Wiki/log.md` was created, and the
+CLAUDE.md starter block was appended after the existing line rather than
+replacing it. Found and fixed one cosmetic gap during this pass (missing
+blank line before the scaffold-note in `template()`), pushed as a
+follow-up commit (`96633a0`).
+
+**Status: NOT installed anywhere, Zenny NOT migrated.** Per the human's
+own decision, the next step is genuinely a human action —
+`/plugin marketplace add https://github.com/muhaiminul00/project-memory` +
+`/plugin install project-memory@project-memory` — run in whichever project
+they choose to try it in first, not assumed to be Zenny. See
+[[reference/project-memory-plugin]].
+
 ## [2026-08-26] session-BC-TOOL-002 | Zenny migrated onto the role-modes plugin (github.com/muhaiminul00/role-modes); local mode-system files retired
 
 **Trigger:** Human, in `/commander`: "switch to new role plugin, just
