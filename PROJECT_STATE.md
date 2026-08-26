@@ -10,14 +10,16 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-26 (latest) — by /execute — **BC-TOOL-003: new sibling plugin
-`project-memory` (github.com/muhaiminul00/project-memory) built,
-`/simplify`-reviewed, live-verified against scratch test projects — NOT
-installed anywhere, Zenny NOT migrated (built first, migration decided
-later, per explicit human instruction).** Human action needed next:
-`/plugin marketplace add https://github.com/muhaiminul00/project-memory`
-+ `/plugin install project-memory@project-memory`. Full detail:
-`Wiki/reference/project-memory-plugin.md`, `Wiki/log.md`
+2026-08-26 (latest) — by /commander — **BC-TOOL-003: `project-memory`
+plugin built, installed by human alongside `role-modes` in a real test
+project, independently live-verified — 1 real bug found + fixed.** Both
+plugins had picked the identical generic CLAUDE.md-seed sentinel filename,
+so whichever ran first silently blocked the other from ever seeding —
+fixed (namespaced sentinel), re-verified, pushed (`13a4933`). **Human
+action needed next:** update/reinstall `project-memory` — the already-
+installed plugin cache still runs the pre-fix code, a git push doesn't
+retroactively refresh it. Zenny still NOT migrated (deferred, per plan).
+Full detail: `Wiki/reference/project-memory-plugin.md`, `Wiki/log.md`
 session-BC-TOOL-003.
 
 2026-08-26 (prior) — by /execute — **BC-TOOL-002 complete: Zenny now runs

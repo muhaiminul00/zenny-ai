@@ -61,10 +61,32 @@ later (see [[reference/role-modes-plugin]] for the sibling plugin Zenny
   cosmetic gap found during this same verification (scaffold templates
   missing a blank line before the "(Scaffolded by...)" note) was fixed and
   pushed as a follow-up commit.
-- **Not yet done (human action required):** `/plugin marketplace add
-  https://github.com/muhaiminul00/project-memory` + `/plugin install
-  project-memory@project-memory`, run by the human in whichever project
-  they choose to try it in first (not necessarily Zenny).
+- **Real bug found live-verifying the actual install (2026-08-26,
+  post-install):** human installed both `project-memory` and `role-modes`
+  together in a real test project (`E:\Programming\claude-memory-test`) and
+  asked for independent verification. Ran both plugins' real cached
+  `hooks/session-start.js` against that project directly (not just trusted
+  the CLI's install success) — `project-memory` scaffolded correctly
+  (all 3 files + CLAUDE.md block, idempotent re-run hash-confirmed), but
+  **`role-modes`'s own CLAUDE.md block never appeared** — both plugins had
+  independently chosen the identical generic sentinel filename
+  `.claude-md-seeded` in the shared `.claude/hooks/state/` directory;
+  whichever plugin's hook fires first "claims" it, so the other silently
+  skips seeding, believing it already ran. This is a class of bug the
+  original single-plugin scratch-test verification structurally could not
+  catch (no second plugin present to collide with) — only surfaced testing
+  both together, exactly as the human asked. **Fixed:** `project-memory`'s
+  sentinel renamed to `.project-memory-claude-md-seeded` (namespaced),
+  pushed (`13a4933`), re-verified in a fresh scratch project with both
+  hooks run in sequence — both blocks now appear correctly. The real test
+  project's own stale `.claude-md-seeded` (written by the old code during
+  this verification pass, before the fix) was deleted so `role-modes` can
+  seed correctly on its next real run there.
+- **Still human action required:** the already-installed plugin cache
+  (`~/.claude/plugins/cache/project-memory/`) still runs the pre-fix code —
+  a `git push` doesn't retroactively update an already-cloned local plugin
+  cache. The human needs to update/reinstall `project-memory` to pull
+  `13a4933` before this fix takes effect in any already-installed project.
 
 See [[reference/role-modes-plugin]] for the sibling mode-system plugin and
 its own extraction/migration history.
