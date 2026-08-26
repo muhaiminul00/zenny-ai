@@ -108,5 +108,31 @@ later (see [[reference/role-modes-plugin]] for the sibling plugin Zenny
   project (both `.claude/CLAUDE.md` blocks present, no sentinel collision).
   Pushed `dd808fa`.
 
+- **BC-TOOL-007 update (2026-08-26), fixing a real bug found via live testing
+  of the actual install:** the human installed both plugins fresh in a new
+  project (project scope) and reported nothing got scaffolded at all. Root
+  cause, confirmed against Claude Code's own docs: there is no
+  `PluginInstalled`/`PluginEnabled` hook - `SessionStart` at the next real
+  session boundary is the only mechanism, and `/plugin install` mid-session
+  never fires one. Not a plugin bug; fixed the `SessionStart` matcher from
+  `startup|resume|compact` to add `clear|fork` (catches `/clear`, a common
+  real restart path this project misses too) and added an explicit README
+  caveat instead of implying instant activation. Separately, per the
+  human's follow-up instruction, reversed the BC-TOOL-004 "keep at root"
+  decision: `PROJECT_STATE.md`/`Wiki/` now scaffold under `.project-memory/`
+  (matching the `remember` plugin's own `.remember/` convention). This
+  required also fixing a self-inflicted bug caught by `/simplify`'s
+  altitude review before commit: the scaffold sentinel wasn't renamed
+  alongside the path move, so an already-scaffolded project would have
+  silently skipped re-scaffolding under the new layout - same class of bug
+  as the earlier sentinel-collision fix, generalized here (sentinel must
+  version with the artifact set it gates). Sentinel renamed
+  `.memory-scaffolded` -> `.memory-scaffolded-v2`. Also added explicit
+  named credit to Andrej Karpathy's gist in the README (inspired-by, not a
+  fork). Live-verified: fresh scaffold, idempotent re-run, an old-sentinel
+  project correctly re-scaffolding under the new layout with its stale
+  root file left untouched, and a joint run alongside `role-modes`. Pushed
+  `7fccc78`.
+
 See [[reference/role-modes-plugin]] for the sibling mode-system plugin and
 its own extraction/migration history.

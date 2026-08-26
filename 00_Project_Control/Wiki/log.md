@@ -9,6 +9,62 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-26] session-BC-TOOL-007-008 | Real install failure found by human's own live test, fixed at root cause; project-memory scaffold moved to .project-memory/
+
+**Trigger:** human installed both plugins fresh (project scope) in a new
+test folder (`E:\Programming\my-plugin-test`) and reported nothing got
+scaffolded - no `.claude/CLAUDE.md`, no `mode.json`, no memory files.
+
+**Root cause, confirmed against Claude Code's own docs, not guessed:**
+there is no `PluginInstalled`/`PluginEnabled` hook. `SessionStart` fires
+on exactly five matchers (`startup`, `resume`, `compact`, `clear`,
+`fork`); both plugins' `hooks.json` only listened for the first three.
+Installing a plugin mid-session (via `/plugin install`) never fires any
+of these - the human had installed and then kept working in the same
+session, so nothing had triggered yet. Manually running both hooks
+directly against the test folder produced everything correctly (mode.json,
+both CLAUDE.md blocks, memory files), proving the hook code itself was
+never broken - confirmed live before writing any fix.
+
+**Fixed (BC-TOOL-007, project-memory):** `SessionStart` matcher widened to
+add `clear|fork`; README now states plainly that `/plugin install` alone
+doesn't trigger setup, a real session boundary does. Separately, per the
+human's follow-up instruction reversing the BC-TOOL-004/BC-TOOL-006
+"keep at root" answer: `PROJECT_STATE.md`/`Wiki/` now scaffold under
+`.project-memory/` (matches `remember`'s own `.remember/` convention).
+`/simplify`'s altitude review (run before commit, 4 parallel agents) caught
+a bug this same change would have introduced: the scaffold sentinel
+wasn't renamed alongside the path move, so an already-scaffolded project
+would silently skip re-scaffolding under the new layout - fixed by
+renaming `.memory-scaffolded` -> `.memory-scaffolded-v2` (same lesson as
+the earlier CLAUDE.md-seed sentinel-collision fix, generalized: a
+sentinel must version with the artifact set it gates). Also fixed several
+bare `Wiki/*.md` path references the path move left inconsistent, and
+added explicit named credit to Andrej Karpathy's gist in the README
+(inspired-by, not a fork - answering the human's direct question this
+session). Live-verified: fresh scaffold, idempotent re-run (hash-compared),
+an old-sentinel project correctly re-scaffolding with its stale root file
+left untouched, joint run alongside `role-modes`. Pushed `7fccc78`.
+
+**Fixed (BC-TOOL-008, role-modes):** same matcher widening + README
+caveat. Diff was one config string + one README paragraph - self-assessed
+as having no reuse/simplification/efficiency/altitude surface and the
+4-agent `/simplify` dispatch was skipped (established pure-diff-skip
+pattern), rather than run for form's sake. Live-verified alongside
+`project-memory`. Pushed `7dee8ec`.
+
+**Also answered this session (human's direct questions, not architectural
+ambiguities needing AskUserQuestion):** (1) Karpathy credit - yes, name him
+explicitly, inspired-by framing, not a fork claim (no code was taken).
+(2) Claude Code-only vs. any-agent scope - asked via AskUserQuestion;
+human chose Claude Code-only, since the `.codex-plugin`/`.cursor-plugin`/
+`gemini-extension.json` manifests already sitting in both repos have never
+been verified to actually work and claiming multi-agent support
+untested would repeat the exact honesty problem just fixed in BC-TOOL-004.
+
+Full detail: `Wiki/reference/project-memory-plugin.md`,
+`Wiki/reference/role-modes-plugin.md`.
+
 ## [2026-08-26] session-BC-TOOL-004-005-006 | Both plugins updated per human's 13-point feedback list, live-verified together, both repos pushed
 
 **Trigger:** human reviewed both plugins after the BC-TOOL-003 verification

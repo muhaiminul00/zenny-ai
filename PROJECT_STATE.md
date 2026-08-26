@@ -10,7 +10,31 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-26 (latest) — by /execute — **BC-TOOL-004/005/006: both plugins
+2026-08-26 (latest) — by /execute — **BC-TOOL-007/008: real install failure
+found by human's own live test of both plugins, fixed at root cause; no
+mid-session plugin-enable hook exists in Claude Code (confirmed against
+docs) — `SessionStart` matcher widened to `startup|resume|compact|clear|
+fork` in both plugins, README caveats added instead of implying instant
+activation.** Also this pass, per human follow-up instruction reversing
+the BC-TOOL-004/006 "keep at root" answer: `project-memory` now scaffolds
+`PROJECT_STATE.md`/`Wiki/` under `.project-memory/` (matches `remember`'s
+`.remember/`); a sentinel-versioning bug this path move would have
+introduced (already-scaffolded projects silently skipping the new layout)
+was caught by `/simplify`'s altitude review before commit and fixed
+(`.memory-scaffolded` → `.memory-scaffolded-v2`). Explicit named credit to
+Andrej Karpathy's gist added to `project-memory`'s README. Scope decided
+(AskUserQuestion): both plugins stay Claude Code-only — the `.codex-plugin`
+/`.cursor-plugin`/`gemini-extension.json` manifests already present in
+both repos remain unverified, so no multi-agent claim was made. Live-
+verified: fresh scaffold, idempotent re-run (hash-compared), an
+old-sentinel project correctly re-scaffolding with its stale root file
+untouched, joint run of both plugins in one scratch project (no sentinel
+collision). `project-memory` pushed `7fccc78`, `role-modes` pushed
+`7dee8ec`. Full detail: `Wiki/reference/project-memory-plugin.md`,
+`Wiki/reference/role-modes-plugin.md`, `Wiki/log.md`
+session-BC-TOOL-007-008.
+
+2026-08-26 (prior) — by /execute — **BC-TOOL-004/005/006: both plugins
 updated per human's 13-point feedback list, live-verified together, both
 repos pushed.** `project-memory`: CLAUDE.md seed target moved to
 `.claude/CLAUDE.md` (was project-root CLAUDE.md — keeps tool instructions

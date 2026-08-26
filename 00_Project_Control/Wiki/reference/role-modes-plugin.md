@@ -111,5 +111,21 @@ this is no longer just a portable extraction, it's Zenny's live mode system.
   [[reference/project-memory-plugin]] for the sibling plugin's matching
   update.
 
+- **BC-TOOL-008 update (2026-08-26), same root-cause fix as the sibling
+  `project-memory` plugin:** live testing of a fresh project-scope install
+  showed nothing activated after `/plugin install role-modes@role-modes`.
+  Confirmed against Claude Code's docs: no `PluginInstalled`/
+  `PluginEnabled` hook exists, `SessionStart` at the next real session
+  boundary is the only mechanism, and installing mid-session never fires
+  one - not a plugin bug. Fixed the `SessionStart` matcher from
+  `startup|resume|compact` to add `clear|fork`, and added an explicit
+  README caveat instead of implying instant activation. Trivial diff (one
+  config string, one README paragraph) - self-assessed and the `/simplify`
+  4-agent dispatch was skipped, per this project's established
+  pure-diff-skip pattern. Live-verified alongside `project-memory` in one
+  scratch project. Pushed `7dee8ec`. See
+  [[reference/project-memory-plugin]] for the sibling plugin's matching
+  update (which also moved its scaffold files to `.project-memory/`).
+
 See [[platform-quirks/mode-self-invocation-limits]] for the underlying
 mode-invocation mechanics this plugin also encodes.
