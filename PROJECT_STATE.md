@@ -10,7 +10,15 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-17 (latest) — by /execute — **BC-071: same customer-resolution bug
+2026-08-26 (latest) — by /execute — **BC-TOOL-002 complete: Zenny now runs
+on the `role-modes` Claude Code plugin for its /advisor, /commander,
+/execute mode system.** Local `.claude/commands/*.md` + `session-start.ps1`
+archived (not deleted), redundant hook entry removed from
+`.claude/settings.json` (now tracked in git for the first time), all other
+Zenny-specific hooks unaffected. Full detail: `Wiki/reference/
+role-modes-plugin.md`, `Wiki/log.md` session-BC-TOOL-002.
+
+2026-08-17 (prior) — by /execute — **BC-071: same customer-resolution bug
 found+fixed system-wide (human's explicit "fix this everywhere"
 request), plus a critical, unrelated auth bypass found and fixed along
 the way.** Human hit the exact same `22P02 invalid uuid` error testing
