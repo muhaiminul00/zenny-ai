@@ -151,5 +151,17 @@ later (see [[reference/role-modes-plugin]] for the sibling plugin Zenny
   a Setup section, and a worked Usage example (scaffold output, then a
   `/memory-promote` example). Pushed `00c9dcd`.
 
+- **Release v1.1.0 (2026-08-27):** same fix as the sibling plugin's release
+  — a plain commit (`00c9dcd`) never reaches an already-installed copy
+  without a `plugin.json` version bump, confirmed against official docs.
+  Also removed the duplicate `version` field from
+  `.claude-plugin/marketplace.json` (docs warn `plugin.json` silently wins
+  if both are set). Bumped `1.0.0` → `1.1.0`, tagged `v1.1.0`, pushed
+  `7d60fb1`, GitHub Release at
+  github.com/muhaiminul00/project-memory/releases/tag/v1.1.0. Every
+  user-facing change now needs a version bump alongside it — documented in
+  a new README "Releases" section. See [[reference/role-modes-plugin]] for
+  the fuller writeup (identical fix, applied to both plugins together).
+
 See [[reference/role-modes-plugin]] for the sibling mode-system plugin and
 its own extraction/migration history.

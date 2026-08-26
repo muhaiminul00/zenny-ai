@@ -9,6 +9,55 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-27] session-BC-TOOL-009-010-release | First real release cut for both plugins: v1.1.0, and the version-bump requirement discovered
+
+**Trigger:** human asked to cut a release for both plugins so existing
+installs could pick up BC-TOOL-009/010 by running update in `/plugin`.
+
+**What was found:** confirmed via `claude-code-guide` (official docs,
+`plugin-marketplaces.md`) that `/plugin update` compares the resolved
+`version` and skips if it matches what's installed — with an explicit
+`version` field set (both plugins had `1.0.0` in `plugin.json`), a plain
+commit to `main` does nothing for already-installed copies. This explained
+the "role-modes is already at the latest version (1.0.0)" message the human
+saw earlier in this same session, right after BC-TOOL-009's commit had
+already landed on GitHub. Also found: both plugins set `version` in both
+`.claude-plugin/plugin.json` AND `.claude-plugin/marketplace.json` — the
+docs explicitly warn Claude Code silently prefers `plugin.json` if both are
+set, so the marketplace.json copy was a pure drift trap, not a functional
+override.
+
+**Fix:** removed `version` from `marketplace.json` in both repos
+(`plugin.json` is now the single source of truth); bumped `plugin.json`
+`1.0.0` → `1.1.0` in both; noticed editing `.claude-plugin/plugin.json`'s
+version auto-propagated to `.codex-plugin/plugin.json`,
+`.cursor-plugin/plugin.json`, and `gemini-extension.json` via some
+pre-existing local mechanism not authored this session (not investigated
+further — output was correct). Added a "Releases" README section to both
+plugins stating the rule going forward: **every user-facing change needs a
+`plugin.json` version bump alongside it, or it never reaches installed
+copies, regardless of how many commits land on `main`.**
+
+**Release mechanics confirmed (not required, done anyway for
+discoverability):** a git tag/GitHub Release is NOT required for
+`/plugin update` to detect a change — only the `plugin.json` version field
+is checked. Tagged `v1.1.0` and cut a GitHub Release on both repos anyway,
+since the human asked for "a release" and a tagged release with notes is
+what that means to a human reader even though Claude Code itself only reads
+`plugin.json`.
+
+**Verification:** confirmed all four edited/auto-synced JSON files parse
+correctly (`node -e "JSON.parse(...)"` on each) before committing. Both
+repos pushed: `role-modes` `971b840` (tag `v1.1.0`,
+github.com/muhaiminul00/role-modes/releases/tag/v1.1.0), `project-memory`
+`7d60fb1` (tag `v1.1.0`,
+github.com/muhaiminul00/project-memory/releases/tag/v1.1.0).
+
+**Resolved:** [[reference/role-modes-plugin]] and
+[[reference/project-memory-plugin]] updated with matching release entries.
+
+---
+
 ## [2026-08-27] session-BC-TOOL-009-010 | Manual /init commands so setup no longer requires a session restart; README overhaul for both plugins
 
 **Trigger:** human, in `/role-modes:commander`, pointed out both plugins now

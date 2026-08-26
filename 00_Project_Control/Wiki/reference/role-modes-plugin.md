@@ -155,5 +155,28 @@ this is no longer just a portable extraction, it's Zenny's live mode system.
   Pushed `aa14e86`. See [[reference/project-memory-plugin]] for the sibling
   plugin's matching BC-TOOL-010 update.
 
+- **Release v1.1.0 (2026-08-27):** human asked for an actual release so
+  existing installs pick up BC-TOOL-009 via `/plugin update`. Confirmed via
+  `claude-code-guide` (official docs, `plugin-marketplaces.md`) that an
+  explicit `version` field means `/plugin update` compares versions and
+  skips if they match — a plain commit to `main` (like `aa14e86`) does
+  nothing for already-installed copies without a version bump. Also found
+  and fixed: `version` was set in both `.claude-plugin/plugin.json` and
+  `.claude-plugin/marketplace.json` — the docs explicitly warn Claude Code
+  silently prefers `plugin.json` if both are set, so the marketplace.json
+  copy was a pure drift trap. Removed it; `plugin.json` is now the single
+  source of truth. Bumped `1.0.0` → `1.1.0`, tagged `v1.1.0`, pushed
+  `971b840`, and cut a GitHub Release
+  (github.com/muhaiminul00/role-modes/releases/tag/v1.1.0). Added a
+  "Releases" README section documenting this process for future changes —
+  **every user-facing change now needs a `plugin.json` version bump
+  alongside it, or it silently never reaches installed copies.** Noted:
+  editing `.claude-plugin/plugin.json`'s version auto-propagated to
+  `.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`, and
+  `gemini-extension.json` via some pre-existing local sync mechanism not
+  authored this session — not investigated further since it produced
+  correct, valid output, but worth knowing about if it ever produces
+  incorrect output.
+
 See [[platform-quirks/mode-self-invocation-limits]] for the underlying
 mode-invocation mechanics this plugin also encodes.

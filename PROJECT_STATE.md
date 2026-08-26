@@ -10,7 +10,26 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-27 (latest) — by /execute — **BC-TOOL-009/010: `/role-modes:init`
+2026-08-27 (latest) — by /execute — **First real release cut for both
+plugins: v1.1.0.** Confirmed via official docs that `/plugin update`
+compares the `version` field and skips if unchanged — a plain commit
+(BC-TOOL-009/010's `aa14e86`/`00c9dcd`) never reaches an already-installed
+copy without a version bump; this is why the human saw "role-modes is
+already at the latest version (1.0.0)" earlier despite the commit already
+being on GitHub. Also found and fixed: both plugins had `version` set in
+both `plugin.json` and `marketplace.json` — the docs warn `plugin.json`
+silently wins, so the marketplace.json copy was a pure drift trap. Removed
+it; `plugin.json` is now the single source of truth. Bumped `1.0.0` →
+`1.1.0` in both, tagged `v1.1.0`, cut GitHub Releases (not required for
+`/plugin update` but done for discoverability), pushed `role-modes`
+`971b840` and `project-memory` `7d60fb1`. **New standing rule for both
+plugins, documented in a new README "Releases" section: every user-facing
+change needs a `plugin.json` version bump alongside it, or existing
+installs never see it.** Full detail: `Wiki/reference/role-modes-plugin.md`,
+`Wiki/reference/project-memory-plugin.md`, `Wiki/log.md`
+session-BC-TOOL-009-010-release.
+
+2026-08-27 (prior) — by /execute — **BC-TOOL-009/010: `/role-modes:init`
 and `/memory-init` now do the full one-time setup on demand, no session
 restart needed; both READMEs overhauled with Install/Setup/Usage-example
 sections.** BC-TOOL-007/008 widened which session boundaries trigger setup,
