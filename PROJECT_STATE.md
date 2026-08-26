@@ -10,7 +10,33 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-26 (latest) — by /commander — **BC-TOOL-003: `project-memory`
+2026-08-26 (latest) — by /execute — **BC-TOOL-004/005/006: both plugins
+updated per human's 13-point feedback list, live-verified together, both
+repos pushed.** `project-memory`: CLAUDE.md seed target moved to
+`.claude/CLAUDE.md` (was project-root CLAUDE.md — keeps tool instructions
+separate from a project's own maintained docs), self-maintenance/Promotion
+Rule framing strengthened (Claude applies it on its own now; `/memory-*`
+commands are the manual fallback), README rewritten honestly (origin
+story, what/why/how). Pushed `dd808fa`. `role-modes`: same seed-target
+move; new `build-cards` skill (generic fallback Build Card format);
+memory-system decision gap closed (Commander recommends `project-memory`
+if installed, else asks once and records the answer in
+`.claude/CLAUDE.md`); live-infra handoff safe-gate now explicit with a
+default threshold of 5 consecutive cards, changeable via a `.claude/
+CLAUDE.md` line; docs/hook fixed to consistently say `/role-modes:
+commander` etc. (Claude Code namespaces every plugin command — a bare
+`/commander` never worked, README previously claimed otherwise); README's
+"What's deliberately NOT included" replaced with a direct `project-memory`
+recommendation. Pushed `d0a1365`. **Live-verified, not just written:**
+fresh scaffold and idempotent re-run (hash-compared) for each plugin
+separately, then both hooks run together in one fresh scratch project —
+both `.claude/CLAUDE.md` marker blocks present, no sentinel collision,
+root `CLAUDE.md` never touched by either. Zenny itself still NOT migrated
+(deferred, per standing decision). Full detail: `Wiki/reference/
+project-memory-plugin.md`, `Wiki/reference/role-modes-plugin.md`,
+`Wiki/log.md` session-BC-TOOL-004-005-006.
+
+2026-08-26 (prior) — by /commander — **BC-TOOL-003: `project-memory`
 plugin built, installed by human alongside `role-modes` in a real test
 project, independently live-verified — 1 real bug found + fixed.** Both
 plugins had picked the identical generic CLAUDE.md-seed sentinel filename,

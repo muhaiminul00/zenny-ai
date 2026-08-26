@@ -9,6 +9,71 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-26] session-BC-TOOL-004-005-006 | Both plugins updated per human's 13-point feedback list, live-verified together, both repos pushed
+
+**Trigger:** human reviewed both plugins after the BC-TOOL-003 verification
+pass and gave a 13-point feedback list in `/commander`. Two points were
+genuinely ambiguous/architecturally consequential enough to ask rather
+than guess (asked via AskUserQuestion, both answered before planning):
+(1) point 12 — "copy every hook/skill/file into the consuming project's
+`.claude/*`" would break the standard plugin-cache auto-update model;
+human confirmed: data only, plugin code stays in the shared cache as
+today. (2) point 10 — move `project-memory`'s scaffolded files into a
+hidden `.project-memory/` folder like the `remember` plugin; human
+confirmed: keep them visible at the project root, just make sure each
+file names the plugin as its owner (already true via the existing
+"Scaffolded by..." footer note). Two other points had one obviously
+correct answer given what was already built, decided without asking:
+point 7/8 (init/trigger for project- vs. user-scope install) needed no
+new work — both hooks already read `CLAUDE_PROJECT_DIR` fresh every
+`SessionStart`, so both scopes already auto-scaffold with zero manual
+trigger; point 9 (bare `/commander` not resolving) has a hard platform
+answer — Claude Code namespaces every plugin slash command, there is no
+way to make one bare, so the fix is correcting the docs, not the code.
+
+**Built (BC-TOOL-004, project-memory):** CLAUDE.md seed target moved from
+project-root `CLAUDE.md` to `.claude/CLAUDE.md`; self-maintenance/
+Promotion Rule framing strengthened in both the injected context and the
+seeded block (Claude applies it on its own now, `/memory-*` commands are
+the manual fallback); the four slash commands now check `.claude/
+CLAUDE.md` alongside root CLAUDE.md for project-specific overrides;
+README rewritten honestly (real origin story, what/why/how, no inflated
+claims). Committed `dd808fa`, pushed.
+
+**Built (BC-TOOL-005, role-modes):** same CLAUDE.md seed-target move; new
+`skills/build-cards/SKILL.md` — a generic fallback Build Card format for
+projects without their own, referenced from Commander's instructions and
+the seeded block; memory-system decision gap closed — Commander checks
+once per project whether a memory system is recorded in `.claude/
+CLAUDE.md`, recommends `project-memory` if installed, else asks and
+records the answer; live-infra handoff safe-gate made explicit with a
+default threshold of 5 consecutive Build Cards (was previously only
+Zenny's own CLAUDE.md convention at 3 — now a portable,
+project-overridable plugin default), changeable by telling Commander a
+new number, which updates the `.claude/CLAUDE.md` line; hook and command
+docs corrected to consistently say `/role-modes:commander` etc.; README's
+"What's deliberately NOT included" section replaced with a direct
+`project-memory` recommendation/link. Committed `d0a1365`, pushed.
+
+**Live-verified, not just written:** ran both updated hooks directly
+(`node hooks/session-start.js` with `CLAUDE_PROJECT_DIR` set) against
+fresh scratch projects — confirmed for each plugin separately: correct
+files scaffolded, `.claude/CLAUDE.md` seeded (not root `CLAUDE.md`, which
+was confirmed to never be created), and a second run is a byte-identical
+no-op (sha256-compared). Then ran both hooks together in one fresh
+scratch project: both `<!-- project-memory-plugin:v1 -->` and
+`<!-- role-modes-plugin:v1 -->` blocks present in the same `.claude/
+CLAUDE.md`, all four sentinel files present with no name collision (the
+BC-TOOL-003 fix holds under the new seed-target code too).
+
+**Not done, per standing decision:** Zenny itself remains on its own
+local Wiki/PROJECT_STATE.md/CLAUDE.md conventions, not migrated onto
+`project-memory` — migration was explicitly deferred when `project-memory`
+was first built (BC-TOOL-003) and this session didn't revisit that call.
+
+Full detail: `Wiki/reference/project-memory-plugin.md`,
+`Wiki/reference/role-modes-plugin.md`.
+
 ## [2026-08-26] session-BC-TOOL-003 | New sibling plugin `project-memory` (github.com/muhaiminul00/project-memory) built, reviewed, live-verified — Zenny not migrated onto it yet
 
 **Trigger:** Human, in `/commander`: extract Zenny's Wiki/PROJECT_STATE.md

@@ -88,5 +88,25 @@ later (see [[reference/role-modes-plugin]] for the sibling plugin Zenny
   cache. The human needs to update/reinstall `project-memory` to pull
   `13a4933` before this fix takes effect in any already-installed project.
 
+- **BC-TOOL-004 update (2026-08-26), per human's 13-point feedback pass:**
+  the CLAUDE.md seed target moved from a project's root `CLAUDE.md` to
+  `.claude/CLAUDE.md` (same rationale as the sibling `role-modes` plugin —
+  plugin/tool instructions stay separate from a project's own maintained
+  docs). Per explicit human decision this session, the scaffolded files
+  themselves (`PROJECT_STATE.md`, `Wiki/`) stay visible at the project
+  root rather than moving into a hidden `.project-memory/` folder — each
+  file's own footer note ("Scaffolded by the `project-memory` plugin...")
+  already marks plugin ownership, which was judged sufficient. Also
+  strengthened this session: the injected per-session context and the
+  seeded block now push self-maintenance as the default — Claude is
+  expected to apply the Promotion Rule on its own, as part of normal work,
+  not wait for a human to invoke `/memory-log`/`/memory-promote`/
+  `/memory-lint` explicitly (those are now framed as the manual fallback).
+  README rewritten for honesty (real origin story, what/why/how, no
+  inflated claims). Live-verified fresh + idempotent (hash-compared) +
+  root-CLAUDE.md-never-touched + alongside `role-modes` in one scratch
+  project (both `.claude/CLAUDE.md` blocks present, no sentinel collision).
+  Pushed `dd808fa`.
+
 See [[reference/role-modes-plugin]] for the sibling mode-system plugin and
 its own extraction/migration history.

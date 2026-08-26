@@ -88,5 +88,28 @@ this is no longer just a portable extraction, it's Zenny's live mode system.
   script — both legitimate ideas surfaced during review, deferred rather
   than built, per "neither mode over-engineers."
 
+- **BC-TOOL-005 update (2026-08-26), per human's 13-point feedback pass:**
+  the CLAUDE.md seed target moved from a project's root `CLAUDE.md` to
+  `.claude/CLAUDE.md` (tool/plugin instructions stay out of the doc a human
+  actually maintains; Claude Code loads both the same way). Zenny itself is
+  unaffected — it pre-created its own `.claude-md-seeded` sentinel during
+  BC-TOOL-002 specifically to skip this seed entirely, and that sentinel
+  still blocks it regardless of which path the code now targets. Also
+  added this session: a generic `build-cards` skill (fallback Build Card
+  format for projects without their own); a memory-system decision gap
+  closed (Commander recommends `project-memory` if installed, else asks
+  once and records the answer); an explicit live-infra handoff safe-gate
+  (default 5 consecutive Build Cards, configurable via `.claude/CLAUDE.md`)
+  — codifying what was previously only Zenny's own CLAUDE.md convention
+  (3 cards) as a portable, project-overridable default in the plugin
+  itself; and a correction to the README's "kept bare" claim about slash
+  commands — Claude Code namespaces every plugin command, so `/commander`
+  never actually worked, only `/role-modes:commander` does, and the docs
+  were wrong to imply otherwise. Live-verified fresh + idempotent +
+  alongside `project-memory` in one scratch project (both `.claude/
+  CLAUDE.md` blocks present, no sentinel collision). Pushed `d0a1365`. See
+  [[reference/project-memory-plugin]] for the sibling plugin's matching
+  update.
+
 See [[platform-quirks/mode-self-invocation-limits]] for the underlying
 mode-invocation mechanics this plugin also encodes.
