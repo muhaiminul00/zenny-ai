@@ -10,8 +10,35 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-26 (latest) — by /execute — **BC-TOOL-007/008: real install failure
-found by human's own live test of both plugins, fixed at root cause; no
+2026-08-27 (latest) — by /execute — **BC-TOOL-009/010: `/role-modes:init`
+and `/memory-init` now do the full one-time setup on demand, no session
+restart needed; both READMEs overhauled with Install/Setup/Usage-example
+sections.** BC-TOOL-007/008 widened which session boundaries trigger setup,
+but `/plugin install` mid-session still can't fire any hook at all — the
+actual gap was narrower than that: `mode.json` already gets created the
+moment any `/role-modes:*` command runs, so only the `.claude/CLAUDE.md`
+starter-block seed (both plugins) and the three memory files
+(`project-memory` only) were stuck behind `SessionStart`. New
+`/role-modes:init` and extended `/memory-init` seed those directly. Both
+commands embed a literal copy of the hook's starter-block text (confirmed
+via `claude-code-guide`: `${CLAUDE_PLUGIN_ROOT}` is hooks/MCP/LSP/
+monitor-only, unreadable from a command) — verified byte-identical against
+each hook's real output in a scratch project before committing.
+`/simplify`'s altitude review (role-modes diff) flagged that a maintenance
+comment alone doesn't enforce the two copies staying in sync; added
+`scripts/check-init-sync.js` to both plugins (runs the hook for real,
+byte-diffs the output) so drift becomes a failing check. Also hit and fixed
+a `simplify-guard` false-negative: `cd <path> && git commit` resolves the
+wrong repo's git-dir because the hook reads the Bash tool's `cwd` parameter,
+not a `cd` inside the command string — `git -C <path> commit` is the
+correct form going forward. `role-modes` pushed `aa14e86`, `project-memory`
+pushed `00c9dcd`. Full detail: `Wiki/reference/project-memory-plugin.md`,
+`Wiki/reference/role-modes-plugin.md`, `Wiki/log.md`
+session-BC-TOOL-009-010.
+
+2026-08-26 (prior) — by /execute — **BC-TOOL-007/008: real install failure
+found by human's own live test of both plugins, fixed at root cause (this
+entry itself demoted from latest — see the 2026-08-27 entry above); no
 mid-session plugin-enable hook exists in Claude Code (confirmed against
 docs) — `SessionStart` matcher widened to `startup|resume|compact|clear|
 fork` in both plugins, README caveats added instead of implying instant

@@ -9,6 +9,81 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-27] session-BC-TOOL-009-010 | Manual /init commands so setup no longer requires a session restart; README overhaul for both plugins
+
+**Trigger:** human, in `/role-modes:commander`, pointed out both plugins now
+depend on a fresh session boundary to complete their one-time setup (the
+BC-TOOL-007/008 matcher fix broadened which boundaries count, but never
+solved needing one at all), and asked for a manual command as an alternative
+plus a proper Install/Setup/Usage-example README for each, "like Gstack's
+readme."
+
+**Root-cause narrowing:** re-examined what's actually gated on a session
+boundary in each plugin. `role-modes`'s `mode.json` was already fine — any
+`/role-modes:advisor|commander|execute` invocation writes it immediately,
+restart or not. The real gap in both plugins is narrower than first assumed:
+only the `.claude/CLAUDE.md` starter-block seed (and, for `project-memory`,
+the three memory files too) is stuck behind `SessionStart`.
+
+**Fix — role-modes (BC-TOOL-009):** added `commands/init.md`
+(`/role-modes:init`) to seed the CLAUDE.md block on demand. Confirmed via a
+`claude-code-guide` subagent, sourced from official docs, that
+`${CLAUDE_PLUGIN_ROOT}` is readable only from hooks/MCP/LSP/monitor
+processes — not from a slash-command's own execution context — so the block
+had to be embedded as a literal text copy in the command file rather than
+loaded from the hook. Verified that copy byte-identical against the real
+hook's actual output (ran `hooks/session-start.js` against a scratch project
+with `CLAUDE_PROJECT_DIR` set, diffed the result) before committing.
+
+**Fix — project-memory (BC-TOOL-010):** extended the existing `/memory-init`
+command (previously file-scaffold-only) to also seed the CLAUDE.md block,
+same verification method.
+
+**Caught by `/simplify`'s altitude-review agent (role-modes diff):** a
+maintenance comment cross-referencing the hook and the command file doesn't
+*enforce* the two copies staying in sync — nothing fails when they drift.
+Added `scripts/check-init-sync.js` to both plugins: it actually runs the
+hook against a scratch project and byte-diffs the output against the
+command file's embedded block, turning future drift into a failing check.
+Applied directly to `project-memory`'s structurally-identical diff without
+re-running the full 4-agent dispatch a second time.
+
+**Skipped, judged a false economy:** the reuse-review agent suggested having
+the command read `hooks/session-start.js` at runtime and extract the block
+programmatically instead of embedding a copy. Rejected — manually
+attempting that exact extraction (to build the verification diff above)
+proved genuinely fragile (regex/eval mis-parsing of escaped JS string
+literals), so a prose-driven runtime parse would trade a known, tested,
+static-duplication risk for a less predictable one. The sync-check script is
+the actual fix for the drift risk; runtime parsing is not a safer
+alternative to it.
+
+**README overhaul, both plugins:** added an Install-time pointer to the new
+manual command, a Setup section, and a worked Usage-example transcript
+(previously description-only, no walkthrough) — the two specific gaps the
+human named.
+
+**Process note — `simplify-guard` false negative:** the first commit attempt
+for each plugin repo, issued as `cd <path> && git commit ...`, was denied by
+the `simplify-guard` PreToolUse hook even after a correct completion signal.
+Read the hook's source (`guard.py`, shipped with the `simplify` plugin):
+it resolves the target repo's git-dir from the Bash tool's registered `cwd`
+parameter, which a `cd` inside the command string does not change — so it
+was checking Zenny's own marker, not the plugin repo's. Fixed by issuing
+`git -C <path> commit ...` instead, whose `-C` the hook's git-dir resolution
+already handles correctly. Not a bug in the guard or in either plugin —
+logged here so a future session doesn't rediscover it the hard way.
+
+**Verification:** `scripts/check-init-sync.js` passes for both plugins (run
+directly, not just written). Both commits pushed: `role-modes` `aa14e86`,
+`project-memory` `00c9dcd`.
+
+**Resolved:** [[reference/role-modes-plugin]] and
+[[reference/project-memory-plugin]] updated with matching BC-TOOL-009/010
+entries.
+
+---
+
 ## [2026-08-26] session-BC-TOOL-007-008 | Real install failure found by human's own live test, fixed at root cause; project-memory scaffold moved to .project-memory/
 
 **Trigger:** human installed both plugins fresh (project scope) in a new

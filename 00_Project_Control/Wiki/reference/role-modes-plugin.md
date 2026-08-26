@@ -127,5 +127,33 @@ this is no longer just a portable extraction, it's Zenny's live mode system.
   [[reference/project-memory-plugin]] for the sibling plugin's matching
   update (which also moved its scaffold files to `.project-memory/`).
 
+- **BC-TOOL-009 update (2026-08-27), manual setup + README overhaul:** even
+  with BC-TOOL-008's `clear|fork` matcher fix, `/plugin install` mid-session
+  still can't fire any hook (confirmed, not new) - so the `.claude/CLAUDE.md`
+  starter-block seed still waits for a real session boundary. `mode.json`
+  itself was already fine: any `/role-modes:*` command writes it the moment
+  it's invoked, restart or not. Added `/role-modes:init` (`commands/init.md`)
+  to seed the CLAUDE.md block on demand. Its content is a literal copy of
+  `hooks/session-start.js`'s `seedClaudeMd()` output, since a slash-command
+  can't `require()` a hook file (confirmed via `claude-code-guide`:
+  `${CLAUDE_PLUGIN_ROOT}` is hooks/MCP/LSP/monitor-only, not readable from a
+  command's execution context) - verified byte-identical against the real
+  hook's output in a scratch project before committing. `/simplify`'s
+  altitude-review agent flagged that a maintenance comment alone doesn't
+  *enforce* the two copies staying in sync - added `scripts/check-init-sync.js`,
+  which actually runs the hook against a scratch project and byte-diffs its
+  output against the command file, so future drift is a failing check, not a
+  hoped-for human memory. Also overhauled the README: an Install-time
+  pointer to `/role-modes:init`, a Setup section, and a worked Usage example
+  transcript (previously text-only description, no worked walkthrough).
+  **Process note:** hit the `simplify-guard` PreToolUse hook resolving the
+  wrong repo's git-dir when the commit was issued as `cd <path> && git
+  commit` - the hook reads the Bash tool's registered `cwd`, which a `cd`
+  inside the command string doesn't change, so it checked Zenny's own
+  marker instead of the plugin repo's. Fixed by using `git -C <path> commit`
+  instead, which the hook's `-C`-aware git-dir resolution handles correctly.
+  Pushed `aa14e86`. See [[reference/project-memory-plugin]] for the sibling
+  plugin's matching BC-TOOL-010 update.
+
 See [[platform-quirks/mode-self-invocation-limits]] for the underlying
 mode-invocation mechanics this plugin also encodes.

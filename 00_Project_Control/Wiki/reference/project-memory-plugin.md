@@ -134,5 +134,22 @@ later (see [[reference/role-modes-plugin]] for the sibling plugin Zenny
   root file left untouched, and a joint run alongside `role-modes`. Pushed
   `7fccc78`.
 
+- **BC-TOOL-010 update (2026-08-27), manual setup + README overhaul:** same
+  gap as the sibling plugin's BC-TOOL-009 - `/memory-init` already existed
+  but only repaired the three memory files, never seeded `.claude/CLAUDE.md`.
+  Extended it to do both, so the full first-run setup can run on demand
+  instead of waiting for a real session boundary. The CLAUDE.md block is a
+  literal copy of `hooks/session-start.js`'s `seedClaudeMd()` output
+  (confirmed `${CLAUDE_PLUGIN_ROOT}` is hooks/MCP/LSP/monitor-only, not
+  readable from a command) - verified byte-identical against the real
+  hook's output in a scratch project. Added `scripts/check-init-sync.js`
+  (same fix as the sibling plugin, applied directly here rather than
+  re-running the full `/simplify` 4-agent dispatch since the diff shape is
+  structurally identical) - runs the hook for real and byte-diffs its
+  output against the command file, so drift is a failing check, not a
+  comment. README overhauled with an Install-time pointer to `/memory-init`,
+  a Setup section, and a worked Usage example (scaffold output, then a
+  `/memory-promote` example). Pushed `00c9dcd`.
+
 See [[reference/role-modes-plugin]] for the sibling mode-system plugin and
 its own extraction/migration history.
