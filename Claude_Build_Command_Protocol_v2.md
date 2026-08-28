@@ -1,38 +1,54 @@
 # Claude Build Command Protocol v2
 
-```
-Status:    APPROVED — supersedes AI_Builder_Operating_Manual_v1.md entirely.
-Purpose:   Define the operating model for building the Zenny platform using
-           two AI parties — Claude (chat) as Commander and Claude Code as
-           Executor — with the human as the sole approval and credential
-           authority. Codex is no longer part of this pipeline; v1's
-           three-party model (Human/Claude/Codex) is retired.
+Status:    APPROVED — supersedes v2's two-product model. Retains all
+           governance content; changes WHERE each role runs.
+Purpose:   Define the operating model for building the Zenny platform
+           using Claude Code as the sole execution surface, operating
+           in three distinct modes (Commander, Executor, Advisor), with
+           the human as the sole approval and credential authority.
+           Claude.ai (chat) is retained ONLY as an optional, non-code
+           advisory surface for strategy/research that never touches
+           live repo or platform state — it is not part of the build
+           loop and never issues Build Cards.
 Position:  Governs how every Build Card gets issued, executed, and
-           reviewed from this point forward. Referenced by
-           Planning_to_Build_Transition_v1.md, which is the current
-           entry point for the active build phase.
-Rename:    v1 was titled "AI Workforce Implementation Orchestration Plan."
-           Renamed to reflect what it actually now governs: a direct
-           command relationship between the two Claude surfaces, not a
-           multi-vendor workforce.
-```
+           reviewed from this point forward.
+Change:    v2 split Commander (Claude.ai chat) and Executor (Claude
+           Code) across two products, reconciled by manual summary/
+           GitHub sync. That sync was found unreliable and token-
+           expensive in practice (repeated real cost, no live grounding
+           on the Commander side). v2.4 collapses both roles into
+           Claude Code itself, switched via /commander, /execute, and
+           /advisor slash-commands, each persisting across sessions via
+           a mode-state file until explicitly changed.
+
 
 ------------------------------------------------------------------------
 
-# 1. Vision — Unchanged in Spirit, Restated for Two Parties
+# 1. Vision — Unchanged in Spirit, Restated for One Tool, Three Modes
 
 Implementation is intentionally **not fully autonomous**. Architecture is
-frozen (or, per `Planning_to_Build_Transition_v1.md`, validated and
-current) before implementation proceeds. Both AI parties execute against
-that architecture; the human remains the approval and credential gate.
+frozen (or validated-current) before implementation proceeds. Every mode
+executes against that architecture; the human remains the approval and
+credential gate.
 
 Core principles, unchanged:
 
 - Architecture drives implementation.
-- Claude (chat) commands. Claude Code executes.
+- Commander mode plans. Executor mode builds. Advisor mode is
+  advisory-only and commits nothing.
 - The human approves and controls credentials.
 - Reality discovered during implementation feeds back into architecture
   only through controlled Change Requests — never a silent edit.
+
+**What changed from v2, and why:** v2's split across two products
+required manual synchronization (pasted summaries, GitHub fetches) for
+the Commander to see real repo/platform state. This was found to be
+both unreliable and expensive in practice — a Commander reasoning from a
+stale or lossy summary produced plans that had to be corrected against
+reality anyway, at real token cost twice over. Collapsing to one tool
+means the Commander (now Claude Code in `/commander` mode) can read
+PROJECT_STATE.md, the Wiki, and live MCP state directly, with zero
+translation loss.
 
 ------------------------------------------------------------------------
 
@@ -40,208 +56,208 @@ Core principles, unchanged:
 
 ## You — Chief Architect & Approval Authority
 
-Owns: final architectural decisions, document approval, build
-prioritization, credential management, change approval, production
-readiness approval.
+Unchanged. Owns: final architectural decisions, document approval,
+build prioritization, credential management, change approval,
+production readiness approval.
 
 Never responsible for: building workflows, configuring nodes, writing
 implementation logic.
 
 ------------------------------------------------------------------------
 
-## Claude (this chat) — Commander
+## Claude Code, in `/commander` mode — Commander
 
-Responsibilities:
+Invoked via the `/commander` slash-command. Persists across sessions
+(via mode-state file) until `/execute` or `/advisor` is invoked.
+Operates at medium effort, `plan` permission mode by default.
 
-- Read and maintain all frozen/current documents.
-- Plan implementation sequence (the phase plan in
-  `Planning_to_Build_Transition_v1.md` Part 4 is the current standing
-  sequence — Claude keeps it current as phases complete).
+Responsibilities — unchanged from v2's Commander role, now performed
+by the same tool that will execute:
+
+- Read and maintain all frozen/current documents, PROJECT_STATE.md,
+  and the Wiki (see Section 3).
+- Plan implementation sequence (per the Build Card system and current
+  PROJECT_STATE.md phase status — `Planning_to_Build_Transition_v1.md`
+  was removed 2026-08-29 as a pre-Wiki-era planning doc; its ordering
+  has been superseded by the Phase Checklist in PROJECT_STATE.md).
 - Generate Build Cards (Section 5).
-- Review Claude Code's Implementation Reports.
+- Review prior Implementation Reports.
 - Detect architectural violations.
 - Generate Change Requests.
 - Approve or reject completed Build Cards.
 - Issue the next Build Card.
 
-**Claude (chat) never directly builds** — no code execution, no MCP tool
-calls that create/modify live infrastructure. It reads (via
-`project_knowledge_search`, file view) and reasons, then commands.
+**New in this version — bounded direct-execution authority:**
+Commander mode may execute directly, without switching to `/execute`,
+ONLY when the action is:
+  - read-only, or
+  - single-file and non-destructive, and
+  - has no credential or live-infra impact (no n8n/Supabase/VPS/DNS
+    writes, no git operations beyond a read).
+
+Anything outside that boundary — any write to live n8n, Supabase,
+infra, or a credential-adjacent action — must hand off to `/execute`,
+even if the action seems small. This boundary exists specifically so
+Commander mode's planning judgment is never exercised under the
+pressure of "it's a small execute, I'll just do it" for anything that
+actually carries real risk.
+
+**Standing constraint, unchanged from v2:** Commander mode never
+bypasses architecture and never approves its own Build Card without a
+genuine Implementation Report to review — even though both roles now
+run in the same tool, the review step is not skipped. A Build Card
+issued in `/commander` mode is reviewed against its Implementation
+Report in a later `/commander` turn, the same as v2's cross-product
+review, just without the sync cost.
+
+**Standing constraint on Build Card issuance:** `/commander` will not
+generate a new Build Card while an unresolved, unacknowledged
+document-level conflict is flagged (per the Document Resolution
+Authority, Section 2 below) — resolve or obtain acknowledgment first.
 
 ------------------------------------------------------------------------
 
-## Claude Code — Executor
+## Claude Code, in `/execute` mode — Executor
 
-Responsibilities:
+Invoked via the `/execute` slash-command. Persists across sessions
+until `/commander` or `/advisor` is invoked. Operates at medium effort,
+`auto` (or this environment's equivalent default) permission mode.
+
+Responsibilities — unchanged from v2:
 
 - Execute a Build Card fully: build workflows, configure nodes/
-  expressions/routing/retries/utilities, write and run migrations, deploy
-  Edge Functions, build dashboard components — whatever the Build Card
-  scopes.
+  expressions/routing/retries/utilities, write and run migrations,
+  deploy Edge Functions, build dashboard components — whatever the
+  Build Card scopes.
 - **Has orchestration authority within a Build Card's scope** — may
-  break a Build Card into its own sub-steps, sequence its own tool calls,
-  and make small implementation-detail judgment calls (e.g., exact node
-  arrangement, minor naming) without stopping to ask, as long as the
-  result matches the Build Card's stated objective and the Fixed
-  Compliance Checklist (Section 10.C.1).
-- Live-verify against MCP/current docs before building on any assumption
-  (Section 6.1 — unchanged from v1, still mandatory).
+  break a Build Card into its own sub-steps, sequence its own tool
+  calls, and make small implementation-detail judgment calls without
+  stopping to ask, as long as the result matches the Build Card's
+  stated objective and the Fixed Compliance Checklist (Section 10.C.1).
+- Live-verify against MCP/current docs before building on any
+  assumption (Section 6.1 — unchanged, still mandatory).
 - Test what it builds.
 - Report back precisely: what was built, what was verified live vs.
   assumed, what's blocked, what deviated from the Build Card and why.
 
-**Claude Code never invents architecture.** A genuinely novel product or
+**Executor never invents architecture.** A genuinely novel product or
 design decision — new territory no document resolves — is a Change
-Request (Section 10.D) back to the Commander, not a unilateral
-invention. What Claude Code *may* do, under the Document Resolution
-Authority below, is resolve a conflict or gap that the system's own
-documents already answer somewhere — that is applying existing
-architecture, not inventing new architecture, even when it requires
-editing a document to reflect what the answer actually is.
+Request (Section 10.D), surfaced to the human directly (there is no
+separate Commander product to route it through; a Change Request
+raised in `/execute` mode is answered by the human, then acted on,
+optionally after a `/commander` turn re-plans around it).
 
-### Document Resolution Authority (Standing Rule)
+------------------------------------------------------------------------
 
-Claude Code may resolve a genuine conflict, gap, or needed correction in
-a system document during a build session — after real verification,
-never a guess — and continue the same session, rather than stopping and
-waiting for the Commander.
+## Claude Code, in `/advisor` mode — Advisor (new in this version)
+
+Invoked via the `/advisor` slash-command. **Default mode for any fresh
+session with no prior persisted mode.** Operates at low effort.
+
+Responsibilities:
+
+- Answer questions, discuss strategy, reason about trade-offs.
+- Read files and summarize when asked.
+- **Never generates a Build Card. Never executes a build action. Never
+  commits an architectural decision to any file** (PROJECT_STATE.md,
+  Wiki, migrations, workflows — nothing is written from this mode
+  beyond the mode-state file itself).
+
+This mode exists to absorb the role Claude.ai chat played in v2 for
+non-code strategic thought — pricing, customer psychology research,
+new archetype design, wording a spec before it becomes a Build Card —
+without ever touching live repo/platform state. Advisor mode may still
+read PROJECT_STATE.md/the Wiki for context when asked a question about
+current state, but reading is not the same as deciding — no plan is
+produced, no Build Card issued, from this mode.
+
+------------------------------------------------------------------------
+
+### Document Resolution Authority (Standing Rule) — unchanged in substance
+
+Claude Code, in either `/commander` or `/execute` mode, may resolve a
+genuine conflict, gap, or needed correction in a system document during
+a session — after real verification, never a guess — and continue the
+same session, rather than stopping and waiting.
 
 **The governing constraint: system documents are the source of truth,
 always searched before anything is resolved.**
 
-```
+
 1. Search the relevant system documents first — broadly, including
    documents that might not be the obvious first place to check.
 2. If the docs contain the answer (even if it takes cross-referencing
-   multiple documents), that IS the answer — use it. "The first
-   document I checked didn't have it" is not equivalent to "the docs
-   don't have it."
+   multiple documents), that IS the answer — use it.
 3. If a real, thorough search genuinely finds no answer anywhere, THEN
    Claude Code decides: resolve it directly (if it's a verification-
    level fact, or a mechanical/structural decision with one obviously
    correct answer given everything else already established), or ask
-   the Commander (if it's a genuine, novel design/product decision not
+   the human (if it's a genuine, novel design/product decision not
    implied by anything already established).
-4. Never invent a reasonable-sounding answer to fill a gap. A guess
-   dressed as a resolution is worse than an honest stop.
-```
+4. Never invent a reasonable-sounding answer to fill a gap.
 
-**What counts as resolvable vs. still-Commander-required:**
-- A stale document contradicted by a later, more authoritative document
-  → resolve it, cite both documents, record which one won and why.
-- A document that explicitly flags something as still undecided (e.g.
-  "DECISION NEEDED") → still requires the Commander, even if Claude
-  Code's own reasoning suggests an answer, unless a *different* document
-  actually resolves it. An explicit open-decision flag is the system
-  saying this wasn't settled yet.
-- A structural/mechanical correction with one obviously correct answer
-  given the rest of the architecture (a wrong primary key, a malformed
-  parameter, a duplicated credential) — ordinary bug-catching, always
-  been Claude Code's to fix, unaffected by this rule either way.
 
-**Logging and acknowledgment gate — never skipped:**
-- Any time Claude Code resolves a genuine document-level conflict, gap,
-  or correction (not a code/schema bug — an actual document correction),
-  it is logged as its own clearly labeled subsection in that session's
-  Implementation Report and in PROJECT_STATE.md's Session Log — never
-  folded into general prose. State what the conflict/gap was, which
-  documents were checked, what it was resolved to, and why.
-- If the resolution requires an edit to a system document file itself,
-  Claude Code makes that edit directly and commits it — the Commander
-  reviews after the fact, not before. This is the standing pattern going
-  forward, replacing the earlier flag-a-diff-for-the-Commander-to-apply
-  pattern for this specific case.
-- After logging any self-resolved document-level item, Claude Code stops
-  at the end of that session's scoped work — even if a next Build Card
-  has already been issued — until the Commander has explicitly
-  acknowledged that specific resolution in a follow-up message.
-- A session with zero self-resolved document-level items (ordinary code/
-  schema work against an already-clear card) is not subject to this
-  gate — proceed normally, no waiting required.
+**Logging destination — changed from v2:** a resolved document-level
+item is logged in the relevant Wiki page (not appended to
+PROJECT_STATE.md's Session Log, which is now a pure dashboard — see
+Section 3) AND in `Wiki/log.md`, with the same required detail as
+before: what the conflict/gap was, which documents were checked, what
+it was resolved to, and why.
 
-**The identical constraint applies to the Commander.** The Commander
-also searches system documents before resolving anything, and any
-Commander-side document resolution is logged and requires the human's
-acknowledgment before the next Build Card issues. One deliberate
-asymmetry: when the Commander identifies that a document needs a
-correction, the Commander flags exactly what needs to change and why,
-but Claude Code performs the actual file edit and commit — matching the
-project's existing read/decide (Commander) vs. write/verify (Claude
-Code) split. This governs who is *allowed to decide* a correction is
-needed without a full round-trip first, not who touches files.
+After logging, `/execute` (or `/commander`, if it self-resolved
+something while planning) stops at the end of that session's scoped
+work — even if a next Build Card has already been issued — until the
+human has explicitly acknowledged that specific resolution in a
+follow-up message. This gate is unchanged from v2; only the log's
+location changed.
 
-**Shared tooling:** both parties have the same MCP connections (Supabase,
-n8n). Claude (chat) uses this to *read/verify* before issuing a Build
-Card; Claude Code uses it to *build*. Read access by the Commander is not
-a build action and doesn't require credential-gate handling.
+A session with zero self-resolved document-level items is not subject
+to this gate — proceed normally.
 
 ------------------------------------------------------------------------
 
-### Per-Workflow Documentation (Standing Rule, added BC-027)
+### Per-Workflow Documentation (Standing Rule) — unchanged
 
-Every workflow is documented immediately with real information as it is
-built or meaningfully modified — not summarized after the fact from
-memory, and not deferred to a later documentation-catchup card.
-
-```
-Any Build Card that creates or meaningfully modifies an n8n workflow
-must add/update that workflow's entry in
-06_Infrastructure/n8n/Workflow_Registry.md BEFORE that session's own
-Definition of Done is considered met.
-```
-
-- Each entry is written from a live `get_workflow_details` read of the
-  actual built workflow — never reconstructed from PROJECT_STATE.md's
-  session-log prose, which records session history, not current-state
-  fact, and can drift from what was actually built (repeatedly observed
-  across this project's sessions).
-- Minimum entry contents: workflow ID + real n8n name, PURPOSE (plain
-  language), TRIGGER (the real trigger node's real configuration — not
-  the spec's intended design if the two differ), INPUT (real payload
-  shape, cross-checked against n8n_Workflow_Specification_v1.md Part 13
-  where applicable, with any drift flagged), OUTPUT/END STATE (the
-  concrete real success state — e.g. "a new escalations row exists with
-  status='open'," not just "returns 200" — and the concrete real
-  failure state), REAL DEPENDENCIES (which other workflows/utilities it
-  actually calls), LAST VERIFIED (date + Build Card ID of the most
-  recent real execution test).
-- This is a Definition-of-Done gate, the same weight as the existing
-  PROJECT_STATE.md sync requirement (Section 10.E) — a session that
-  built or changed a workflow but didn't update its registry entry has
-  not met Definition of Done, regardless of what else it accomplished.
+Every workflow is documented immediately with real information as it
+is built or meaningfully modified. Any session (in `/execute` mode)
+that creates or meaningfully modifies an n8n workflow must add/update
+that workflow's entry in `06_Infrastructure/n8n/Workflow_Registry.md`
+before that session's Definition of Done is considered met. Full
+detail unchanged from v2.2 — see Section 12.
 
 ------------------------------------------------------------------------
 
-# 3. Required Reading Before Building
+# 3. Required Reading — updated for the Wiki/PROJECT_STATE.md split
 
-Per `Planning_to_Build_Transition_v1.md`, the current entry point. That
-document supersedes v1's static "Required Documents" list (which
-referenced a `Build Execution Plan` and standalone `Build Cards` gate that
-this project's actual history moved past). Current standing reading list,
-maintained going forward in the Transition document itself, not
-duplicated here to avoid drift:
+Before any `/commander` or `/execute` session begins real work:
 
-- Every frozen/current architecture document (Runtime, Database,
-  Execution Architecture, Integration Contract, Workflow Specification)
-- `External_Integration_Strategy_v1.md`,
-  `Client_Integration_and_Credential_Platform_v1.md`,
-  `Provider_App_Setup_Guide_v1.md`
-- The three Convocore FINAL documents
-- `Planning_to_Build_Transition_v1.md` itself — the current phase plan
-  and decision record
+1. **PROJECT_STATE.md** — current-state dashboard only (phase,
+   per-module status, active blockers). Read in full every session;
+   it is kept deliberately short.
+2. **Wiki/index.md** — catalog of durable facts/decisions. Read the
+   index; drill into specific pages only as needed for the task at
+   hand, not read cover-to-cover.
+3. **CLAUDE.md** — standing rules, including the Tool Routing Table.
+4. The specific frozen/current architecture document(s) the current
+   Build Card actually touches — not the full document set by default.
+
+**Do NOT read `Wiki/log.md` or `00_Project_Control/Session_Log_
+Archive.md`** as part of normal session start — these are historical/
+audit records, consulted only when a session genuinely needs to know
+*when* something was decided, not *what* is currently true.
 
 ------------------------------------------------------------------------
 
-# 4. End-to-End Lifecycle
+# 4. End-to-End Lifecycle — updated, single tool
 
-```
+
 Current Architecture (frozen or validated-current)
         ↓
-Claude (Commander) reviews relevant documents
+/commander reads PROJECT_STATE.md + Wiki + relevant docs
         ↓
-Claude issues a Build Card
+/commander issues a Build Card
         ↓
-Claude Code (Executor) executes — self-orchestrating sub-steps as needed
+/execute — self-orchestrating sub-steps as needed
         ↓
 Credential required?
       /        \
@@ -253,106 +269,87 @@ Credential required?
     |            |
     └──── Resume ────┘
         ↓
-Claude Code Implementation Report
+Implementation Report (written by /execute)
         ↓
 Human review
         ↓
-Claude Architecture Review
+/commander — Architecture Review
         ↓
 Approved?
    /        \
  Yes         No
  |            |
 Next Card   Fix / Change Request
-```
+
+
+No GitHub-sync step, no cross-product summary step — both removed, per
+the reasoning in Section 1.
 
 ------------------------------------------------------------------------
 
-# 5. Build Card System
+# 5. Build Card System 
 
-Unchanged from v1 — each Build Card represents exactly **one** workflow,
-dashboard component, migration, or comparably-scoped unit of work.
+Each Build Card represents exactly one workflow, dashboard component, migration, or comparably-scoped unit of work.
 
 Contains:
 
-- Build Card ID
-- Target (workflow name / migration / dashboard piece / Edge Function)
-- Runtime Module or system area
-- Purpose
-- Inputs
-- Outputs
-- Dependencies
-- Shared Utilities involved
-- Acceptance Criteria
-- Test Cases
-- Definition of Done
+* Build Card ID
+* Target (workflow name / migration / dashboard piece / Edge Function)
+* Runtime Module or system area
+* Purpose
+* Inputs
+* Outputs
+* Dependencies
+* Shared Utilities involved
+* Acceptance Criteria
+* Test Cases
+* Definition of Done
 
 ------------------------------------------------------------------------
 
-# 6. Claude → Claude Code Build Card Issuance
+# 6. Build Card Issuance — unchanged in content, issued from /commander
 
 Every Build Card includes:
 
-- Build Card reference/ID
-- Architectural constraints
-- Objective
-- Required utilities
-- Folder/location placement
-- Testing instructions
-- Expected outputs
-- Open Verification Items resolved by this card, if any (6.2)
+* Build Card reference/ID
+* Architectural constraints
+* Objective
+* Required utilities
+* Folder/location placement
+* Testing instructions
+* Expected outputs
+* Open Verification Items resolved by this card, if any (6.2)
 
 Claude Code should never receive the full project for one Build Card —
 scope stays narrow, per-card.
 
-------------------------------------------------------------------------
 
-## 6.1 Mandatory Pre-Build MCP Verification — Unchanged, Still Mandatory
+## 6.1 Mandatory Pre-Build MCP Verification — unchanged, still mandatory
 
-Before executing any Build Card, Claude Code must verify the specific
-node, capability, or field the card depends on directly against the live
-n8n MCP / Supabase MCP connection and current documentation — not recite
-it from a frozen architecture document.
+Before executing any Build Card (in `/execute` mode), verify the
+specific node, capability, or field it depends on directly against the
+live n8n MCP / Supabase MCP connection — not recited from a frozen
+document. 
 
-This is not optional. Prior build documentation has already been found
-substantially wrong against the live platform more than once in this
-project (the Supabase schema-header question; Claude Code's own draft
-catching missing `event_type`/`eventTypeId` params before shipping,
-Calendar provider research). Frozen documents describe *architecture and
-intent*, never *current platform capability*.
-
-**Applies in particular to:**
-
-- Node type / capability questions (e.g., native vs. HTTP Request node
-  for a given operation)
-- Credential store mechanics for the specific service the workflow calls
-- Any node parameter, expression syntax, or default behavior the Build
-  Card relies on
-- Any third-party provider API shape (Google, Shopify, Slack, Calendly,
-  Cal.com, Convocore) — verify against that provider's current live docs,
-  not memory
-
-**Procedure, unchanged:**
+**Procedure:**
 
 1. Identify the specific capability the Build Card depends on.
 2. Query the MCP connection / current docs directly for that capability.
 3. If it matches the assumption — proceed, note "verified" in the
-   Implementation Report.
+Implementation Report.
 4. If it doesn't match — do not silently patch around it. Raise a Change
-   Request if the mismatch affects architecture; otherwise correct course
-   and note the correction and why.
+Request if the mismatch affects architecture; otherwise correct course
+and note the correction and why.
 5. Never build on an unverified assumption, even if it "should" be true.
 
 Scoped to the one capability the current Build Card needs — not a full
 platform audit before every card.
 
-------------------------------------------------------------------------
+## 6.2 Closing Open Verification Items 
 
-## 6.2 Closing Open Verification Items
-
-Both `INTEGRATION_CONTRACT_v1.md`'s originally-flagged items and every
+Both `INTEGRATION\_CONTRACT\_v1.md`'s originally-flagged items and every
 open item accumulated since (tracked centrally in
-`Planning_to_Build_Transition_v1.md` Part 6) follow the same rule:
+`Planning\_to\_Build\_Transition\_v1.md` Part 6) follow the same rule:
 whenever a Build Card's MCP verification (6.1) resolves one — confirming
 or contradicting the prior assumption — the Implementation Report states
 which item it resolves. Once resolved, the next Architecture Review marks
@@ -361,7 +358,7 @@ open after the fact.
 
 ------------------------------------------------------------------------
 
-# 7. Claude Code Execution Rules
+# 7. Execution Rules (in /execute mode) — unchanged
 
 For every workflow or comparable build unit:
 
@@ -377,23 +374,24 @@ For every workflow or comparable build unit:
 10. Export/deploy
 11. Report
 
+
 ------------------------------------------------------------------------
 
-# 8. Human Credential Gate — Unchanged
+# 8. Human Credential Gate — unchanged
 
 AI never creates or invents credentials.
 
 If credentials are required:
 
-- Create nodes/config with every non-secret field set.
-- Leave the credential empty or use the agreed placeholder pattern
-  (`Client_Integration_and_Credential_Platform_v1.md`'s placeholder
-  convention, or the HTTP Request + Header Auth test-account pattern
-  confirmed in `Planning_to_Build_Transition_v1.md` Part 2.8 for live
-  end-to-end testing).
-- Stop and report exactly what credential is required.
-- Human adds the credential.
-- Claude Code resumes.
+* Create nodes/config with every non-secret field set.
+* Leave the credential empty or use the agreed placeholder pattern
+(`Client\_Integration\_and\_Credential\_Platform\_v1.md`'s placeholder
+convention, or the HTTP Request + Header Auth test-account pattern
+confirmed in `Planning\_to\_Build\_Transition\_v1.md` Part 2.8 for live
+end-to-end testing).
+* Stop and report exactly what credential is required.
+* Human adds the credential.
+* Claude Code resumes.
 
 **External Secrets** (require human intervention): Google OAuth, Shopify,
 Slack, Calendly, Cal.com, Supabase Service Role, Twilio, Convocore agent
@@ -403,84 +401,91 @@ secrets, any LLM/OpenRouter API key.
 under a known name, Claude Code may reference it without exposing the
 secret value.
 
-------------------------------------------------------------------------
 
-# 9. Pause Point System — Unchanged
+**New note:** the `.zenny-py-venv` standing rule (all Python installs
+scoped to the project venv) is enforced via a `PreToolUse` hook
+(`pip-guard.ps1`) — a soft gate, not a credential, but the same "stop,
+report, human/Claude decides" shape. If Claude proceeds with a global
+install because the venv genuinely can't accommodate a package, it
+must log why (1-2 lines) in both the response summary and `Wiki/
+log.md`, per the hook's own instruction.
 
-If blocked, report:
-
-- Pause Point ID
-- Reason
-- Progress %
-- Remaining Tasks
-- Resume Instruction
-
-Human performs the required action. Claude Code resumes from the pause
-point — it does not restart the Build Card from zero.
+AI never creates or invents credentials.
 
 ------------------------------------------------------------------------
 
-# 10. Standard Reports
+# 9. Pause Point System
 
-## A. Build Card
+If blocked, report: Pause Point ID, Reason, Progress %, Remaining
+Tasks, Resume Instruction. Human performs the required action.
+Resumes from the pause point, not from zero.
 
-Issued by Claude (Commander).
+**New note on permission denials specifically:** governed by the
+`permission-fallback.ps1` hook (`PermissionDenied` event). On a real
+tool-permission denial (n8n/Supabase/git): check for an easy
+alternative first; if found and it works, note the substitution in the
+Wiki and continue. If no alternative exists and the denied action is
+essential to the current task, stop and ask the human (standard Pause
+Point). If the denied action is NOT essential to completing the
+current task (e.g. a routine git commit), do not stop — continue the
+task and flag the pending action at the end of the response summary
+instead.
 
-## B. Implementation Report
+------------------------------------------------------------------------
 
-Issued by Claude Code. Includes:
+# 10. Standard Reports — unchanged in content, all issued by Claude Code under the relevant mode
 
-- Build Card reference
-- Status
-- Work completed
-- Tests run and results
-- Credential requirements encountered
-- Problems
-- Workarounds
-- Questions for the Commander
-- Deployment/export status
-- MCP-verified facts discovered (per 6.1) — any live platform behavior
-  that differs from a frozen/current document's assumption must be
-  reported even if not specifically asked for
-- Open Verification Item(s) resolved this cycle, if any (6.2)
+## A. Build Card — issued from `/commander`.
 
-## C. Architecture Review
+## B. Implementation Report — issued from `/execute`. Build Card reference
+* Build Card reference
+* Status
+* Work completed
+* Tests run and results
+* Credential requirements encountered
+* Problems
+* Workarounds
+* Questions for the Commander
+* Deployment/export status
+* MCP-verified facts discovered (per 6.1) — any live platform behavior
+that differs from a frozen/current document's assumption must be
+reported even if not specifically asked for
+* Open Verification Item(s) resolved this cycle, if any (6.2)
 
-Issued by Claude (Commander), from the Implementation Report. Includes:
+## C. Architecture Review — issued from `/commander`, from the Implementation Report.
+* Compliance checklist (not reinvented per card)
+* Violations
+* Required fixes
+* Approval status
+* Next Build Card
 
-- Compliance checklist (fixed — 10.C.1, not reinvented per card)
-- Violations
-- Required fixes
-- Approval status
-- Next Build Card
-
-### C.1 Fixed Compliance Checklist — Unchanged
+### C.1 Fixed Compliance Checklist :
 
 Every Architecture Review checks the same list, derived from
-`INTEGRATION_CONTRACT_v1.md` Part 22 and this document's Section 12. Not
+`INTEGRATION\_CONTRACT\_v1.md` Part 22 and this document's Section 12. Not
 reinvented per Build Card.
 
 **From the Integration Contract (Part 22):**
 
 1. Runtime calls Tools, never workflows — nothing n8n-internal leaked to
-   the Runtime side.
+the Runtime side.
 2. Tool name is stable PascalCase; breaking changes ship as a new
-   version, never a silent redefinition.
+version, never a silent redefinition.
 3. n8n owns execution and retries — no retry logic pushed upstream.
 4. Database structure untouched by workflow logic — schema needs route
-   through `Template_Migration_Process.md`.
+through `Template\_Migration\_Process.md`.
 5. Authentication present on every entry point.
 6. `Accept-Profile` / `Content-Profile` resolved fresh via Schema
-   Resolver — no static/default schema anywhere.
-7. `tool_call_log` row written on every execution, matching the real
-   column set.
-8. `idempotency_key` present and honored for every create/modify/trigger
-   action.
+Resolver — no static/default schema anywhere.
+7. `tool\_call\_log` row written on every execution, matching the real
+column set.
+8. `idempotency\_key` present and honored for every create/modify/trigger
+action.
 9. Response matches the Standard Success/Error shape exactly.
 10. Utility order matches the Mandatory Utility Order (Schema Resolver →
-    Validator → Stop Checker → Business Workflow → Error Logger →
-    Notification Router → Credential Resolver where applicable, per
-    UTIL-006's addition).
+Validator → Stop Checker → Business Workflow → Error Logger →
+Notification Router → Credential Resolver where applicable, per
+UTIL-006's addition).
 
 **From this document (Section 12, Definition of Done):**
 
@@ -488,27 +493,27 @@ reinvented per Build Card.
 12. Correct naming convention.
 13. Shared Utilities reused, not reimplemented inline.
 14. Tests passed, matching the 5 test categories (Success, Failure,
-    Security, Retry, Duplicate) from the Integration Contract.
+Security, Retry, Duplicate) from the Integration Contract.
 
 **Additional, per Section 6.1/6.2:**
 
 15. Any live-platform fact the Build Card depended on was actually
-    verified — not assumed.
+verified — not assumed.
 16. If this Build Card touched an Open Verification Item, the live
-    answer is recorded and reflected back to the tracking list.
+answer is recorded and reflected back to the tracking list.
 
 **New, per this document's two-party model:**
 
 17. If Claude Code exercised orchestration authority (Section 2) to
-    deviate from the Build Card's literal steps, the Implementation
-    Report states what changed and why — the Commander reviews this as
-    part of approval, not as a silent implementation detail.
+deviate from the Build Card's literal steps, the Implementation
+Report states what changed and why — the Commander reviews this as
+part of approval, not as a silent implementation detail.
 
 A Build Card fails review if any applicable item is unresolved, not just
 the ones judged "important" for that particular unit of work.
 
-## D. Change Request
 
+## D. Change Request :
 Raised only when implementation reveals a genuine architectural issue —
 not a mechanical registration gap (which Claude Code may fix directly
 under its orchestration authority if it's purely additive/consistent with
@@ -521,70 +526,88 @@ Approval status.
 No architectural document changes without Commander review and human
 approval.
 
-## E. PROJECT_STATE.md Sync
+## E. State Sync — renamed and restructured from v2's "PROJECT_STATE.md Sync"
 
-PROJECT_STATE.md is the real-time ground truth of build state — schema,
-workflows, credentials, blockers — maintained by Claude Code at the end
-of every session (per CLAUDE.md's session protocol) and committed to
-the zenny-sync repo alongside that session's actual changes.
+**PROJECT_STATE.md** is now a pure current-state dashboard — phase,
+per-module one-line status, active blockers, pointer to the Wiki.
+Overwritten, not appended, at the end of every session. Target: stays
+under ~150 lines. If a line describes something that *happened* rather
+than something that *is currently true*, it does not belong here — it
+belongs in the Wiki or `Wiki/log.md`.
 
-**Before issuing any Build Card, the Commander reads PROJECT_STATE.md
-first** — via GitHub MCP (fetch directly from zenny-sync), UNLESS the
-human states in-chat that they've uploaded PROJECT_STATE.md directly
-into the project files, in which case the uploaded copy is read instead
-and a fresh MCP fetch is not needed.
+**The Wiki** (`00_Project_Control/Wiki/`) holds durable facts and
+decisions, organized by topic/entity, edited in place as understanding
+changes — not appended to chronologically. `Wiki/index.md` is the
+catalog read at the start of every session; `Wiki/log.md` is the
+append-only change record, read only for historical/audit purposes.
 
-This exists because a Build Card issued against a stale or assumed state
-is worse than one delayed by 30 seconds of reading — Section 6.1's
-MCP-verification discipline applies to schema/workflow build capability;
-this section applies the same principle to the Commander's own picture
-of what's already built.
+**The promotion rule, standing from this version forward:** at the end
+of every session, ask — did this session produce a durable fact
+(→ Wiki page, cross-referenced in index.md), or just complete a task
+(→ one-line PROJECT_STATE.md status update)? The full narrative of
+*how* something was fixed (exact commands, exact errors) goes in
+`Wiki/log.md`, never in PROJECT_STATE.md itself.
 
-**Archive note (added BC-030):** PROJECT_STATE.md's Session Log retains
-only the most recent ~8-10 sessions going forward — older entries are
-moved verbatim (never summarized or condensed) to
-`00_Project_Control/Session_Log_Archive.md` as the file grows, to keep
-it usable ahead of the largest remaining build phases. This does not
-change what either party reads before acting: PROJECT_STATE.md's
-current-state STATUS sections remain the primary, sufficient source for
-"what's true right now" regardless of Session Log trimming. The archive
-is consulted only when a session genuinely needs context older than
-what the trimmed Session Log covers.
+**The confidence rule:** if the Wiki has no page or only weak/tangential
+matches for a query, say so explicitly rather than synthesizing an
+answer from unrelated pages. Never file a synthesized-from-weak-
+evidence answer back into the Wiki as established fact.
+
+**The lint operation, new standing task:** roughly every 5 sessions,
+`/commander` should run a Wiki health-check — contradictions, orphan
+pages, stale claims, missing cross-references — and correct what it
+finds, logging the correction in `Wiki/log.md` the same as any other
+document resolution.
+
+Committed to the zenny-sync repo alongside that session's actual
+changes, same as v2 — via real git commands, not any MCP git tool, per
+the existing standing instruction.
+
 ------------------------------------------------------------------------
 
-# 11. Workflow/Build Status Model — Unchanged
+# 11. Workflow/Build Status Model — unchanged
 
 Draft → Implemented → Test Blocked → Tested → Approved → Production Ready
 
 ------------------------------------------------------------------------
 
-# 12. Definition of Done — updated BC-027
+# 12. Definition of Done — unchanged content, re-stated for one tool
 
-A Build Card is complete only when: the artifact exists, correct
+A Build Card (issued and reviewed in `/commander`, executed in
+`/execute`) is complete only when: the artifact exists, correct
 folder/location, correct naming, utilities reused, schema targeting
-implemented, logging implemented, retry implemented (where applicable),
-idempotency implemented (where applicable), standard response
-implemented, tests passed, **the workflow's Workflow_Registry.md entry
-is added/updated (Per-Workflow Documentation standing rule, above)**,
-Commander approved.
+implemented, logging implemented, retry implemented (where
+applicable), idempotency implemented (where applicable), standard
+response implemented, tests passed, the workflow's Workflow_
+Registry.md entry is added/updated, PROJECT_STATE.md + Wiki updated
+per Section 10.E, human approved (via a `/commander` Architecture
+Review).
 
 ------------------------------------------------------------------------
 
-# 13. Implementation Rules
+# 13. Implementation Rules — restated per mode, same substance as v2
 
-**Claude (Commander):**
-- Never builds directly.
+**`/commander`:**
+- Never builds directly beyond the bounded direct-execution authority
+  (Section 2).
 - Never bypasses architecture.
 - Never approves its own Build Card without a genuine Implementation
   Report to review.
+- Never issues a new Build Card over an unresolved, unacknowledged
+  document-level conflict.
 
-**Claude Code (Executor):**
+**`/execute`:**
 - Never changes architecture unilaterally.
 - Never invents credentials.
 - Never embeds secrets in code/config.
 - Never bypasses a Build Card's stated objective, even while exercising
   orchestration authority over *how* to reach it.
 - Always verifies live before building on an assumption (6.1).
+
+**`/advisor`:**
+- Never generates a Build Card.
+- Never executes a build action.
+- Never commits an architectural decision to any file.
 
 **Human:**
 - Owns approvals.
@@ -593,62 +616,57 @@ Commander approved.
 
 ------------------------------------------------------------------------
 
-# 14. Benefits — Unchanged
+# 14. Benefits — unchanged
 
-Strong architectural consistency, secure credential handling, controlled
-evolution, clear separation of responsibilities, repeatable
-implementation process, easier debugging and auditing.
+Strong architectural consistency, secure credential handling,
+controlled evolution, clear separation of responsibilities, repeatable
+implementation process, easier debugging and auditing. **Added in this
+version:** zero cross-product sync cost, since planning and execution
+now share the same live repo/MCP context.
 
 ------------------------------------------------------------------------
 
-# 15. Future Expansion
+# 15. Future Expansion — unchanged
 
-Additional AI parties may be introduced later (testing, documentation,
-QA), but must integrate through the same Commander → Executor → Human
-approval pipeline without altering the core two-AI-party model defined
-here.
+Additional AI parties may be introduced later, but must integrate
+through the same Commander → Executor → Human approval pipeline
+(now expressed as modes rather than separate products) without
+altering the core model defined here.
 
 ------------------------------------------------------------------------
 
 ## Document Changelog
 
 - **v1** — original 3-party model (Human / Claude / Codex).
-- **v2 (this version)** — retired Codex entirely; Claude Code now holds
-  both the orchestration and execution responsibilities v1 split across
-  Claude and Codex. Added explicit orchestration authority for Claude
-  Code within a Build Card's scope (Section 2, Section 13, new checklist
-  item 17). Renamed from "AI Workforce Implementation Orchestration Plan"
-  to "Claude Build Command Protocol" to reflect the actual two-party
-  relationship. Section 3's document list now points to
-  `Planning_to_Build_Transition_v1.md` as the maintained entry point
-  rather than a static list that had drifted out of date. Section 10.C.1
-  checklist item 10 updated to include UTIL-006 (Credential Resolver) in
-  the Mandatory Utility Order.
-- **v2.1** — added the Document Resolution Authority standing rule
-  (Section 2, after Claude Code — Executor): Claude Code may now resolve
-  a genuine system-document conflict or gap itself, after real
-  verification, rather than always stopping for the Commander — subject
-  to the doc-search-first discipline, the open-decision-flag exception,
-  and a mandatory logging + Commander-acknowledgment gate before the
-  next Build Card's work begins. The identical constraint and gate apply
-  to the Commander, with one asymmetry: the Commander flags document
-  corrections, Claude Code performs the actual file edit and commit
-  (unchanged execution split, extended to this new authority).
-- **v2.2 (BC-027)** — added the Per-Workflow Documentation standing rule
-  (Section 2, after Document Resolution Authority): every Build Card
-  that creates or meaningfully modifies an n8n workflow must add/update
-  that workflow's entry in the new `06_Infrastructure/n8n/
-  Workflow_Registry.md` before that session's own Definition of Done is
-  met — written from a live `get_workflow_details` read, not
-  reconstructed from PROJECT_STATE.md's session prose. Section 12
-  (Definition of Done) updated to include this as an explicit checklist
-  item. Prompted by BC-027's own retroactive documentation pass, which
-  found the registry didn't exist at all and several already-"complete"
-  workflows had real, previously-unnoticed defects that a per-workflow,
-  live-verified reference would have caught sooner.
-- **v2.3 (BC-030)** — added the archive note to Section 10.E
-  (PROJECT_STATE.md Sync): the Session Log now retains only the most
-  recent ~8-10 sessions, with older entries moved verbatim to the new
-  `00_Project_Control/Session_Log_Archive.md` as the file grows.
-  Pure housekeeping — no change to what either party reads before
-  acting; PROJECT_STATE.md's current-state sections remain primary.
+- **v2** — retired Codex; two-party model (Claude.ai chat = Commander,
+  Claude Code = Executor).
+- **v2.1** — Document Resolution Authority standing rule.
+- **v2.2 (BC-027)** — Per-Workflow Documentation standing rule.
+- **v2.3 (BC-030)** — PROJECT_STATE.md Session Log archive note.
+- **v2.4 (this version)** — Collapsed the two-product Commander/
+  Executor split into a single tool, Claude Code, operating in three
+  slash-command-invoked modes: `/commander` (planning, Build Cards,
+  bounded direct-execution authority for low-risk actions),
+  `/execute` (full build authority, unchanged from v2's Executor),
+  and `/advisor` (new — low-effort, non-code advisory mode, default
+  for any fresh session, replacing Claude.ai chat's role in the build
+  loop; Claude.ai chat is retained only as an optional, out-of-loop
+  surface for non-code strategic thought). Mode persists across
+  sessions via a mode-state file until explicitly changed. Reason for
+  change: the two-product model's Commander could not see live repo/
+  platform state without a manual, lossy, token-expensive sync step
+  (pasted summaries, GitHub fetches) — found unreliable in practice.
+  Section 10.E (PROJECT_STATE.md Sync) restructured into a three-layer
+  model — PROJECT_STATE.md (thin current-state dashboard),
+  `Wiki/` (durable, topic-organized, LLM-maintained facts and
+  decisions, per the raw-sources/wiki/schema pattern), and
+  `Wiki/log.md` (chronological change record) — replacing the prior
+  single ever-growing Session Log, which had outgrown its own
+  usefulness. Document Resolution Authority's logging destination
+  updated to match. Added a standing Wiki lint operation (~every 5
+  sessions). Section 8 (Credential Gate) extended with the
+  `.zenny-py-venv` PreToolUse soft-gate. Section 9 (Pause Points)
+  extended with the PermissionDenied retry/escalate/defer sequence.
+
+
+---

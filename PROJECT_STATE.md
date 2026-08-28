@@ -10,7 +10,33 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-27 (latest) — by /execute — **First real release cut for both
+2026-08-29 (latest) — by /execute — **gstack-integration Phase 2
+(working-folder legacy-file cleanup) complete, human-reviewed before
+deletion.** Removed: `CLAUDE_v3.0.md` (superseded prior version),
+`.agents/skills/` (stale duplicate of `.claude/skills`), the entire
+`05_Platform_Builds/Convocore/Archieve/` folder (9 files, all superseded
+by a named FINAL/v2/v3 doc or already folded into `Convocore_Master_
+Reference_v3.md`), 5 pre-Wiki-era root strategy docs
+(`Planning_to_Build_Transition_v1.md`, `Database Architecture Review &
+Future Runtime Roadmap v1.md`, `External_Integration_Strategy_v1.md`,
+`INTEGRATION_CONTRACT_v1.md`, `Client_Integration_and_Credential_
+Platform_v1.md`), and 2 unused skill folders (`graphify`,
+`semantic-search`, plus the now-dangling `graphify` trigger block that
+was `.claude/CLAUDE.md`'s only content). **Kept per explicit human
+amendment:** `01_Strategy/Modular_Legacy/` and `05_Platform_Builds/
+.Future_Custom/`. Fixed 2 live dangling references the deletion created
+(`Claude_Build_Command_Protocol_v2.md`, `Convocore_Findings_Required_
+Updates_FINAL.md`) — both mechanical corrections, not new decisions.
+**New flagged item, not yet actioned:** a stray root file,
+`Too_ Routing_Table.md` (typo'd name), looks like an old duplicate of
+the Tool Routing Table now in `CLAUDE.md` — needs its own review, not
+part of this approved list. **gstack-integration Phase 1** (human
+manually installing gstack) **and Phase 3** (hook removal, CLAUDE.md/
+Build Command Protocol rewrite around the gstack-first dispatch model)
+remain not started. Full detail: `Wiki/log.md`
+session-gstack-phase2-cleanup.
+
+2026-08-27 (prior) — by /execute — **First real release cut for both
 plugins: v1.1.0.** Confirmed via official docs that `/plugin update`
 compares the `version` field and skips if unchanged — a plain commit
 (BC-TOOL-009/010's `aa14e86`/`00c9dcd`) never reaches an already-installed

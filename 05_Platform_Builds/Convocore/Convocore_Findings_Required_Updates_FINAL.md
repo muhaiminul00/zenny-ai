@@ -239,9 +239,9 @@ ALTER TABLE {client_schema}.leads
 
 **Why it matters:** this is a real, deliberate exception to the standard "every integration routes through Zenny's own registered OAuth app" model — worth a formal addendum rather than an ambiguous gap, since without one, a future builder might assume Shopify should work exactly like every other integration.
 
-**Proposed change:** add a short, explicit addendum section to `Client_Integration_and_Credential_Platform_v1.md`: *"Shopify is a confirmed exception — client credentials are collected via the standard credential platform UI, but are manually provisioned into Convocore's native Shopify tool rather than used by a Zenny-owned integration workflow. This is intentional, not a gap."*
+**Proposed change:** add a short, explicit addendum: *"Shopify is a confirmed exception — client credentials are collected via the standard credential platform UI, but are manually provisioned into Convocore's native Shopify tool rather than used by a Zenny-owned integration workflow. This is intentional, not a gap."*
 
-**Status:** CONFIRMED.
+**Status:** CONFIRMED. `Client_Integration_and_Credential_Platform_v1.md` (the original addendum target) was removed 2026-08-29 as a pre-Wiki-era doc — this exception is already durably recorded in `Wiki/credentials/shopify.md`, so nothing is lost.
 
 ### 4.2 New credential fields: Twilio (Account SID, Auth Token, phone number)
 

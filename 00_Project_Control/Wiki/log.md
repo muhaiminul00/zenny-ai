@@ -9,6 +9,126 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-29] session-gstack-phase2-cleanup | Working-folder legacy-file cleanup (Phase 2 of gstack-integration plan), review-gated
+
+**Trigger:** human's gstack-integration redesign (dispatch model, hook
+removal, gstack-first precedence — full plan still pending, see
+`Wiki/reference/gstack-skill-playbook.md` for the prior theoretical
+model, due for a rewrite once gstack is actually installed) explicitly
+called for cleaning stale Voiceflow/Convocore-era docs out of the
+working folder first, since they risk hallucination. Commander proposed
+a delete/keep list; human reviewed and approved it with 2 amendments
+(keep `01_Strategy/Modular_Legacy` and `05_Platform_Builds/.Future_Custom`
+as live/reference material, not delete) before Execute ran it — per
+Commander's own execute-directly limits (destructive, multi-file), the
+deletion itself required a real mode-state handoff to Execute, done via
+`/role-modes:execute`, not performed under Commander's authority.
+
+**Deleted (superseded/dead, human-approved):**
+- `CLAUDE_v3.0.md` — confirmed via diff to be the exact prior version of
+  the current `CLAUDE.md` (v3.1); only the Commander→Execute auto-handoff
+  section was added since, nothing lost.
+- `.agents/skills/` (whole folder, now-empty `.agents/` also removed) —
+  stale duplicate of `.claude/skills/supabase` +
+  `.claude/skills/supabase-postgres-best-practices`; dated before
+  `.claude/skills` picked up `book-to-skill`/`graphify`/`semantic-search`/
+  the brand-guideline skill — not the folder Claude Code actually reads.
+- `05_Platform_Builds/Convocore/Archieve/` (entire folder, now removed —
+  all 9 files were superseded by a named `_FINAL`/`v2`/`v3` doc still
+  live in the parent folder, or were one-off closeout/research notes
+  already folded into `Convocore_Master_Reference_v3.md`): 
+  `Convocore_Adapter_Spec_v1.md`, `Convocore_Findings_Required_Updates_v1.md`,
+  `Convocore_Canvas_Ground_Truth_v1.md`, `Convocore_Master_Reference_v1.md`,
+  `Convocore_Master_Reference_v2.md`, `Convocore_Agent_Build_Order_Guide_v1.md`,
+  `Convocore_Session_Closeout_v1.md`, `covocore-research-report.md`,
+  `EMBER_BUILD_GUIDE_(Convocore).md` (this last one explicitly carried
+  "lessons from Voiceflow build" — the exact hallucination-risk case
+  flagged).
+- 5 root-level pre-Wiki-era strategy docs (human-named for removal):
+  `Planning_to_Build_Transition_v1.md`, `Database Architecture Review &
+  Future Runtime Roadmap v1.md`, `External_Integration_Strategy_v1.md`,
+  `INTEGRATION_CONTRACT_v1.md`, `Client_Integration_and_Credential_
+  Platform_v1.md`.
+- `.claude/skills/graphify/` and `.claude/skills/semantic-search/`
+  (human-named unnecessary skills) — plus the dangling `graphify`
+  trigger block that was `.claude/CLAUDE.md`'s only content (file now
+  empty; nothing else referenced it).
+
+**Kept, explicitly, per human amendment:** `01_Strategy/Modular_Legacy/`
+(stale but wanted as Voiceflow-era planning reference) and
+`05_Platform_Builds/.Future_Custom/` (live reference — human may build
+from these). Also left alone per `CLAUDE.md`'s own Repo Notes (already
+correctly governed, out of scope): `_archive_planning_phase/`,
+`00_Project_Control/Session_Log_Archive.md`.
+
+**Dangling references found and fixed (mechanical correction, not a new
+decision — Document Resolution Authority applies):** two *live*
+(non-archived) docs pointed at deleted files as authoritative sources:
+`Claude_Build_Command_Protocol_v2.md` cited `Planning_to_Build_
+Transition_v1.md` Part 4 as "the current standing sequence" — corrected
+to point at PROJECT_STATE.md's Phase Checklist instead, which already
+superseded it in practice. `Convocore_Findings_Required_Updates_FINAL.md`
+Part 4 proposed an addendum to `Client_Integration_and_Credential_
+Platform_v1.md` — annotated: that content is already durably recorded in
+`Wiki/credentials/shopify.md`, nothing lost.
+
+**Not yet actioned, flagged for the human:** a previously-unnoticed
+stray file, `Too_ Routing_Table.md` (root, typo'd filename) — appears to
+be an older/duplicate draft of the Tool Routing Table now living in
+`CLAUDE.md` itself. Not deleted — wasn't part of the approved list,
+needs its own review pass.
+
+**Not yet done:** Phase 1 (gstack install + real skill-inventory/hook-
+collision research, human doing the manual install step) and Phase 3
+(hook removal, CLAUDE.md/Build Command Protocol rewrite around the
+gstack-first dispatch model, `gstack-skill-playbook.md` rewrite) — both
+still pending, per the human's explicit "phase 1 manually, then phase 2
+fully, then back to phase 1" sequencing.
+
+## [2026-08-27] session-gstack-playbook-draft | gstack integration theoretical model agreed, playbook drafted (no install yet)
+
+**Trigger:** human asked to resume planning Zenny's mode system to dispatch
+`garrytan/gstack` skills, discuss properly before any execution.
+
+**What happened:** verified (via WebFetch/WebSearch, not carried over
+assumption from an earlier pre-compact conversation) that gstack is a
+machine-global `git clone` + `./setup` install, not a Claude Code
+marketplace plugin, and ships its own hook system (stop hooks,
+pre/post-tool-use, throttled auto-updater) — correcting the earlier
+session's plan, which had assumed a scoped plugin install. Also confirmed
+self-chaining between gstack skills is real and automatic (`/ship` →
+`/document-release`, `/autoplan`'s CEO→design→eng→DX chain), not
+hypothetical.
+
+Also reconsidered and dropped the earlier plan's Phase 1 (revert BC-TOOL-002,
+restore local mode commands) — unnecessary: `role-modes`'s own Commander
+instructions already defer to "this project's own Commander/planning
+protocol if its CLAUDE.md defines one," and Zenny's root CLAUDE.md v3.1
+already is that protocol. The gstack-dispatch redefinition lands there
+directly; the plugin repo is untouched.
+
+Walked the human through a keep/adopt/coexist decision map across every
+functional area (planning, security, code review, debugging, browser/QA,
+dashboard design, memory, docs, deploy) via targeted questions on the four
+genuine collisions (code review, debugging, browser/QA, dashboard design).
+Dashboard design initially came back "keep both" with no precedence rule —
+resolved into a generate/judge split (gstack generates greenfield designs,
+Zenny's existing taste-skill/brandkit/minimalist-skill/frontend-design
+bundle judges the output, impeccable keeps the live-polish-audit job).
+
+**Resolved to:** [[reference/gstack-skill-playbook]] — the full decision
+map, the two dispatch seams (stop-conditions, standing-rule enforcement)
+made concrete, and a Zenny-adapted essential path. GBrain-vs-Wiki
+reconfirmed (keep Wiki) with an added point: `/context-save`/`/context-restore`
+and `/learn` are also skipped, not just `/setup-gbrain`/`/sync-gbrain`, since
+they duplicate PROJECT_STATE.md's job and Wiki's no-synthesis discipline
+respectively.
+
+**Not yet done:** install (`./setup`), the live SessionStart hook-collision
+check against `role-modes` + Zenny's own five hooks, and the root
+CLAUDE.md Modes-section edit pointing at this playbook — scoped as the next
+Build Card, handed to Execute (global tool install + eventual git-write).
+
 ## [2026-08-27] session-BC-TOOL-009-010-release | First real release cut for both plugins: v1.1.0, and the version-bump requirement discovered
 
 **Trigger:** human asked to cut a release for both plugins so existing
