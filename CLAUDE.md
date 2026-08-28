@@ -171,6 +171,31 @@ after Execute builds it.
 
 ---
 
+## gstack
+
+`garrytan/gstack` is installed globally (`~/.claude/skills/gstack`,
+`./setup` run 2026-08-29 — not project-scoped yet, see Wiki/reference/
+gstack-skill-playbook.md for status). **For all web browsing, use
+gstack's `/browse` skill — never the `mcp__claude-in-chrome__*` tools.**
+
+Available gstack skills: `/office-hours`, `/plan-ceo-review`,
+`/plan-eng-review`, `/plan-design-review`, `/design-consultation`,
+`/design-shotgun`, `/design-html`, `/review`, `/ship`,
+`/land-and-deploy`, `/canary`, `/benchmark`, `/browse`,
+`/connect-chrome`, `/qa`, `/qa-only`, `/design-review`,
+`/setup-browser-cookies`, `/setup-deploy`, `/setup-gbrain`, `/retro`,
+`/investigate`, `/document-release`, `/document-generate`, `/codex`,
+`/cso`, `/autoplan`, `/plan-devex-review`, `/devex-review`, `/careful`,
+`/freeze`, `/guard`, `/unfreeze`, `/gstack-upgrade`, `/learn`.
+
+Full dispatch-model integration (precedence vs. Zenny's own skills,
+memory-system wiring, Credential Gate/Testing enforcement on gstack's
+infra actions) is the gstack-integration Phase 3 rewrite — not done
+yet. Until then, invoke gstack skills deliberately by name; this
+section is not yet the authoritative routing table for them.
+
+---
+
 ## Tool Routing Table
 
 Check this before manual grep/bash/ad-hoc search. Route to the bundle;

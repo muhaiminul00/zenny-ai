@@ -14,16 +14,26 @@ sits alongside.
 Not infra, not a Claude Code plugin — a `git clone` of
 `github.com/garrytan/gstack` into `~/.claude/skills/gstack` (+ `./setup`),
 **machine-global**, not scoped to this project the way `role-modes`/
-`project-memory` are. 23 skills wrapping Garry Tan's own Think→Plan→Build→
-Review→Ship→Reflect discipline, plus GBrain (an optional persistent-memory
-layer), browser automation, security review, and destructive-command
-guardrails. Ships its own hook system (stop hooks, pre/post-tool-use hooks,
-an auto-updater throttled to 1/hour on session start) — a third SessionStart
-actor alongside `role-modes`'s hook and Zenny's own five wired hooks
-(pip-guard, permission-fallback, post-edit, prompt-routing, session-end).
-**A live hook-collision check is mandatory before this playbook is trusted
-in practice** — same bug class BC-TOOL-007/008 already found once between
-`role-modes` and `project-memory`.
+`project-memory` are (human declined `--team`/project-scoped install
+2026-08-29 — revisit after Phase 3). **Actually 55 skills, 76 browse
+commands** (live-verified at install, `gen-llms-txt` output) — the
+"23-skill" figure in earlier research was wrong, corrected here. Each
+skill is its own subdirectory with a generated `SKILL.md` directly under
+`~/.claude/skills/gstack/` — Claude Code auto-discovers and surfaces
+them the moment the repo is cloned, same mechanism as any other skill
+(confirmed: the router skill appeared in the available-skills list
+immediately after `git clone`, before `./setup` even ran). Wraps Garry
+Tan's own Think→Plan→Build→Review→Ship→Reflect discipline, plus GBrain
+(an optional persistent-memory layer), browser automation, security
+review, and destructive-command guardrails.
+
+**Hook-collision check, live-verified 2026-08-29 (global, non-team
+install):** `~/.claude/settings.json` has zero gstack hook entries —
+grepped in full, no matches. No collision with `role-modes`'s hook or
+Zenny's own wired hooks for this install mode. Team mode (`--team`,
+declined for now) is documented to add "auto-update" behavior for a
+shared repo — re-check hooks if that's adopted later, don't assume this
+result carries over.
 
 Self-chaining is real and automatic, not optional: `/ship` auto-invokes
 `/document-release`; `/autoplan` runs CEO→design→eng→DX with no described
@@ -105,7 +115,18 @@ specific gap appears that nothing in the decision map above already covers.
 
 ## Status
 
-Theoretical model only, agreed with the human 2026-08-27, not yet installed
-or live-verified. Install (`./setup`, global) + the SessionStart
-hook-collision check + root `CLAUDE.md` Modes-section update are the next
-Build Card, scoped to Execute (global tool install + git-write).
+**Installed 2026-08-29** (global, `~/.claude/skills/gstack`, non-team) —
+hook-collision check clear (see above). A minimal `## gstack` section
+was added to root `CLAUDE.md` (use `/browse` for all web browsing,
+never `mcp__claude-in-chrome__*`; lists all available skills) — this is
+**not yet** the full dispatch-model integration described in this
+page's Decision Map/Essential Path sections above. That rewrite,
+**plus a new addition to its scope (human, 2026-08-29): prune skills/
+plugins no longer required or related to the project, at both user
+(machine-global) and project scope**, is Phase 3 — still not started.
+
+Bun (`~/.bun/bin`, v1.4.0) was installed as a prerequisite (gstack's
+setup requires it, wasn't already present); a `bunx` shim
+(`~/.bun/bin/bunx` → `bun x "$@"`) was added since this bun build didn't
+ship a separate `bunx` binary and `./setup`'s Playwright-install step
+calls it by name.

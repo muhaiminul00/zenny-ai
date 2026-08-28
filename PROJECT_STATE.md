@@ -10,7 +10,20 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /execute — **gstack-integration Phase 2
+2026-08-29 (latest) — by /execute — **gstack-integration Phase 1
+(install) complete: gstack installed globally (`~/.claude/skills/
+gstack`, non-team), hook-collision check clear, minimal `## gstack`
+section live in root CLAUDE.md.** Real skill count verified: 55
+skills/76 browse commands (corrects the earlier "23-skill" estimate).
+`bun` installed as a prerequisite; a `bunx` shim was needed for
+setup's final Playwright-install step. Human declined `--team`
+(project-scoped) install for now — stays machine-global until Phase 3
+lands. **Phase 3 scope grown:** now also covers pruning unnecessary
+skills/plugins at user and project scope, not just the dispatch-model
+rewrite. Full detail: `Wiki/log.md` session-gstack-install,
+`Wiki/reference/gstack-skill-playbook.md`.
+
+2026-08-29 (prior) — by /execute — **gstack-integration Phase 2
 (working-folder legacy-file cleanup) complete, human-reviewed before
 deletion.** Removed: `CLAUDE_v3.0.md` (superseded prior version),
 `.agents/skills/` (stale duplicate of `.claude/skills`), the entire

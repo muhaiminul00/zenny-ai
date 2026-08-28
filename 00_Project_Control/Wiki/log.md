@@ -9,6 +9,64 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-29] session-gstack-install | gstack installed (global, non-team), CLAUDE.md gstack section added, Phase 3 scope grown
+
+**Trigger:** human gave gstack's own exact recommended install steps
+verbatim and asked they be followed literally, superseding the earlier
+plan to have the human install it manually. Also asked, separately, that
+Phase 3 additionally cover pruning unnecessary skills/plugins at both
+user (machine-global) and project scope — not just the dispatch-model
+rewrite already planned.
+
+**What happened:** `git clone --single-branch --depth 1
+https://github.com/garrytan/gstack.git ~/.claude/skills/gstack` — the
+router skill auto-surfaced in the available-skills list immediately
+after clone, before `./setup` ran, confirming each gstack skill is a
+real Claude Code skill (own `SKILL.md`), not just command files.
+`./setup` needed a real prerequisite not present on this machine: `bun`
+(installed via the official `bun.sh/install` script, v1.4.0). Setup then
+completed skill-doc generation for all supported hosts (claude, codex,
+kiro, factory, agents — confirmed real count: **55 skills, 76 browse
+commands**, correcting the earlier "23-skill" estimate) but failed its
+final step — `bunx: command not found` (this bun build doesn't ship a
+separate `bunx` binary). Fixed with a small shim
+(`~/.bun/bin/bunx` → `bun x "$@"`) and ran the remaining step directly
+(`bun x playwright install chromium`, ~306MB, both Chrome-for-Testing
+and headless-shell downloaded successfully). Install complete, exit 0.
+
+**Live-verified, per the playbook's own mandatory hook-collision
+check:** grepped `~/.claude/settings.json` in full for "gstack" — zero
+matches. No collision with `role-modes`'s hook or Zenny's own hooks, for
+this install mode (global, non-team). Not re-checked for team mode,
+which the setup script documents as adding auto-update behavior — would
+need its own check if adopted later.
+
+**Added to root `CLAUDE.md`:** a minimal `## gstack` section, per the
+human's literal instruction — states `/browse` is used for all web
+browsing (never `mcp__claude-in-chrome__*`), and lists gstack's
+available skills. Explicitly scoped as *not* the full dispatch-model
+integration (precedence, memory-system wiring, standing-rule
+enforcement) — that stays Phase 3, flagged in the new section's own
+text so it isn't mistaken for done.
+
+**Asked, per the human's own literal instruction:** whether to also
+install gstack project-scoped (`--team` mode, the current recommended
+path — `--local` is deprecated) so teammates opening the repo get it
+too. **Human declined for now** — staying machine-global only until
+Phase 3's dispatch-model work has landed.
+
+**Phase 3 scope grown (human, this session):** in addition to the
+dispatch-model rewrite already planned, Phase 3 now also covers pruning
+skills/plugins no longer required or related to the project, at both
+user (machine-global `~/.claude/skills` and `~/.claude/settings.json`
+`enabledPlugins`) and project scope (`.claude/skills`,
+`.claude/settings.json`) — not yet started.
+
+**Resolved to:** [[reference/gstack-skill-playbook]] (status, skill
+count, and hook-collision sections all updated in place) and
+`Wiki/index.md`'s cross-reference. CLAUDE.md's own `## gstack` section
+is the live, human-visible record of what's actually wired so far.
+
 ## [2026-08-29] session-gstack-phase2-cleanup | Working-folder legacy-file cleanup (Phase 2 of gstack-integration plan), review-gated
 
 **Trigger:** human's gstack-integration redesign (dispatch model, hook
