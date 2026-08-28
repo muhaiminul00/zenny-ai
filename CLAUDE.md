@@ -179,7 +179,6 @@ let Claude pick the right skill within a single-domain bundle.
 | Task category | Tool |
 |---|---|
 | Find code/call chains in Dashboard | codebase-memory-mcp MCP (search_graph, trace_path, get_architecture) |
-| Search architecture docs/specs | cowork-semantic-search MCP (hybrid mode) |
 | Convert a large, stable reference doc into a loadable structure | book-to-skill (CLI, via `.zenny-py-venv`) — one-time, not for fast-changing files |
 | Anything n8n | n8n-skills bundle + n8n MCP |
 | Anything Hostinger (VPS/DNS/domains/hosting/billing) | hostinger-agent-skills bundle + Hostinger MCP |

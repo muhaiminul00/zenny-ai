@@ -5,7 +5,17 @@
 Zenny_production_credential*
 .env
 .env.*
+.semantic_search/
+.cowork/
+*.vector
+*.chromadb
+*.lancedb
+.cowork-semantic-search/
 
 # OS / editor cruft
 .DS_Store
 Thumbs.db
+.vscode/
+
+# Throwaway browser-automation session artifacts
+.playwright-mcp/

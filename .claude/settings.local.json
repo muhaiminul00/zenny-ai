@@ -1,5 +1,51 @@
 {
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(git -C \"e:/Programming/Zenny - breakthrough\" push zenny-sync main)",
+      "mcp__plugin_n8n-skills_n8n-mcp__search_workflows",
+      "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"& { . 'E:/Programming/Zenny - breakthrough/.claude/hooks/session-end.ps1' }\" 2>&1)",
+      "Bash(xxd \"E:/Programming/Zenny - breakthrough/.claude/hooks/session-end.ps1\")",
+      "Bash(python *)",
+      "Bash(python3 -)",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__plugin_n8n-skills_n8n-mcp__get_workflow_best_practices",
+      "mcp__plugin_n8n-skills_n8n-mcp__get_sdk_reference",
+      "mcp__plugin_n8n-skills_n8n-mcp__get_workflow_details",
+      "mcp__plugin_n8n-skills_n8n-mcp__list_credentials",
+      "mcp__plugin_n8n-skills_n8n-mcp__validate_workflow",
+      "mcp__plugin_n8n-skills_n8n-mcp__create_workflow_from_code",
+      "mcp__plugin_n8n-skills_n8n-mcp__update_workflow",
+      "mcp__plugin_n8n-skills_n8n-mcp__publish_workflow",
+      "Bash(set -e)",
+      "Bash(curl -s -X POST __TRACKED_VAR__/create-callback-queue-entry -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(curl -s -X POST https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/create-callback-queue-entry -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(curl -s -X POST https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/create-inspection-slot-booking -H 'Content-Type: application/json' -d '{ *)",
+      "mcp__plugin_n8n-skills_n8n-mcp__search_executions",
+      "mcp__plugin_n8n-skills_n8n-mcp__get_execution",
+      "Bash(curl -s -X POST https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/create-scored-booking -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(curl -s -X POST https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/create-registration -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(curl -s -X POST https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/record-conversion -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(git check-ignore *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'BC-034: Phase 8b complete - final 5 Conversion Engine Tools \\(WF-008-012\\) *)",
+      "Bash(git push *)",
+      "Bash(curl -s -X POST https://n8n-cbzu.srv1881104.hstgr.cloud/webhook/convocore-adapter -H 'Content-Type: application/json' -H 'Authorization: Bearer bc028-test-convocore-secret-value' -d '{ *)",
+      "Bash(git commit -m 'BC-035: ADP-002 tool-forwarding allow-list extended to 17 Tools *)",
+      "Bash(git commit -m 'Commander: handoff note + defer appointments doc diff *)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__plugin_n8n-skills_n8n-mcp__get_node_types"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
-    "convocore"
-  ]
+    "convocore",
+    "codebase-memory-mcp"
+  ],
+  "skillOverrides": {
+    "graphify": "off",
+    "supabase": "off",
+    "supabase-postgres-best-practices": "off",
+    "book-to-skill": "off"
+  }
 }
