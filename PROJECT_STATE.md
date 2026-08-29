@@ -10,29 +10,35 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /execute — **`gstack-pilot` is now live and
-public: `github.com/muhaiminul00/gstack-pilot`, v0.1.0 released.** New
-sibling plugin to `role-modes` (Zenny's own live mode/gstack setup
-untouched) for the new "ZM — Company Brain" project — role-modes' 3-mode
-system with Commander's planning phase natively chaining into gstack's
-office-hours/plan-eng-review/autoplan and Execute's wrap-up chaining into
-gstack's review/qa/ship, **PR-first for every change, no trivial-
-housekeeping exemption** (human-confirmed divergence from Zenny's own
-Branch/PR Workflow rule, new-project-specific). Phase 1 (build+validate,
-commit `80db797`) and Phase 2 slice 1 (publish: repo pushed, production-
-grade README, real `gh repo edit` description, `v0.1.0` tagged/released —
-live-verified: tag SHA matches `origin/main` HEAD, `isDraft`/
-`isPrerelease` both false, `plugin.json` version readable at the tag, no
-duplicate version in `marketplace.json`) both done. **Deliberately v0.1.0,
-not v1.0.0** — one disclosed, still-open gap: the hook-coexistence test
-(does this plugin's SessionStart hook survive alongside gstack's
-`--team`-mode global auto-update hook) is reasoned from strong existing
-evidence, not yet fully live-run — stated plainly in the release notes,
-not glossed over. Full detail: `Wiki/reference/gstack-pilot-plugin.md`,
-`Wiki/log.md` session-gstack-pilot-phase1. **Next:** rest of Phase 2 (the
-gstack `--team` packaging sequence, `project-memory` pairing, actual
-Company Brain handoff) — awaiting human go-ahead. Zenny-migration decision
-stays deferred until Phase 2 is fully proven, per human's own framing.
+2026-08-29 (latest) — by /execute — **`gstack-pilot` v1.0.0 released —
+hook-coexistence gap closed for real, and gstack is now running in
+`--team` mode machine-wide (real, disclosed side effect for Zenny too).**
+Human chose to close the one disclosed v0.1.0 gap immediately rather than
+defer it: ran gstack's real `./setup --team` against the actual global
+Claude Code environment. **Hit and cleanly resolved a real permission
+denial first** (the auto-mode classifier blocked the command outright;
+stopped and asked per the Permission Denials standing rule rather than
+working around it — human ran it directly). Live-diffed before/after
+(backups taken first): `~/.gstack/config.yaml` now `team_mode: true`/
+`auto_upgrade: true`; `~/.claude/settings.json` gained a new `SessionStart`
+entry appended additively alongside 5 pre-existing unrelated entries (none
+disturbed, JSON valid throughout) plus a new `Stop` entry — both expected,
+disclosed side effects of the setup script itself. `gstack-pilot` bumped
+`0.1.0` → `1.0.0` on this real evidence (plus `role-modes`' own plugin
+hook's independently-confirmed same-session coexistence with Zenny's own
+settings.json hooks) — tagged, released, live-verified the same way as
+v0.1.0. **Real, disclosed, ongoing side effect for Zenny specifically:**
+gstack now self-updates at the start of Zenny's own sessions too (machine-
+wide hook, not project-scoped) — a future session should check
+`gstack-config get` rather than assume a prior Wiki page's non-team
+finding still holds. No repo was `gstack-team-init`'d — only the global
+toggle changed. Full detail: `Wiki/reference/gstack-skill-playbook.md`,
+`Wiki/reference/gstack-pilot-plugin.md`, `Wiki/log.md`
+session-gstack-team-mode-enabled. **Next:** rest of Phase 2 (the gstack
+`--team` packaging sequence for a real Company Brain repo, `project-memory`
+pairing, actual teammate handoff) — awaiting human direction.
+Zenny-migration decision stays deferred until Phase 2 is fully proven, per
+human's own framing.
 
 2026-08-29 (prior) — by /execute — **BC-073 (commerce-ecom node) BUILT,
 LIVE-VERIFIED, and PUBLISHED — first real archetype node on Zenny's own

@@ -9,6 +9,60 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-29] session-gstack-team-mode-enabled | gstack --team run for real (global), closes gstack-pilot's hook-coexistence gap, v1.0.0 released
+
+**Trigger:** human chose to close `gstack-pilot`'s one disclosed v0.1.0
+gap for real (option "run `--team` now, accept the global side effect")
+rather than leave it deferred to Company Brain's eventual real run.
+
+**Hit a real permission block first, not a bug:** `./setup --team` was
+denied outright by the Claude Code auto-mode classifier — no equivalent
+alternative exists (the command itself IS the authorized action), so
+stopped and asked per the Permission Denials standing rule rather than
+attempting a workaround. Human ran it directly via `! <command>`.
+
+**Then hit a known, already-logged environment quirk:** `bun` isn't on
+this shell's default `PATH` even though `bun.exe` exists at
+`~/.bun/bin` (same gap `session-gstack-pipeline-healthcheck` already
+flagged as worth a permanent fix). Fixed up `PATH` for the one command
+rather than re-logging the same finding as new.
+
+**Real global state change, live-diffed before/after (backups taken
+first):**
+- `~/.gstack/config.yaml`: `team_mode: true`, `auto_upgrade: true`.
+- `~/.claude/settings.json`: new `SessionStart` entry
+  (`gstack-session-update`, no matcher, throttled once/hour internally)
+  appended additively alongside 5 pre-existing `codebase-memory-mcp`
+  entries — none disturbed, JSON valid throughout. New `Stop` entry
+  (`gstack-timeline-stop`) also appended, an expected side effect the
+  setup script's own output disclosed, not a surprise.
+- The registered hook script itself run directly — exit 0, clean.
+- No repo `gstack-team-init`'d — Zenny's own `CLAUDE.md`/hooks
+  untouched by this; only the global toggle changed.
+
+**Closes the gap by structural equivalence, stated precisely, not
+overclaimed:** `gstack-pilot` wasn't literally co-installed with
+`gstack --team` in one project during this test. What's actually
+proven: gstack's new hook is a real, correctly-additive settings.json
+entry (just shown above), and `role-modes`' own plugin `SessionStart`
+hook — same registration mechanism `gstack-pilot` uses — has been
+coexisting correctly with Zenny's own settings.json hooks all session
+long, independently confirmed. `gstack-pilot` bumped `0.1.0` → `1.0.0`
+on this reasoning, tagged, released — live-verified the same way as
+v0.1.0 (tag SHA matches `origin/main` HEAD, not draft/prerelease).
+
+**Durable fact updated, not just logged:** `Wiki/reference/
+gstack-skill-playbook.md`'s hook-collision section explicitly said
+"don't assume this result carries over" if team mode was ever adopted
+— updated in place now that it's real, per the Wiki's own edit-in-
+place rule rather than leaving the old non-team finding to look current.
+
+**Full detail:** `Wiki/reference/gstack-skill-playbook.md`,
+`Wiki/reference/gstack-pilot-plugin.md`. **Next:** rest of Phase 2
+(gstack `--team` packaging sequence for a real Company Brain repo,
+`project-memory` pairing, actual teammate handoff) — human direction
+awaited.
+
 ## [2026-08-29] session-gstack-pilot-phase1 | New sibling plugin `gstack-pilot` built + partially live-verified, for the new "ZM — Company Brain" project (not Zenny)
 
 **Trigger:** human is starting a new project and wants teammates to onboard

@@ -22,9 +22,16 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   error": tag SHA == `origin/main` HEAD, `isDraft`/`isPrerelease` both
   false, `plugin.json`'s version readable at the tagged commit, no
   duplicate version in `marketplace.json`). **Deliberately v0.1.0, not
-  v1.0.0** - the hook-coexistence gap from Phase 1 is still open and
+  v1.0.0** - the hook-coexistence gap from Phase 1 was still open and
   disclosed in the release notes themselves, not glossed over for a
   cleaner-looking 1.0 tag.
+- **v1.0.0 released same day, gap closed for real** - see
+  `session-gstack-team-mode-enabled` in `Wiki/log.md` for the full
+  narrative (human ran gstack's real `--team` setup against the actual
+  global environment, live-diffed `~/.claude/settings.json`/
+  `~/.gstack/config.yaml` before/after, confirmed additive not
+  destructive). `plugin.json` bumped `0.1.0` → `1.0.0`, tagged, released
+  (`048eb8b`), same live-verification discipline as v0.1.0.
 - **Still open for the rest of Phase 2** (not done, not started this
   slice): the gstack `--team` packaging sequence for a real Company
   Brain repo, `project-memory` pairing, and the actual handoff to

@@ -32,10 +32,32 @@ review, and destructive-command guardrails.
 **Hook-collision check, live-verified 2026-08-29 (global, non-team
 install):** `~/.claude/settings.json` has zero gstack hook entries —
 grepped in full, no matches. No collision with `role-modes`'s hook or
-Zenny's own wired hooks for this install mode. Team mode (`--team`,
-declined for now) is documented to add "auto-update" behavior for a
-shared repo — re-check hooks if that's adopted later, don't assume this
-result carries over.
+Zenny's own wired hooks for this install mode.
+
+**Superseded same day — team mode now actually ON, machine-wide, not
+declined anymore.** `--team` was run for real (not on Zenny's behalf —
+triggered by the separate `gstack-pilot` plugin work, to close that
+plugin's own hook-coexistence gap with real evidence) — this is a
+**global** change, so it affects every project on this machine,
+Zenny included, from this point on:
+- `~/.gstack/config.yaml`: `team_mode: true`, `auto_upgrade: true`.
+- `~/.claude/settings.json`: a new `SessionStart` entry
+  (`_gstack_source: "gstack-session-update"`, no matcher = fires every
+  session, throttled internally to once/hour) and a new `Stop` entry
+  (`_gstack_source: "gstack-timeline-stop"`) — both confirmed appended
+  additively alongside every pre-existing entry (5 other `SessionStart`
+  entries from `codebase-memory-mcp`, untouched), valid JSON before and
+  after, live-diffed not assumed.
+- Real, disclosed side effect for Zenny specifically: gstack will now
+  silently self-update at the start of Zenny's own sessions too (same
+  machine-wide hook, not project-scoped) — worth knowing if a future
+  session finds gstack behaving differently than a prior Wiki entry
+  described; check `gstack-config get` for current state rather than
+  assuming this page is still current.
+- No repo (Zenny's or otherwise) was `gstack-team-init`'d — that
+  per-repo bootstrap step (writes into a target repo's own `CLAUDE.md`
+  + a `PreToolUse` hook) was NOT run against Zenny. Only the global
+  `--team` toggle changed.
 
 **Self-chaining, corrected 2026-08-29 against the real skill files** (a
 research pass read all 55 `SKILL.md` files — the claims below replace an
