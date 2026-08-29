@@ -1148,6 +1148,49 @@ Published (`a5c4b85d-7adb-480b-a92c-38a41ef5188d`).
 
 ---
 
+## Zenny Own Runtime (Phase 14) — BC-072 Shared Runtime Foundation
+
+Own-conversation-runtime track, replacing Convocore (fully stopped 2026-08-29).
+Architecture: `05_Platform_Builds/Zenny_SaaS/Zenny_MultiNode_Runtime_Architecture_v1.0.md`
++ `Zenny_Channel_Adapter_Architecture_v2.0.md`. Full decision record:
+`docs/designs/zenny-saas-runtime-pivot.md`, `Wiki/decisions/zenny-saas-runtime-pivot.md`.
+
+### Zenny Runtime - Resolve or Create Conversation Session
+**n8n ID:** `hA0PJmeEzEeLssNC` · **published**, active (sub-workflow, no production trigger)
+
+**PURPOSE:** The shared entry choke point every future conversation-node workflow calls first — closes the tenant-isolation finding from BC-072's eng review. Resolves `client_id` → `client_schema_name` (reusing UTIL-001 directly, not rebuilt) then finds or creates the conversation + session row for that client's schema. **Tenant isolation is schema-per-client** (matching this platform's existing pattern — WF-017/UTIL-001), **not** the RLS+`organization_id`+`app.current_org_id` model the MultiNode Runtime v1.0 doc originally assumed; that mismatch was found live reading WF-017 during BC-072, corrected before building — see the design doc's CORRECTION section.
+
+**TRIGGER:** Execute Workflow Trigger (Define Below): `client_id` (string), `channel` (string, matches `channel_type_enum`), `external_id` (string).
+
+**OUTPUT / END STATE:**
+- Resolved: `{ resolved: true, client_schema_name, conversation_id, is_new }` — `is_new: true` on first message for that `external_id`+`channel` pair, `false` on a returning one (same `conversation_id`).
+- Unknown client: `{ resolved: false, error_type: "permanent", error_message: "client_id does not resolve to a known client" }`.
+
+**REAL DEPENDENCIES:** UTIL-001 (schema resolution, reused unmodified), `find_or_create_conversation` RPC (new, BC-072), `zenny-vault-suparbase` Supabase credential.
+
+**LAST VERIFIED:** BC-072, 2026-08-29 — live via `execute_workflow` (manual mode, not `test_workflow`-pinned, since `test_workflow` auto-pins credentialed nodes and would only simulate the Supabase call). Three real executions against the live test-client roster: (1) new conversation created for `client_test_002_acme_commerce_test` (`43ed5d3e-...`, `is_new: true`); (2) same client_id + same `external_id` replayed → same `conversation_id`, `is_new: false` (idempotency proven); (3) a **different** client (`client_test_003_acme_appointment_test`) with the **same** `external_id` → a genuinely separate `conversation_id` (`90bc192a-...`) in the other schema — tenant isolation proven, not assumed. All 3 synthetic rows deleted after verification. A real n8n IF-node bug was found and fixed during this verification: a `{type:'boolean', operation:'true'}` condition on `$json.resolved` threw a strict-type-validation error (this project's most recurring n8n bug class per `Wiki/platform-quirks/n8n-node-behaviors.md`) — fixed by switching to the already-proven `{type:'string', operation:'exists'}` pattern on `client_schema_name`, matching WF-017's own "Customer Found?" node.
+
+**FIXED BC-072 (schema-provisioning gap, found live):** `create_client_schema_from_template` only clones tables that exist in the source `tpl_*` schema at call time — the 3 already-provisioned test-client schemas needed for Phase 1 (`client_test_002/003/004`) predated this migration and had no `conversations`/`conversation_sessions`/`messages` tables. Backfilled directly, including re-adding the foreign keys `LIKE ... INCLUDING ALL` never copies (a real Postgres gotcha, not an oversight — matches why `create_client_schema_from_template`'s own `v_fk_defs` array exists). Also extended these 3 tables to `tpl_emergency`/`tpl_engagement` (outside Phase 1 scope, but needed to avoid breaking future provisioning for those archetypes once `create_client_schema_from_template` expects them everywhere).
+
+**FIXED BC-072 (RPC grant gap, found via `get_advisors`):** `find_or_create_conversation`/`append_message` were created with `REVOKE ... FROM anon, authenticated` (matching BC-052/064's documented pattern) but remained executable by both roles — Postgres grants `EXECUTE` to the implicit `PUBLIC` pseudo-role by default, and every role is a member of `PUBLIC`, so revoking named roles alone doesn't remove it. Fixed with an explicit `REVOKE ... FROM PUBLIC` + `GRANT ... TO service_role`. Checked live whether this gap existed in any of the 62 functions BC-064 already fixed — it did not (zero `SECURITY DEFINER` functions in `public` are anon-executable as of this check), so this was specific to these 2 new functions, not a platform-wide regression.
+
+### Zenny Runtime - Call LLM via OpenRouter
+**n8n ID:** `OuJt2xCEOL8CgZJy` · **published**, active (sub-workflow, no production trigger)
+
+**PURPOSE:** Reusable LLM-call wrapper for every future node type (BC-073/074/075), matching the existing `chainLlm`+`lmChatOpenRouter` pattern already live in this repo (`Wiki/platform-quirks/n8n-openrouter-direct-llm-pattern.md`, built for INT-010). Closes the eng review's "LLM provider single point of failure" finding: a 15s timeout + graceful degradation message on the error output, instead of a silent hang or a thrown workflow error.
+
+**TRIGGER:** Execute Workflow Trigger (Define Below): `prompt` (string), `system_message` (string).
+
+**OUTPUT / END STATE:**
+- Success: `{ success: true, output: "<model's reply text>" }`.
+- Degraded (timeout/failure after 3 retries): `{ success: false, output: "We're having trouble right now — please try again shortly.", error_type: "llm_unavailable" }`.
+
+**REAL DEPENDENCIES:** `openrouter-zm` OpenRouter credential (the same credential name INT-010/011 already use, per Workflow_Registry's own INT-010 entry — confirmed consistent, not a new/different key).
+
+**LAST VERIFIED:** BC-072, 2026-08-29 — live via `execute_workflow` (a temporary Manual Trigger was added for direct invocation, since Execute Workflow Trigger sub-workflows can't be called directly through the MCP's `execute_workflow`, then removed after verification). Real call to `openai/gpt-4.1-mini` returned "connection verified" for a controlled test prompt — genuine external API round trip, not simulated (`test_workflow` was deliberately avoided here since it auto-pins credentialed nodes, which would have only proven the wiring, not the actual OpenRouter connection).
+
+---
+
 ## Referenced In Docs But Not Found As A Real Built Workflow
 
 **ADP-001 Voiceflow Adapter** — n8n_Workflow_Specification_v1.md Part 17 lists this as status "Production," but a full `search_workflows` audit (BC-027, 2026-08-07) found no n8n workflow matching this name or purpose anywhere in the live instance. This is a real doc/reality mismatch, not resolved or investigated further this session (BC-027 is a documentation card) — flagged here for whoever picks up Voiceflow-adapter work next.

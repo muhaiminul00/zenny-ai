@@ -9,6 +9,79 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-29] session-bc072-shared-runtime-foundation | BC-072 built, live-verified, published — first real workflows on Zenny's own runtime
+
+**Trigger:** human confirmed the last blocking item (which 2-3 archetypes:
+commerce-ecom + appointment + consultation) and asked to choose next step;
+Commander drafted BC-072 (Shared Runtime Foundation), human approved,
+auto-handed to Execute. n8n/Supabase MCP had been disconnected at session
+start — human fixed the connections mid-session and this card resumed.
+
+**What was built:** two n8n sub-workflows — `Zenny Runtime - Resolve or
+Create Conversation Session` (`hA0PJmeEzEeLssNC`) and `Zenny Runtime - Call
+LLM via OpenRouter` (`OuJt2xCEOL8CgZJy`), both published — plus new Supabase
+schema: `conversations`/`conversation_sessions`/`messages` tables added to
+all 5 `tpl_*` archetype templates (not just the 3 in Phase 1 scope, to avoid
+breaking `create_client_schema_from_template` for the other 2), backfilled
+into the 3 already-provisioned test-client schemas Phase 1 needs, plus two
+new RPCs (`find_or_create_conversation`, `append_message`).
+
+**Real architecture correction found live, before building (not a bug found
+after):** read WF-017 directly instead of trusting the Wiki's prose summary
+of it — discovered Zenny's actual tenant-isolation mechanism is
+schema-per-client (explicit `p_schema` parameter on every RPC), not the
+RLS+`organization_id`+`app.current_org_id` model
+`Zenny_MultiNode_Runtime_Architecture_v1.0.md` assumed. Presented to the
+human as a real decision (not self-resolved); schema-per-client chosen for
+consistency with all 13 existing build phases. Also decided: normalized
+one-row-per-message table (matching `sync_log`/`connection_audit_log`/
+`tool_call_log`), not the JSONB-blob storage the human proposed as an
+alternative — weighed against existing convention, decided together.
+
+**Two real bugs found and fixed during live verification, both logged so
+they don't recur:**
+1. **Postgres implicit-PUBLIC-grant gap:** `REVOKE ... FROM anon,
+   authenticated` on the two new RPCs didn't actually block them —
+   `has_function_privilege` proved `anon`/`authenticated` could still
+   execute both, because every role is an implicit member of `PUBLIC` and
+   Postgres grants `EXECUTE` to `PUBLIC` by default on function creation.
+   Fixed with an explicit `REVOKE ... FROM PUBLIC`. Checked whether this
+   gap existed in any of the 62 functions BC-064 already fixed — it did
+   not (zero anon-executable `SECURITY DEFINER` functions found platform-
+   wide) — isolated to these 2 new functions, not a regression.
+2. **n8n IF-node boolean-operator strict-type-validation bug** (this
+   project's most recurring n8n bug class, per `Wiki/platform-quirks/
+   n8n-node-behaviors.md`): a `{type:'boolean', operation:'true'}`
+   condition on `$json.resolved` threw `Wrong type: '' is a string but was
+   expecting a boolean` even though the identical shape appears in WF-017's
+   own live production node. Fixed by switching to the already-proven
+   `{type:'string', operation:'exists'}` check on `client_schema_name`,
+   matching WF-017's own "Customer Found?" node pattern.
+
+**Live verification, not `test_workflow`-pinned:** `test_workflow` auto-pins
+credentialed nodes, which would have only proven wiring, not real external
+calls. Used `execute_workflow` (manual mode) instead, with a temporary
+Manual Trigger added/removed around each sub-workflow's Execute Workflow
+Trigger (which `execute_workflow` can't invoke directly via MCP). Real
+results: a genuine OpenRouter call (`openai/gpt-4.1-mini`) returned "connection
+verified"; a real conversation row created in `client_test_002_acme_commerce_
+test` (`is_new: true`), replayed to prove idempotency (`is_new: false`, same
+`conversation_id`), then a different client with the same `external_id`
+produced a genuinely separate `conversation_id` in a different schema —
+tenant isolation proven live, not assumed. All synthetic test rows deleted
+after.
+
+**Also found and fixed, unrelated to BC-072's scope but surfaced by
+`get_advisors`:** `public.waitlist_entries` and `control.archetype_recovery_
+defaults` have RLS disabled — flagged to the human, not auto-fixed (enabling
+RLS without policies would block all access; needs the human's policy
+decision). Not yet resolved — tracked here, not silently dropped.
+
+**Outcome:** BC-072 complete. Full detail: `06_Infrastructure/n8n/
+Workflow_Registry.md`'s "Zenny Own Runtime (Phase 14)" section,
+`docs/designs/zenny-saas-runtime-pivot.md`, `Wiki/decisions/
+zenny-saas-runtime-pivot.md`. Next: BC-073/074/075, one per archetype.
+
 ## [2026-08-29] session-zenny-saas-runtime-pivot | Architecture locked for Zenny's own conversation runtime (Convocore replacement), full gstack review pipeline + post-review correction pass
 
 **Trigger:** human, in Commander mode, asked to plan Zenny's strategy and

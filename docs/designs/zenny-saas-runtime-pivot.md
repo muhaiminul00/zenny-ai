@@ -677,7 +677,22 @@ listed here as fast-follow; now required at launch alongside web chat.
 - `Convocore_Agent_Intake_Checklist_v1.md` — stays the onboarding process,
   not rebuilt as a self-service UI for this track.
 
-## BC-072: Shared Runtime Foundation (first Build Card, not yet approved)
+## BC-072: Shared Runtime Foundation — COMPLETE (2026-08-29)
+
+Built, live-verified, and published. Full detail:
+`06_Infrastructure/n8n/Workflow_Registry.md`'s "Zenny Own Runtime (Phase 14)"
+section. One real architecture correction made during the build, not after:
+tenant isolation is **schema-per-client** (matching this platform's existing
+pattern), not the RLS+`organization_id` model the MultiNode Runtime v1.0 doc
+assumed — found by reading WF-017 directly, corrected before building, not
+discovered as a bug afterward. Two real Postgres/n8n bugs found and fixed
+live during verification: an implicit-`PUBLIC`-grant gap on the new RPCs
+(Postgres-specific, distinct from the anon/authenticated pattern BC-052/064
+already fixed platform-wide — checked, not a regression there), and this
+project's most recurring n8n bug class (IF-node boolean-operator strict-type
+validation) hit again and fixed the same way as its known precedent.
+
+### Original card text (kept for record)
 
 Per Commander's scoping responsibility — smallest correct unit first, not
 all 3 node types in one card. This card builds the foundation every node

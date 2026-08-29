@@ -1,6 +1,10 @@
 # Decision: Zenny's Own Conversation Runtime (Convocore Replacement)
 
-**Status:** DECIDED, architecture locked — 2026-08-29. Build not yet started.
+**Status:** DECIDED, architecture locked — 2026-08-29. **BC-072 (Shared
+Runtime Foundation) built, live-verified, and published same day** — see
+`06_Infrastructure/n8n/Workflow_Registry.md`'s "Zenny Own Runtime (Phase 14)"
+section. Next: BC-073/074/075, one per confirmed archetype (commerce-ecom,
+appointment, consultation).
 
 ## What was decided
 
@@ -32,6 +36,18 @@ not a duplicate of that full record.
   architecture docs' own estimate for the full scope (2-3 archetype node
   types + 3-channel gateway) is 2.5-3 months. Both numbers are on record —
   the plan does not pretend the shorter one is confirmed.
+
+## Corrected during BC-072's build (not a new decision, a live-verification finding)
+
+Tenant isolation is **schema-per-client** (matching every other phase already
+built in this repo — WF-017/UTIL-001's real pattern), not the RLS +
+`organization_id` + `app.current_org_id` model `Zenny_MultiNode_Runtime_
+Architecture_v1.0.md` assumed. Found by reading WF-017 directly during
+BC-072's build, before writing any new schema — corrected in the design doc
+and the actual build, not discovered as a bug afterward. Message storage is a
+normalized one-row-per-message table (matching `sync_log`/`connection_audit_
+log`/`tool_call_log`), not a JSONB blob, per the founder's own question
+weighed against existing convention.
 
 ## What's still open (not yet decided)
 

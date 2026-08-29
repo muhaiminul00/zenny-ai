@@ -10,7 +10,37 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /commander — **Architecture locked for Zenny's own
+2026-08-29 (latest) — by /execute — **BC-072 (Shared Runtime Foundation)
+built, live-verified, and published — the first real workflows on Zenny's
+own conversation runtime.** Two n8n sub-workflows live: `Zenny Runtime -
+Resolve or Create Conversation Session` (`hA0PJmeEzEeLssNC`) and `Zenny
+Runtime - Call LLM via OpenRouter` (`OuJt2xCEOL8CgZJy`). New Supabase schema:
+`conversations`/`conversation_sessions`/`messages` added to all 5 `tpl_*`
+templates + backfilled into the 3 test-client schemas Phase 1 needs, plus
+`find_or_create_conversation`/`append_message` RPCs. **Real architecture
+correction found live before building, not after:** tenant isolation is
+schema-per-client (matching every other phase already built here), not the
+RLS+`organization_id` model `Zenny_MultiNode_Runtime_Architecture_v1.0.md`
+assumed — found by reading WF-017 directly. **Two real bugs found+fixed
+during live verification:** an implicit-Postgres-`PUBLIC`-grant gap on the
+new RPCs (checked — not present in any of BC-064's already-fixed 62
+functions, isolated to these 2 new ones); this project's recurring n8n
+IF-node boolean-strict-type-validation bug, fixed the same proven way as its
+precedent. **Verified via `execute_workflow` (manual mode), not
+`test_workflow`-pinned** — a real OpenRouter call, a real conversation row
+created+replayed for idempotency, and genuine cross-tenant isolation proven
+(same `external_id`, two different clients, two separate schemas, two
+separate rows). All synthetic test data cleaned up after. **Also found,
+unrelated to BC-072, flagged not auto-fixed:** `public.waitlist_entries` and
+`control.archetype_recovery_defaults` have RLS disabled — needs the human's
+policy decision before enabling (enabling without policies would block all
+access). **Next:** BC-073/074/075, one per confirmed archetype (commerce-ecom,
+appointment, consultation). Full detail: `06_Infrastructure/n8n/
+Workflow_Registry.md`'s "Zenny Own Runtime (Phase 14)" section,
+`docs/designs/zenny-saas-runtime-pivot.md`, `Wiki/log.md`
+session-bc072-shared-runtime-foundation.
+
+2026-08-29 (prior) — by /commander — **Architecture locked for Zenny's own
 conversation runtime (Convocore replacement): MultiNode Runtime v1.0 +
 Channel Adapter v2.0, both real docs in `05_Platform_Builds/Zenny_SaaS/`.**
 Ran the full gstack review pipeline (`/office-hours` → `/plan-ceo-review` →
@@ -881,14 +911,17 @@ patterns reused by the new build — WF-017's shared choke point, BC-053's
 Verification Approval Queue, the OpenRouter pattern, etc.) not as an active
 track. **The active track is Phase 14 below.**
 
-Phase 14 — Zenny Own Runtime (SaaS Pivot) — ARCHITECTURE LOCKED, BUILD NOT
-STARTED. MultiNode Runtime v1.0 + Channel Adapter v2.0 (both real docs,
-`05_Platform_Builds/Zenny_SaaS/`). Real demand signal driving this (7-8
-leads/day via Meta ads, blocked on price); channel parity (web+WhatsApp+IG)
-required at launch; 2-3 archetype node types needed (exact archetypes not
-yet named — blocking item); timeline dual-stated (1-1.5mo target / 2.5-3mo
-doc estimate). Full record: `docs/designs/zenny-saas-runtime-pivot.md`,
-`Wiki/decisions/zenny-saas-runtime-pivot.md`.
+Phase 14 — Zenny Own Runtime (SaaS Pivot) — IN PROGRESS. BC-072 (Shared
+Runtime Foundation) COMPLETE: shared entry sub-workflow (schema-per-client
+tenant isolation) + OpenRouter LLM call wrapper + core conversation schema,
+all live-verified and published. MultiNode Runtime v1.0 + Channel Adapter
+v2.0 (both real docs, `05_Platform_Builds/Zenny_SaaS/`) are the target
+architecture. Archetypes confirmed: commerce-ecom + appointment +
+consultation. Real demand signal driving this (7-8 leads/day via Meta ads,
+blocked on price); channel parity (web+WhatsApp+IG) required at launch;
+timeline dual-stated (1-1.5mo target / 2.5-3mo doc estimate). **Next:**
+BC-073/074/075, one per archetype. Full record: `docs/designs/
+zenny-saas-runtime-pivot.md`, `Wiki/decisions/zenny-saas-runtime-pivot.md`.
 
 Phase 8 — Conversion Engine (11 Tools) — COMPLETE (11/11 built and
 live-tested)
