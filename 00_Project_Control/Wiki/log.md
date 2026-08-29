@@ -9,6 +9,94 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-29] session-gstack-dispatch-rewrite | gstack studied in depth (55 skills), using-gstack skill built, CLAUDE.md rewritten, 3 hooks retired (Phase 3)
+
+**Trigger:** human asked to start the dispatch-model/routing-table
+rewrite, but first to "study gstack skills properly" and asked whether a
+dedicated skill for using gstack made sense.
+
+**Research done:** a full pass read all 55 `SKILL.md` files (not just
+frontmatter/names), gstack's README/ARCHITECTURE/AGENTS/ETHOS/CLAUDE.md/
+USING_GBRAIN docs, and produced a skill-by-skill table (purpose, real
+triggers, verified vs. per-doc chaining, side effects). Full findings
+kept in the subagent transcript; the durable corrections were folded
+into `Wiki/reference/gstack-skill-playbook.md` directly.
+
+**Self-correction, important:** the playbook previously claimed "gstack's
+own docs describe an 'Essential Core Path'" — the research grepped the
+entire gstack doc set for that phrase and found zero matches. It does
+not exist; it was fabricated last session, likely by conflating
+README's actual "Quick start" trial sequence with a permanent tiering
+doctrine that was never there. Corrected in the Wiki page with an
+explicit retraction note — the "essential path" section there is now
+labeled as Zenny's own construction, not sourced from gstack.
+
+**Other corrections, verified against the real files:**
+- `/ship` **mandatorily** dispatches a `/document-release` subagent
+  before opening a PR (Step 18, "you are NOT done" language) — not
+  merely "usable," it fires every time `/ship` runs.
+- `/autoplan` is a real, unconditional sequential chain (CEO → Design
+  [if UI scope] → Eng → DX [if DX scope]); `/office-hours`'s output is
+  NOT auto-picked-up by anything — that was wrong in the prior version,
+  it's a manual handoff via a shared design-doc file.
+- `/guard` does not invoke `/careful`/`/freeze` as separate skills — it
+  duplicates their exact hook-script registrations itself. `/investigate`'s
+  "auto-freeze" is the same pattern (re-implements, doesn't Skill-tool-call
+  `/freeze`).
+- GBrain confirmed opt-in at every layer (nothing installs/wires it
+  without `/setup-gbrain`/`/sync-gbrain` being run explicitly; `/sync-
+  gbrain` only writes its CLAUDE.md block after a live round-trip test
+  passes) — safe to keep skipping entirely, per the existing decision.
+- `/browse`-over-MCP-browser is a static install-time instruction in
+  gstack's own README, not adaptive runtime detection — matches what
+  Zenny already implemented, just now backed by the real mechanism
+  instead of an assumption.
+- No documented gstack convention exists for a *host project's own*
+  router sitting above gstack's — `using-gstack` (below) is built by
+  analogy to gstack's own root `SKILL.md` template, not from a gstack
+  convention.
+
+**Built:** `.claude/skills/using-gstack/SKILL.md` — a real, auto-
+surfacing Claude Code skill (confirmed: appeared in the skill listing
+immediately after creation, same mechanism gstack's own router uses),
+same role as `n8n-skills:using-n8n-skills-official`/
+`superpowers:using-superpowers` for their bundles. This is now the
+actual day-to-day dispatch mechanism — routing rules, the two
+enforcement seams, and the memory-system instruction all live there,
+not in a CLAUDE.md block or the Wiki page.
+
+**CLAUDE.md changes:**
+- `## gstack` section shrunk to a pointer at the `using-gstack` skill
+  (was inlining the full skill list and precedence description).
+- Tool Routing Table: browser/QA row now points at gstack `/browse`/
+  `/qa`/`/qa-only` (Playwright MCP retired from the default path, still
+  installed/usable ad hoc); debugging row points at gstack `/investigate`
+  (`systematic-debugging`/`diagnosing-bugs` retired from default path);
+  code-review row points at gstack `/review` for the default pre-ship
+  pass (`mattpocock-skills:code-review`/`requesting-code-review`/
+  `simplify` stay for ad-hoc use).
+- **3 hooks retired** (`prompt-routing.ps1`, `pip-guard.ps1`,
+  `permission-fallback.ps1`) — removed from `.claude/settings.json` and
+  deleted. `prompt-routing.ps1` is directly superseded by the
+  `using-gstack` skill's auto-surfacing (the actual mechanism the human
+  asked for, back when this hook was first flagged as "doesn't work
+  well, need a real reminder mechanism"). `pip-guard`/`permission-
+  fallback` become plain prose instructions in their existing CLAUDE.md
+  standing-rule sections instead of hook-enforced — both sections
+  updated in place with a retirement note.
+- `post-edit.ps1`/`session-end.ps1` unchanged, still wired.
+
+**Not yet done:** the skill/plugin-pruning half of Phase 3's grown scope
+(4 flagged-but-kept items from the prior triage — `neon`/`neon-postgres`,
+`skill-creator`, `andrej-karpathy-skills`, `playwright` — still sitting
+at "keep for now"); no new pruning happened this session beyond the
+already-completed `learned`/`claude-tools` removals from the prior turn.
+
+**Resolved to:** [[reference/gstack-skill-playbook]] (corrected in
+place), `.claude/skills/using-gstack/SKILL.md` (new), `CLAUDE.md`
+(gstack section + Tool Routing Table + 2 standing-rule sections),
+`.claude/settings.json` (3 hooks removed).
+
 ## [2026-08-29] session-gstack-install | gstack installed (global, non-team), CLAUDE.md gstack section added, Phase 3 scope grown
 
 **Trigger:** human gave gstack's own exact recommended install steps

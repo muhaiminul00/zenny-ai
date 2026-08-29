@@ -10,24 +10,6 @@
     ]
   },
   "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe",
-            "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/prompt-routing.ps1"
-            ],
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
@@ -41,58 +23,6 @@
               "Bypass",
               "-File",
               "${CLAUDE_PROJECT_DIR}/.claude/hooks/post-edit.ps1"
-            ],
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash|PowerShell",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe",
-            "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/pip-guard.ps1"
-            ],
-            "if": "Bash(pip install*)",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "powershell.exe",
-            "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/pip-guard.ps1"
-            ],
-            "if": "PowerShell(pip install*)",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "PermissionDenied": [
-      {
-        "matcher": "mcp__.*n8n.*|mcp__.*supabase.*|Bash|PowerShell",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe",
-            "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/permission-fallback.ps1"
             ],
             "timeout": 10
           }

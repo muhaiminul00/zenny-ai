@@ -10,7 +10,26 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /execute — **gstack-integration Phase 1
+2026-08-29 (latest) — by /execute — **gstack-integration Phase 3
+dispatch-model rewrite done (most of it): `.claude/skills/using-gstack/
+SKILL.md` built (real auto-surfacing skill, gstack-vs-Zenny routing +
+the two enforcement seams + memory-instruction), CLAUDE.md's `## gstack`
+section shrunk to a pointer at it, Tool Routing Table rows updated
+(browser/QA/debugging/code-review now point at gstack for the default
+path), 3 hooks retired (`prompt-routing.ps1`, `pip-guard.ps1`,
+`permission-fallback.ps1` — last two became plain CLAUDE.md instructions,
+first is superseded by the new skill's auto-surfacing).** Preceded by a
+full research pass reading all 55 gstack skill files, which corrected
+several earlier assumptions and **retracted a fabricated claim** — an
+invented "gstack has a documented Essential Core Path" that doesn't
+exist in gstack's docs; the Wiki page now labels that section as
+Zenny's own construction. **Still open in Phase 3:** 4 flagged-but-kept
+skill/plugin pruning candidates from the prior triage (`neon`/`neon-
+postgres`, `skill-creator`, `andrej-karpathy-skills`, `playwright`) —
+human said keep for now, revisit later. Full detail: `Wiki/log.md`
+session-gstack-dispatch-rewrite, `Wiki/reference/gstack-skill-playbook.md`.
+
+2026-08-29 (prior) — by /execute — **gstack-integration Phase 1
 (install) complete: gstack installed globally (`~/.claude/skills/
 gstack`, non-team), hook-collision check clear, minimal `## gstack`
 section live in root CLAUDE.md.** Real skill count verified: 55

@@ -1,13 +1,15 @@
 # gstack skill playbook — Commander's dispatch reference
 
-Commander's reference sheet for deciding which `gstack` skill (or sequence of
+Commander's decision-record for which `gstack` skill (or sequence of
 skills) to invoke, and where Zenny's own existing skills/rules take
-precedence instead. Written 2026-08-27, before install — this is the
-*theoretical* interaction model, agreed with the human, not yet
-live-verified. Advisor and Execute read this same page; neither keeps a
-separate copy. See [[reference/role-modes-plugin]] and
-[[reference/project-memory-plugin]] for the sibling mode/memory system this
-sits alongside.
+precedence instead. Written 2026-08-27 (theoretical), installed and
+live-verified 2026-08-29 (a full research pass read all 55 skill files
+against this page's claims — several corrections below replace earlier
+guesses). The actual day-to-day dispatch mechanism is
+`.claude/skills/using-gstack/SKILL.md`, not this page — this page is
+the durable *why* behind that skill's routing rules. See
+[[reference/role-modes-plugin]] and [[reference/project-memory-plugin]]
+for the sibling mode/memory system this sits alongside.
 
 ## What gstack actually is
 
@@ -35,11 +37,37 @@ declined for now) is documented to add "auto-update" behavior for a
 shared repo — re-check hooks if that's adopted later, don't assume this
 result carries over.
 
-Self-chaining is real and automatic, not optional: `/ship` auto-invokes
-`/document-release`; `/autoplan` runs CEO→design→eng→DX with no described
-human gate in between; `/office-hours`'s output is auto-picked-up by three
-review skills. This is why Commander staying the outer gate (see "The two
-seams" below) is load-bearing, not decorative.
+**Self-chaining, corrected 2026-08-29 against the real skill files** (a
+research pass read all 55 `SKILL.md` files — the claims below replace an
+earlier, less precise version of this paragraph):
+- **`/ship` mandatorily dispatches a `/document-release` subagent** at
+  its Step 18, before the PR is created — explicit "you are NOT done"
+  language, only a *failed* subagent run is non-blocking. This is a real
+  automatic chain.
+- **`/autoplan` is a real, unconditional sequential chain**: it reads and
+  runs `plan-ceo-review` → `plan-design-review` (only if UI scope
+  detected) → `plan-eng-review` → `plan-devex-review` (only if DX scope
+  detected), auto-answering most questions via 6 encoded decision
+  principles instead of surfacing them all.
+- **`/office-hours`'s output is NOT auto-picked-up by anything** — this
+  was wrong in an earlier version of this page. Its own text says "use
+  before /plan-ceo-review or /plan-eng-review"; downstream skills read
+  its design-doc file if a human chooses to run them next, but nothing
+  invokes them automatically.
+- **`/investigate`'s "auto-freeze" is a re-implementation, not a
+  skill-to-skill call**: it directly writes the same freeze-dir state
+  file `/freeze` uses and registers the same hook script, rather than
+  invoking `/freeze` via the Skill tool. Functionally equivalent, worth
+  knowing mechanically.
+- **`/guard` does not invoke `/careful` and `/freeze`** — it duplicates
+  their exact hook-script registrations itself. All three end up wiring
+  the identical two hook scripts either way.
+
+This is why Commander staying the outer gate (see "The two seams" below)
+is load-bearing, not decorative — real automatic chains exist (`/ship`,
+`/autoplan`), even though several things once assumed to be automatic
+here turned out to be manual handoffs between skills that just share a
+data file.
 
 Real-world caveat found during research (no substantive independent
 criticism exists yet — the project is young, v0.15.x, 66K GitHub stars in
@@ -76,16 +104,26 @@ claims, not something to plan capacity around.
 | Debugging | `/investigate` wins — its 3-failed-attempts stop and auto-`/freeze` on the affected module are concrete safety properties the alternatives lack. Retires `superpowers:systematic-debugging` and `mattpocock-skills:diagnosing-bugs` from the Tool Routing Table's default path. |
 | Browser / QA | `/browse`, `/qa`, `/qa-only`, `/setup-browser-cookies` supersede the Tool Routing Table's Playwright MCP row — `/qa` is diff-aware (auto-detects affected pages from `git diff`) and auto-generates regression tests, strictly more complete for this project's OAuth/dashboard-UI verification needs. |
 | Dashboard design | **Split, not a straight replacement:** gstack's `/design-consultation` → `/design-shotgun` → `/design-html` handle greenfield generation (new screens/systems — fits "building almost from scratch"); Zenny's existing `taste-skill` + `brandkit` + `minimalist-skill` + `frontend-design` bundle is the judgment/critique gate gstack's output must pass before a design pass is called done; `impeccable` keeps the post-ship live-polish-audit job (existing Tool Routing Table row) — gstack's `/design-review` is skipped specifically to avoid two full live-audit passes over the same shipped UI. |
-| Memory | Wiki + PROJECT_STATE.md stay the sole system of record. GBrain, `/setup-gbrain`, `/sync-gbrain`, `/context-save`, `/context-restore`, and `/learn` are all skipped — `/context-save` duplicates PROJECT_STATE.md's exact job, and `/learn`'s auto-biasing across sessions is the opposite instinct from Wiki's explicit "say so if no match, never synthesize" confidence rule. |
-| Documentation | Wiki's Promotion Rule and the Per-Workflow Documentation standing rule stay authoritative. `/document-release` and `/document-generate` are usable only for the Dashboard repo's own README/inline docs — never a substitute for a Wiki page or a `Wiki/log.md` entry. |
+| Memory | Wiki + PROJECT_STATE.md stay the sole system of record. GBrain, `/setup-gbrain`, `/sync-gbrain`, `/context-save`, `/context-restore`, and `/learn` are all skipped — `/context-save` duplicates PROJECT_STATE.md's exact job, and `/learn`'s auto-biasing across sessions is the opposite instinct from Wiki's explicit "say so if no match, never synthesize" confidence rule. **Confirmed low-risk to skip cleanly (2026-08-29 research):** GBrain is opt-in at every layer — nothing installs it, wires an MCP server, or writes anything to a project's CLAUDE.md without `/setup-gbrain`/`/sync-gbrain` being run explicitly first, and `/sync-gbrain` only writes its CLAUDE.md block after a live round-trip test passes (removes it if the test fails). `/context-save`/`/context-restore`/`/learn` are fully independent of GBrain — plain local files, not a reason to reconsider skipping GBrain itself. |
+| Documentation | Wiki's Promotion Rule and the Per-Workflow Documentation standing rule stay authoritative. `/document-release`/`/document-generate` update the Dashboard repo's own README/Diataxis-style docs — never a substitute for a Wiki page or a `Wiki/log.md` entry. **Correction (2026-08-29 research):** `/document-release` is not merely "usable" — `/ship`'s Step 18 *mandatorily* dispatches it before opening a PR, so it fires automatically every time `/ship` is used. That's fine under this row's existing split (it only ever touches repo-technical docs, never Wiki/PROJECT_STATE.md), but Commander should expect it to run, not treat it as an optional add-on. |
 | Deploy | `/ship` → `/land-and-deploy` → `/canary` → `/setup-deploy` → `/benchmark` are scoped to the **Dashboard repo only**. n8n/Supabase changes keep going through their own MCPs per the Credential Testing and Mandatory MCP Verification standing rules — this pipeline has no concept of either and must never be allowed near live n8n/Supabase/VPS/DNS state directly. This is where seam 1 matters most. |
 | iOS skills (`/ios-qa`, `/ios-fix`, `/ios-design-review`, `/ios-clean`, `/ios-sync`) | Installed (it's a bundle, no per-skill opt-out), never invoked — Zenny has no iOS app. |
 | Niche utilities (`/retro`, `/benchmark-models`, `/pair-agent`, `/make-pdf`, `/diagram`, `/scrape`, `/skillify`, `/codex`, `/plan-tune`) | Available but not built into any dispatch workflow — usable ad hoc if asked for by name. |
 
-## Essential path (Zenny-adapted from gstack's own tiering)
+## Essential path (Zenny-authored — correction below)
 
-gstack's own docs describe an "Essential Core Path"; the Zenny-scoped
-version, cross-referenced against the decision map above:
+**Correction, 2026-08-29:** an earlier version of this page claimed
+gstack's own docs describe an "Essential Core Path." A full research
+pass grepped every doc file in the gstack repo (README, ARCHITECTURE,
+AGENTS, ETHOS, CLAUDE.md, USING_GBRAIN, everything under `docs/`) for
+that phrase and found **zero matches — it does not exist in gstack's
+docs.** That claim was fabricated, likely by conflating README's actual
+"Quick start" section (a 6-step first-time-trial sequence: install →
+`/office-hours` → `/plan-ceo-review` → `/review` → `/qa` → "stop there,
+you'll know if this is for you") with a permanent tiering doctrine that
+was never there. The sequence below is **Zenny's own construction**,
+built from the real decision map above — not sourced from gstack, and
+should never have been presented as if it were.
 
 1. `/office-hours` → `/plan-ceo-review` → `/plan-design-review` (dashboard
    work only) → `/plan-eng-review` — plan, reviewed on every dimension that
@@ -103,6 +141,28 @@ version, cross-referenced against the decision map above:
    documented per Per-Workflow Documentation.
 6. `/careful`/`/guard` active by default near production; `/freeze` when
    debugging a specific module.
+
+## The dispatch mechanism: a real skill, not a CLAUDE.md block
+
+Static markdown has to be remembered and cross-referenced manually; a
+real Claude Code skill (its own `SKILL.md`, `name:`/`description:`
+frontmatter) auto-surfaces in the available-skills listing every
+session — the same mechanism that made gstack's own router skill appear
+the instant it was cloned, before `./setup` even ran, and the same
+pattern `n8n-skills:using-n8n-skills-official` and
+`superpowers:using-superpowers` already use in this project. gstack's
+own root `SKILL.md` demonstrates the exact template: frontmatter with
+trigger phrases, a "route first" override check, a flat bullet list of
+"trigger phrase → invoke this skill" rules, an explicit proactivity
+gate (auto-invoke vs. suggest-only, user-toggleable, biased toward
+over-routing — "a false positive is cheaper than a false negative"),
+and best-effort routing telemetry. gstack's own dev `CLAUDE.md` shows
+the same pattern a second way — a routing-rules list embedded directly
+in CLAUDE.md text, for its own repo's dev workflow. Neither document
+describes a convention for a *host project's own* router sitting above
+gstack's — this repo's `.claude/skills/using-gstack/SKILL.md` is built
+by analogy to gstack's own template, not from a documented gstack
+convention.
 
 ## Explicitly out of scope for Zenny (for now)
 

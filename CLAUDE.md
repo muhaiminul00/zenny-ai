@@ -173,26 +173,19 @@ after Execute builds it.
 
 ## gstack
 
-`garrytan/gstack` is installed globally (`~/.claude/skills/gstack`,
-`./setup` run 2026-08-29 — not project-scoped yet, see Wiki/reference/
-gstack-skill-playbook.md for status). **For all web browsing, use
-gstack's `/browse` skill — never the `mcp__claude-in-chrome__*` tools.**
+`garrytan/gstack` (55 skills) is installed globally (`~/.claude/skills/
+gstack`, non-team — not project-scoped, human declined `--team` for
+now). **For all web browsing, use gstack's `/browse` skill — never the
+`mcp__claude-in-chrome__*` tools.**
 
-Available gstack skills: `/office-hours`, `/plan-ceo-review`,
-`/plan-eng-review`, `/plan-design-review`, `/design-consultation`,
-`/design-shotgun`, `/design-html`, `/review`, `/ship`,
-`/land-and-deploy`, `/canary`, `/benchmark`, `/browse`,
-`/connect-chrome`, `/qa`, `/qa-only`, `/design-review`,
-`/setup-browser-cookies`, `/setup-deploy`, `/setup-gbrain`, `/retro`,
-`/investigate`, `/document-release`, `/document-generate`, `/codex`,
-`/cso`, `/autoplan`, `/plan-devex-review`, `/devex-review`, `/careful`,
-`/freeze`, `/guard`, `/unfreeze`, `/gstack-upgrade`, `/learn`.
-
-Full dispatch-model integration (precedence vs. Zenny's own skills,
-memory-system wiring, Credential Gate/Testing enforcement on gstack's
-infra actions) is the gstack-integration Phase 3 rewrite — not done
-yet. Until then, invoke gstack skills deliberately by name; this
-section is not yet the authoritative routing table for them.
+**Dispatch is a real skill, not this section**: `.claude/skills/
+using-gstack/SKILL.md` is the authoritative router — which gstack skill
+wins vs. Zenny's own for every task category, the memory-system
+instruction (Wiki only, never GBrain), and the two enforcement seams
+(stop-conditions, standing-rule application on gstack's output). It
+auto-surfaces in the skill listing the same way this section used to be
+manually checked. Full rationale/decision history: `Wiki/reference/
+gstack-skill-playbook.md`.
 
 ---
 
@@ -208,15 +201,14 @@ let Claude pick the right skill within a single-domain bundle.
 | Anything n8n | n8n-skills bundle + n8n MCP |
 | Anything Hostinger (VPS/DNS/domains/hosting/billing) | hostinger-agent-skills bundle + Hostinger MCP |
 | Anything Supabase (schema/RLS/queries/migrations) | supabase + postgres-best-practices bundles + Supabase MCP |
-| Live browser verification (OAuth, dashboard UI) | Playwright MCP |
+| Live browser verification, QA, screenshots | gstack `/browse`/`/qa`/`/qa-only` — see `.claude/skills/using-gstack/SKILL.md`. Playwright MCP retired from the default path (still installed, ad hoc only). |
 | Frontend/component structure | frontend-design |
-| Debugging with unclear root cause | superpowers:systematic-debugging |
-| Before claiming a fix is done/verified | superpowers:verification-before-completion — mandatory gate, always |
+| Debugging with unclear root cause | gstack `/investigate` — see `using-gstack`. `superpowers:systematic-debugging`/`mattpocock-skills:diagnosing-bugs` retired from the default path, still usable by name. |
+| Before claiming a fix is done/verified | superpowers:verification-before-completion — mandatory gate, always (no gstack equivalent) |
 | Isolated risky change | superpowers:using-git-worktrees |
-| Writing a plan, then executing | superpowers:writing-plans → superpowers:executing-plans |
-| Code/diff review pass | superpowers:requesting-code-review / receiving-code-review, mattpocock-skills:code-review, simplify |
+| Writing a plan, then executing | superpowers:writing-plans → superpowers:executing-plans (feature-planning substance goes through gstack first — see `using-gstack`) |
+| Code/diff review pass, default pre-ship | gstack `/review` — see `using-gstack`. `mattpocock-skills:code-review`/`superpowers:requesting-code-review`/`simplify` stay available for ad-hoc use outside the ship pipeline. |
 | TDD | mattpocock-skills:tdd |
-| Diagnosing a bug | mattpocock-skills:diagnosing-bugs (overlaps systematic-debugging — pick one, don't run both) |
 | Architecture/codebase design review | mattpocock-skills:codebase-design |
 | Merge conflicts | mattpocock-skills:resolving-merge-conflicts |
 | New feature, unclear scope [user-only, invoke by name] | mattpocock-skills:grill-with-docs |
@@ -233,11 +225,14 @@ let Claude pick the right skill within a single-domain bundle.
 ## Standing Rule — Python Installs
 
 All Python packages install into the project venv (`.zenny-py-venv`)
-only. Never global/system Python. Enforced via a `PreToolUse` soft-gate
-(`pip-guard.ps1`) — if you determine a package genuinely cannot work in
-the local venv, or forcing it there would cost more tokens than it's
-worth, you may proceed with a global install, but you MUST log a 1-2
-line reason both in your response summary and as a new entry in
+only. Never global/system Python. **Applied as a standing instruction,
+not a hook** (`pip-guard.ps1` retired 2026-08-29, gstack-integration
+Phase 3 — no reliable equivalent tool-gate existed on gstack's side
+either, so this became prose enforcement like everything else in this
+section) — if you determine a package genuinely cannot work in the
+local venv, or forcing it there would cost more tokens than it's worth,
+you may proceed with a global install, but you MUST log a 1-2 line
+reason both in your response summary and as a new entry in
 `Wiki/log.md` (`## [date] pip-global | package | reason`).
 
 ---
@@ -316,8 +311,9 @@ PROJECT_STATE.md prose.
 
 ## Standing Rule — Permission Denials (n8n / Supabase / git)
 
-Governed by the `PermissionDenied` hook (`permission-fallback.ps1`).
-When a permission is denied:
+**Applied as a standing instruction, not a hook** (`permission-
+fallback.ps1` retired 2026-08-29, gstack-integration Phase 3). When a
+permission is denied:
 
 1. Check for an easy, equivalent alternative. If one works, use it —
    then note the substitution in the relevant Wiki page AND `Wiki/log.md`
