@@ -9,6 +9,26 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-30] session-gstack-pilot-readme-status-fix | Stale release/status claims corrected — README now matches reality
+
+**Trigger:** human's go-ahead on the two stale README claims flagged
+last session (v1.0.0, Status section).
+
+**Fixed:** "Current release: v1.0.0" → v1.0.1, with the real reason for
+the patch spelled out (the `office-hours`/`plan-eng-review` routing bug
+found via live use on `zm-brain`). Rewrote the `## Status` section from
+"not yet run against a real team project end to end" (false by this
+point) to state plainly what was actually proven — 3 real changes on
+`zm-brain`, each through the full branch → PR → gstack `review` →
+merge route, 2 real findings caught and fixed, 3 consistent scope-drift
+detections on an unrelated change correctly left untouched. Docs-only,
+no version bump (metadata correction, not a new user-facing change).
+Committed direct to `main` (`6bd50d9`).
+
+**Full detail:** `Wiki/reference/gstack-pilot-plugin.md`. Both open
+items from the last session are now closed — `gstack-pilot`'s own
+documentation is fully current.
+
 ## [2026-08-30] session-gstack-pilot-team-docs | TEAM_SETUP.md + VERIFICATION_CHECKLIST.md added; a real `!command` misconception corrected first
 
 **Trigger:** human asked to verify `gstack-pilot`'s own install guide

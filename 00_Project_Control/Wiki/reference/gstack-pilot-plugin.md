@@ -118,6 +118,14 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   go-ahead: README's "v1.0.0"/"not yet run against a real team
   project" lines are now stale. Committed `ba07da8`. See
   `session-gstack-pilot-team-docs` in `Wiki/log.md`.
+- **Stale README claims fixed, same day:** v1.0.0 → v1.0.1 (with the
+  real patch reason), `## Status` rewritten from a false "not yet run
+  against a real team project" to the actual proof (3 real PRs on
+  `zm-brain`, 2 real findings fixed, 3 correct scope-drift detections).
+  Committed `6bd50d9`. **This closes out the `gstack-pilot` initiative
+  end to end** - built, released, live-proven, accurately documented,
+  team-onboarding docs in place. See `session-gstack-pilot-readme-
+  status-fix` in `Wiki/log.md`.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

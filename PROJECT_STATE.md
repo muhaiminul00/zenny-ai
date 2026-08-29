@@ -10,7 +10,21 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-30 (latest) — by /execute — **`gstack-pilot` gained
+2026-08-30 (latest) — by /execute — **`gstack-pilot`'s README fully
+current now — both flagged stale claims fixed.** "Current release:
+v1.0.0" → v1.0.1 with the real patch reason stated; `## Status`
+rewritten from a false "not yet run against a real team project" to
+what's actually proven (3 real PRs on `zm-brain` through the full
+review pipeline, 2 real findings fixed, 3 consistent scope-drift
+detections handled correctly). Docs-only, no version bump. Committed
+direct to `main` (`6bd50d9`). Full detail: `Wiki/reference/
+gstack-pilot-plugin.md`, `Wiki/log.md`
+session-gstack-pilot-readme-status-fix. **`gstack-pilot` initiative is
+now fully closed out — built, released, proven live, documented
+accurately, team-onboarding docs in place.** Zenny-migration remains
+the one open, unhurried, human-owned decision.
+
+2026-08-30 (prior) — by /execute — **`gstack-pilot` gained
 `TEAM_SETUP.md` + `VERIFICATION_CHECKLIST.md`; corrected a real
 `!command` misconception before building anything.** Human asked
 whether install commands should use `!command` syntax for Claude-side
