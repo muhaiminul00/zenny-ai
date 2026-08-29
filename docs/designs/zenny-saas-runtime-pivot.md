@@ -638,10 +638,10 @@ traffic exists, not before.
 - **Self-service onboarding UI** — the existing manual intake process
   (`Convocore_Agent_Intake_Checklist_v1.md`) stays the onboarding method;
   founder does it by hand as today.
-- **Full 6-archetype rollout** — 2-3 node types matching the actual lead
-  pipeline's needs are built for launch (corrected from the original
-  1-archetype/Carmelli scoping — see CORRECTION section); the remaining
-  archetypes wait for their own real client need.
+- **Full 6-archetype rollout** — only **commerce-ecom, appointment, and
+  consultation** (the 3 confirmed 2026-08-29, matching the actual lead
+  pipeline) are built for launch; emergency, commerce-restaurant, and
+  engagement wait for their own real client need.
 - **Global/Condition/End node types, `node_stack` rewind support** — not
   needed for launch; deferred until a client actually needs them.
 - **Facebook Messenger** — bundled with Instagram in the Channel Adapter doc's
@@ -676,6 +676,68 @@ listed here as fast-follow; now required at launch alongside web chat.
   than introducing new LLM-provider infrastructure.
 - `Convocore_Agent_Intake_Checklist_v1.md` — stays the onboarding process,
   not rebuilt as a self-service UI for this track.
+
+## BC-072: Shared Runtime Foundation (first Build Card, not yet approved)
+
+Per Commander's scoping responsibility — smallest correct unit first, not
+all 3 node types in one card. This card builds the foundation every node
+type depends on; BC-073/074/075 (one per archetype: commerce-ecom,
+appointment, consultation) follow once this lands.
+
+**Build Card ID:** BC-072
+**Target:** New n8n shared entry sub-workflow + OpenRouter connection +
+core session-state schema (no archetype-specific node logic yet)
+**Runtime Module:** Zenny Own Runtime (Phase 14) — architectural constraint:
+must match `Zenny_MultiNode_Runtime_Architecture_v1.0.md`'s data model
+exactly (`conversations`, `conversation_sessions`, `messages` tables) so
+BC-073/074/075 can build directly on it without rework.
+
+**Objective:**
+- **Purpose:** every future node/channel build enters through one shared
+  choke point that sets `app.current_org_id` before anything else runs
+  (closes the tenant-isolation finding from the eng review) — matches the
+  existing WF-017 shared-choke-point pattern already live in this repo.
+- **Inputs:** a normalized inbound message payload (channel-agnostic —
+  built generically enough that Approach B's future web-chat/WhatsApp/
+  Instagram adapters can all feed into it the same way).
+- **Outputs:** a loaded/created `conversation_sessions` row with
+  `app.current_org_id` set for every downstream query in that execution.
+
+**Dependencies / Required utilities:**
+- OpenRouter API key (Credential Gate — not yet provided; stop and request
+  from the human before this card can be marked live-verified, per Standing
+  Rule — Credential Gate).
+- Existing Supabase `zenny-vault` project (new tables added there, per the
+  MultiNode doc's data model — Mandatory MCP Verification required before
+  any live schema change).
+
+**Shared Utilities / Folder placement:** new n8n workflow lives alongside
+existing shared-utility workflows (per `n8n-subworkflows-official` skill
+conventions); new tables added to `public`/`tpl_*` schemas following the
+same clone pattern as `agent_prompts`/`client_config`.
+
+**Acceptance Criteria:**
+1. A test request for a synthetic "Org A" session cannot read/write a
+   synthetic "Org B" session's rows — live-verified, not assumed.
+2. The shared sub-workflow correctly creates a new session on first message
+   and loads an existing one on a returning `conversation_id`.
+3. An OpenRouter LLM call (any model) succeeds end-to-end through this
+   sub-workflow with the graceful-degradation timeout in place (per the eng
+   review's LLM-timeout fix).
+
+**Test Cases:** per the eng review's test-plan artifact
+(`~/.gstack/projects/.../eng-review-test-plan-*.md`) — tenant isolation,
+first-message/new-session path, LLM timeout simulation.
+
+**Definition of Done:** all 3 Acceptance Criteria live-verified via Supabase
++ n8n MCP (not validate-only); `Workflow_Registry.md` entry added per the
+Standing Rule — Per-Workflow Documentation; Wiki updated if this surfaces any
+new durable fact.
+
+**Open Verification Items resolved by this card:** none yet — this is the
+first card in the track, so it doesn't close any of the still-open items
+(OpenBSP health check, Meta App Review lead time) — those belong to the
+later Channel Adapter card.
 
 ## What I noticed about how you think
 
@@ -719,12 +781,9 @@ this correction. What changed is the operating context those choices sit in:
 no live system to protect, no synthetic client to validate against, a harder
 timeline, and a wider Phase 1 scope.
 
-**New unresolved item from this correction, not covered by either formal
-review:** the exact 2-3 archetypes the lead pipeline needs are not yet named
-— "mixed archetypes" was confirmed, but which ones (of the 6: emergency,
-commerce-ecom, commerce-restaurant, appointment, consultation, engagement)
-wasn't specified. This blocks finalizing Phase 1's real node list and should
-be named before a Build Card is issued.
+**Archetype item — RESOLVED (2026-08-29, same session):** Phase 1 builds
+**commerce-ecom + appointment + consultation** node types. This is now the
+final piece needed to scope the first Build Card — see BC-072 below.
 
 ## GSTACK REVIEW REPORT
 
@@ -741,7 +800,6 @@ be named before a Build Card is issued.
 - **VERDICT:** CEO + ENG CLEARED — ready to proceed toward a Build Card. Two accepted-risk items remain tracked, not blocking: n8n's fitness as a full conversation runtime (latency/streaming/concurrency) is unproven until a real spike; tenant isolation's shared entry sub-workflow is necessary but not sufficient without the RLS tests named in the Test Plan artifact.
 
 **UNRESOLVED DECISIONS:**
-- Which specific 2-3 archetypes the lead pipeline needs — confirmed "mixed," not yet named (new, from the post-review correction pass).
 - OpenBSP's live project health (commit activity, community size) — must be re-verified before the channel gateway build starts, not assumed stable from the Channel Adapter doc alone.
 - Meta App Review lead time — unquantified; get a real number before it feeds a Build Card timeline.
 - Whether the Convocore subscription is actually cancelled or just unused (Budget section) — confirm before treating it as a real $0.
