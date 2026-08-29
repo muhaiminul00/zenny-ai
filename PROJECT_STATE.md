@@ -11,6 +11,29 @@ file points to but doesn't explain.
 
 ## Last Updated
 2026-08-29 (latest) — by /execute — **gstack-integration Phase 3
+validated live: real `/review` structural gap found, hook-update gap
+closed.** Ran gstack's `/review` for real against the dispatch-rewrite
+commit — found it hard-requires an `origin` remote + PR/branch-vs-base
+diff, neither of which this repo has (remote is `zenny-sync`, direct-to-
+`main` workflow); confirmed via live `git remote`/`git branch` checks,
+not assumed. `/review` immediately reports "nothing to review" and
+stops here — not worked around by faking a branch. Updated `CLAUDE.md`'s
+routing row, `.claude/skills/using-gstack/SKILL.md`, and `Wiki/reference/
+gstack-skill-playbook.md` to say `/review` is the real default only once
+Zenny adopts a branch/PR workflow (open, human decision, not made here);
+`mattpocock-skills:code-review`/`simplify` are the actual default today.
+Also closed a real, previously-logged-and-deferred gap: `post-edit.ps1`/
+`session-end.ps1` had never actually been updated for gstack-awareness
+despite being planned to — both now updated (gstack-file-touch reminder;
+pruning-candidates reminder), syntax-validated, live-simulated. Also
+answered: role-modes' generic mode skeleton correctly stays unedited —
+the gstack wrap-up belongs at the project CLAUDE.md/skill layer (its own
+"follow this project's protocol" extension point), not forked into the
+portable plugin's raw source. Full detail: `Wiki/log.md`
+session-gstack-review-validation, `Wiki/reference/
+gstack-skill-playbook.md`.
+
+2026-08-29 (prior) — by /execute — **gstack-integration Phase 3
 dispatch-model rewrite done (most of it): `.claude/skills/using-gstack/
 SKILL.md` built (real auto-surfacing skill, gstack-vs-Zenny routing +
 the two enforcement seams + memory-instruction), CLAUDE.md's `## gstack`

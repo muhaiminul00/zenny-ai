@@ -100,7 +100,7 @@ claims, not something to plan capacity around.
 | Build Card planning | gstack's `/office-hours` → `/plan-ceo-review` → `/plan-design-review` → `/plan-eng-review` (or `/autoplan` for the bundled run) generates the plan's *substance*; Commander still packages the result into a Build Card before Execute sees it. Build Card stays the interface to Execute. |
 | Security review | `/cso` (OWASP Top 10 + STRIDE) — adopt outright, no Zenny equivalent existed. |
 | Destructive-command guardrails | `/careful` / `/freeze` / `/guard` / `/unfreeze` — adopt outright, additive, no collision. |
-| Code review | `/review` wins for the default pre-`/ship` pass (it's what feeds `/ship`'s Review Readiness Dashboard and auto-fixes obvious issues). `mattpocock-skills:code-review` stays available for ad-hoc use outside the pipeline, off the default path. |
+| Code review | `/review` wins for the default pre-`/ship` pass **when a PR/feature-branch actually exists.** **Live-tested 2026-08-29, real structural gap found:** `/review`'s Step 0 hard-requires a remote literally named `origin` and diffs the current branch against a base branch (PR's base, or the repo's default branch via `origin/HEAD`). This repo's remote is `zenny-sync` (no `origin` at all), and work lands directly on `main` — no feature-branch/PR flow. Run as designed: `git remote get-url origin` fails → git-native fallback tries `origin/main`/`origin/master`, both fail → defaults to `main` → since the working branch already IS `main`, Step 1 immediately outputs "Nothing to review — you're on the base branch" and stops. **Not worked around by inventing a throwaway branch or an `origin` alias just to force a green run** — that would misrepresent the actual result. `mattpocock-skills:code-review`/`simplify` are the real default for Zenny's current commit-direct-to-main workflow; `/review` stays the intended path *if* Zenny ever adopts a branch/PR workflow (a real workflow decision, not self-resolved here — see Status below). |
 | Debugging | `/investigate` wins — its 3-failed-attempts stop and auto-`/freeze` on the affected module are concrete safety properties the alternatives lack. Retires `superpowers:systematic-debugging` and `mattpocock-skills:diagnosing-bugs` from the Tool Routing Table's default path. |
 | Browser / QA | `/browse`, `/qa`, `/qa-only`, `/setup-browser-cookies` supersede the Tool Routing Table's Playwright MCP row — `/qa` is diff-aware (auto-detects affected pages from `git diff`) and auto-generates regression tests, strictly more complete for this project's OAuth/dashboard-UI verification needs. |
 | Dashboard design | **Split, not a straight replacement:** gstack's `/design-consultation` → `/design-shotgun` → `/design-html` handle greenfield generation (new screens/systems — fits "building almost from scratch"); Zenny's existing `taste-skill` + `brandkit` + `minimalist-skill` + `frontend-design` bundle is the judgment/critique gate gstack's output must pass before a design pass is called done; `impeccable` keeps the post-ship live-polish-audit job (existing Tool Routing Table row) — gstack's `/design-review` is skipped specifically to avoid two full live-audit passes over the same shipped UI. |
@@ -176,14 +176,27 @@ specific gap appears that nothing in the decision map above already covers.
 ## Status
 
 **Installed 2026-08-29** (global, `~/.claude/skills/gstack`, non-team) —
-hook-collision check clear (see above). A minimal `## gstack` section
-was added to root `CLAUDE.md` (use `/browse` for all web browsing,
-never `mcp__claude-in-chrome__*`; lists all available skills) — this is
-**not yet** the full dispatch-model integration described in this
-page's Decision Map/Essential Path sections above. That rewrite,
-**plus a new addition to its scope (human, 2026-08-29): prune skills/
-plugins no longer required or related to the project, at both user
-(machine-global) and project scope**, is Phase 3 — still not started.
+hook-collision check clear (see above). **Phase 3 dispatch-model
+rewrite complete 2026-08-29** (commit `a309460`): `.claude/skills/
+using-gstack/SKILL.md` built (real auto-surfacing router), CLAUDE.md's
+`## gstack` section shrunk to a pointer at it, Tool Routing Table rows
+updated, 3 hooks retired (`prompt-routing.ps1` superseded by the new
+skill; `pip-guard.ps1`/`permission-fallback.ps1` converted to plain
+CLAUDE.md instructions).
+
+**Post-integration validation, 2026-08-29:** ran `/review` for real
+against the dispatch-rewrite commit to confirm the routing actually
+works, not just that it's documented. Found the structural gap recorded
+in the Code review decision-map row above (`origin` remote + PR/branch
+workflow assumed, neither exists here) — a real, disclosed limitation,
+not a pass/fail on the skill itself. **Open, not self-resolved:**
+whether Zenny should adopt a branch/PR workflow to actually use `/review`
+and `/ship`'s pipeline is a real workflow decision for the human, not
+something to decide here.
+
+**Still open, kept-for-now per human decision (revisit when asked):** 4
+skill/plugin pruning candidates — `neon`/`neon-postgres`, `skill-creator`,
+`andrej-karpathy-skills`, `playwright`.
 
 Bun (`~/.bun/bin`, v1.4.0) was installed as a prerequisite (gstack's
 setup requires it, wasn't already present); a `bunx` shim

@@ -9,6 +9,76 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-29] session-gstack-review-validation | /review validated live, real origin/PR-workflow gap found; post-edit.ps1/session-end.ps1 gstack-aware update closed
+
+**Trigger:** human, in Commander mode, asked (1) whether role-modes was
+properly wired to wrap gstack or needed its raw plugin source edited,
+and (2) whether the 3 retired hooks were actually gone and whether
+`post-edit.ps1`/`session-end.ps1`'s planned "stay but updated" work had
+ever landed. Answered both, then approved: validate `using-gstack`'s
+`/review` routing for real, and close the hook-update gap.
+
+**Role-modes question, answered not built:** role-modes is a portable,
+separately-versioned plugin (its own repo, v1.1.0, version-bump-per-
+change standing rule). Its own command text already carries the correct
+extension point — "follow this project's own Commander/planning
+protocol if its CLAUDE.md defines one" — which is exactly what
+`CLAUDE.md` + `.claude/skills/using-gstack/SKILL.md` plug into. Forking
+role-modes' raw source to hardcode gstack logic would diverge from the
+maintained/versioned plugin for no gain; the correct wrap-up already
+exists at the project-scoped CLAUDE.md/skill layer, confirmed against
+`Wiki/reference/role-modes-plugin.md`'s own stated plugin/project-tooling
+boundary. Noted as a real but minor soft spot: role-modes' own
+stop-condition text doesn't explicitly say "check this project's skill
+router before a self-chain fires" — it relies on Commander reading
+CLAUDE.md each session, which works but is implicit, not enforced.
+
+**Hook removal, re-verified:** `prompt-routing.ps1`/`pip-guard.ps1`/
+`permission-fallback.ps1` confirmed actually gone from disk and from
+`.claude/settings.json` (grepped, zero matches) — not just logged as
+removed. `enforce-venv.ps1` confirmed a pre-existing orphan, never wired
+into `settings.json` either before or after, unrelated to this work.
+
+**Hook-update gap, real, now closed:** `Wiki/log.md`'s own prior entry
+(BC-TOOL-009/010 area, line ~87) already recorded "`post-edit.ps1`/
+`session-end.ps1` unchanged, still wired" — confirmed by reading both
+files: byte-identical to before the gstack work started. Updated both,
+narrowly: `post-edit.ps1` gained a branch flagging edits under
+`.claude/skills/gstack/` or gstack doc-release-style output (reminder:
+Wiki is the memory system, never GBrain) — live-simulated with a
+synthetic PostToolUse event, fired correctly. `session-end.ps1`'s
+stderr reminder now also names the 4 still-open pruning candidates
+(`neon`/`neon-postgres`, `skill-creator`, `andrej-karpathy-skills`,
+`playwright`) so they don't get silently forgotten. Both scripts
+PowerShell-syntax-validated (`PSParser::Tokenize`, 0 errors each).
+
+**`/review` validation — real structural gap found, not a pass/fail on
+the skill:** ran gstack's `/review` skill file against the
+dispatch-rewrite commit (`a309460`) to confirm `using-gstack`'s routing
+actually works, not just that it's documented. `/review`'s Step 0 hard-
+requires a remote literally named `origin` and a PR/feature-branch-vs-
+base-branch diff. This repo's remote is `zenny-sync` (no `origin` at
+all), and work lands directly on `main` — confirmed live via
+`git remote get-url origin` (fails) and `git branch --show-current`
+(`main`). Traced through what `/review` would actually do: git-native
+fallback tries `origin/main`/`origin/master` (both fail, no `origin`),
+defaults to `main` — and since the working branch already IS `main`,
+Step 1 immediately outputs "Nothing to review — you're on the base
+branch" and stops. **Did not work around this by inventing a throwaway
+branch or an `origin` alias just to force a green run** — that would
+misrepresent the actual result. Updated 3 places to reflect this
+honestly: `Wiki/reference/gstack-skill-playbook.md`'s Code review
+decision-map row + Status section, `.claude/skills/using-gstack/
+SKILL.md`'s routing rule, and `CLAUDE.md`'s Tool Routing Table row —
+all now say `/review` is the intended path only once/if Zenny adopts a
+branch/PR workflow, with `mattpocock-skills:code-review`/`simplify` as
+the real default today. **Left open, not self-resolved:** whether Zenny
+should actually adopt a branch/PR workflow to make `/review`/`/ship`
+usable is a real workflow decision for the human, not something
+resolved here.
+
+---
+
 ## [2026-08-29] session-gstack-dispatch-rewrite | gstack studied in depth (55 skills), using-gstack skill built, CLAUDE.md rewritten, 3 hooks retired (Phase 3)
 
 **Trigger:** human asked to start the dispatch-model/routing-table

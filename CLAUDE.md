@@ -207,7 +207,7 @@ let Claude pick the right skill within a single-domain bundle.
 | Before claiming a fix is done/verified | superpowers:verification-before-completion — mandatory gate, always (no gstack equivalent) |
 | Isolated risky change | superpowers:using-git-worktrees |
 | Writing a plan, then executing | superpowers:writing-plans → superpowers:executing-plans (feature-planning substance goes through gstack first — see `using-gstack`) |
-| Code/diff review pass, default pre-ship | gstack `/review` — see `using-gstack`. `mattpocock-skills:code-review`/`superpowers:requesting-code-review`/`simplify` stay available for ad-hoc use outside the ship pipeline. |
+| Code/diff review pass, default pre-ship | gstack `/review` **only when a real PR/feature-branch exists** (it hard-requires an `origin` remote + branch-vs-base diff — live-tested 2026-08-29, this repo has neither: remote is `zenny-sync`, work lands direct-to-`main`). Default for Zenny's actual workflow today: `mattpocock-skills:code-review`/`superpowers:requesting-code-review`/`simplify`. See `using-gstack`, `Wiki/reference/gstack-skill-playbook.md`. |
 | TDD | mattpocock-skills:tdd |
 | Architecture/codebase design review | mattpocock-skills:codebase-design |
 | Merge conflicts | mattpocock-skills:resolving-merge-conflicts |
