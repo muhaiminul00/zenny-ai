@@ -38,13 +38,31 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   no restructuring) and `gstack-team-init required` run for real against
   it (append-only, confirmed not to touch the project's own existing
   Hard Rules). See `session-zm-brain-onboarding` in `Wiki/log.md`.
-- **Still open for the rest of Phase 2, genuinely blocked on the human
-  now, not a to-do list item:** `/plugin marketplace add` +
-  `/plugin install` for both `gstack-pilot` and `project-memory` are
-  real interactive Claude Code commands with no tool-equivalent - they
-  must run in a session working in `zm-brain` itself. `/gstack-pilot:init`
-  and the actual first-Commander-session live-verification (the real
-  Definition-of-Done proof point) wait on that.
+- **Human ran the plugin installs + first real verification pass,
+  2026-08-30 — genuine first-use findings, one real fix shipped:**
+  4 of 6 verification items passed clean. **Item 3/4 (memory-system
+  check + `.project-memory/` scaffold) "failed" only because the first
+  `/gstack-pilot:commander` invocation was bare** (no argument) - per
+  the command's own explicit rule, a bare invocation confirms the mode
+  switch and stops, so the memory check correctly never got a turn to
+  fire yet. Not a bug; re-running with real work triggered it correctly
+  (`project-memory` auto-recommended, scaffolded, sentinel files
+  coexist cleanly with gstack-pilot's own, no collision).
+- **Item 5 (real chain test) found a real, fixed gap:** asked to plan
+  "propose reviving the Technical Architecture phase" (already named as
+  a next step in that project's own frozen master plan) - misrouted to
+  `office-hours` instead of `plan-eng-review`, because "propose"
+  pattern-matches gstack's own office-hours trigger language. **Nothing
+  executed on the wrong branch** (no `AskUserQuestion`, no side effects)
+  - self-corrected before acting, which is the chain mechanism's safety
+  property working as intended, not luck. Fixed: `commander.md`'s
+  branch-selection criterion sharpened with an explicit disambiguator
+  (prior-document-names-it-as-scoped wins over surface phrasing like
+  "propose"/"consider"/"revive"). `hooks/session-start.js` checked - no
+  change needed, already defers detail correctly. **v1.0.1 released**
+  (`829cd00`), same live-verification discipline as prior releases.
+- **`check-gstack.sh` PreToolUse hook confirmed working** (item 6) -
+  never blocked any of the above, gstack resolved correctly throughout.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

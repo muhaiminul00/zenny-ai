@@ -9,6 +9,61 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-30] session-gstack-pilot-first-use-verification | Human ran the real Phase 2 verification pass on zm-brain, one real routing bug found and fixed (v1.0.1)
+
+**Trigger:** human completed the blocked plugin installs
+(`gstack-pilot`, `project-memory`) and `/gstack-pilot:init` in a real
+`zm-brain` session, per the exact 5 commands reported last session.
+Asked for a verification prompt covering the 6 things that actually
+needed proving, ran it, reported back plain pass/fail per item.
+
+**Results, verbatim structure preserved (this is the actual proof
+point Phase 2 was building toward, not a formality):**
+1. `mode.json` — PASS.
+2. `.claude/CLAUDE.md` seed block present, correctly non-duplicative
+   of the root `CLAUDE.md`'s separate `gstack-team-init` section —
+   PASS.
+3-4. Memory-system check + `.project-memory/` scaffold — **initially
+   "FAIL," correctly diagnosed as not-a-bug**: the first
+   `/gstack-pilot:commander` invocation was bare, and per the command's
+   own explicit rule a bare invocation confirms-and-stops without
+   touching the memory check. Re-run with real work triggered it
+   correctly — `project-memory` auto-recommended (installed, no
+   question asked), scaffolded, sentinel files (`.claude-md-seeded-
+   gstack-pilot` / `.project-memory-claude-md-seeded`) confirmed
+   distinct, no collision.
+5. Real chain test — **found a genuine gap.** Asked Commander to plan
+   "propose reviving the Technical Architecture phase" (zm-brain's own
+   next roadmap phase, already named in its frozen master plan).
+   Misrouted to `office-hours` instead of `plan-eng-review` — "propose"
+   pattern-matched gstack's own office-hours trigger vocabulary despite
+   the substance being already-scoped. Self-corrected before executing
+   anything on the wrong branch (no `AskUserQuestion`, no telemetry, no
+   side effects) — direct proof both that the chain mechanism itself
+   works (the Skill tool successfully loaded `office-hours/SKILL.md`)
+   and that the safety property (judgment before action) held.
+6. `check-gstack.sh` PreToolUse hook — never blocked anything, gstack
+   resolved correctly throughout — PASS.
+
+**Fix shipped same session:** `commander.md`'s branch-selection
+criterion between `office-hours`/`plan-eng-review` was under-specified
+("genuinely a new idea/pitch (not yet scoped)" gave no guidance for
+surface phrasing vs. substance). Added an explicit disambiguator: a
+prior document already naming the work as a scoped next step wins over
+tentative-sounding phrasing ("propose"/"consider"/"revive"/"should
+we") every time. Checked `hooks/session-start.js`'s injected summary —
+already correctly defers detail to the command file, no duplicate fix
+needed there. `check-init-sync.js` re-run, unaffected, still passes.
+**Patch release `v1.0.1`** (`829cd00`), same live-verification
+discipline as v1.0.0/v0.1.0 (tag SHA == `origin/main` HEAD, not draft/
+prerelease).
+
+**Full detail:** `Wiki/reference/gstack-pilot-plugin.md`. **Next:**
+Phase 2's remaining piece — confirming the fixed routing holds on a
+real re-test, and eventually declaring Phase 2 fully complete — human
+direction awaited; Zenny-migration decision stays deferred per human's
+own framing.
+
 ## [2026-08-30] session-zm-brain-onboarding | Company Brain's real repo (zm-brain) populated + gstack-team-init'd, plugin installs genuinely blocked on the human
 
 **Trigger:** human confirmed the Company Brain repo exists

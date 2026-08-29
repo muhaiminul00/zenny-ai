@@ -10,7 +10,30 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-30 (latest) — by /execute — **Phase 2's real target repo,
+2026-08-30 (latest) — by /execute — **First real-world use of
+`gstack-pilot` (in `zm-brain`) found one genuine bug, fixed same
+session: v1.0.1 released.** Human ran the full 6-item verification
+pass in a real `zm-brain` session. 4/6 clean; item 3/4 (memory-system
+check) "failed" only because Commander's own bare-invocation-stops
+rule correctly hadn't given it a turn yet — re-run confirmed
+`project-memory` auto-recommends/scaffolds cleanly, no sentinel
+collision. **Item 5 found a real gap:** "propose reviving [an already-
+scoped roadmap phase]" misrouted to `office-hours` instead of
+`plan-eng-review` — surface phrasing ("propose") pattern-matched
+gstack's own office-hours trigger vocabulary despite the substance
+being already-scoped. Self-corrected before executing anything (no
+side effects) — proves the chain mechanism and its safety property
+both work. **Fixed:** `commander.md`'s branch-selection criterion now
+has an explicit disambiguator (a prior document naming the work as
+scoped wins over tentative phrasing, always). `session-start.js`
+checked, no duplicate fix needed. Patch release `v1.0.1` (`829cd00`),
+live-verified same as prior releases. Full detail: `Wiki/reference/
+gstack-pilot-plugin.md`, `Wiki/log.md`
+session-gstack-pilot-first-use-verification. **Next:** confirm the
+routing fix holds on re-test, then Phase 2 is effectively complete —
+human direction awaited; Zenny-migration decision stays deferred.
+
+2026-08-30 (prior) — by /execute — **Phase 2's real target repo,
 `zm-brain`, populated and gstack-team-init'd — plugin installs blocked
 on the human, real stop, not a workaround.** Local folder
 `E:\Programming\ZenoManual - Compnay Brain` (pre-existing content: 8
