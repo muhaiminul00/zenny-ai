@@ -87,6 +87,15 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   to a document, `marked_for_technical_architecture.md`, that doesn't
   actually exist anywhere in the repo, verified via find/grep), merged
   for real. See `session-zm-brain-claude-md-rewrite` in `Wiki/log.md`.
+- **README.md fixed + onboarding pointer added, same day, PR #2:**
+  found the `marked_for_technical_architecture.md` false-existence
+  claim actually originated in README.md itself (`CLAUDE.md` had
+  inherited it) - fixed at the source. Added a short "Working in this
+  repo" pointer to `CLAUDE.md`. Second real pass through the pipeline:
+  scope-drift detection correctly flagged an unrelated, uncommitted
+  file-move sitting in the repo (not touched, flagged for the human).
+  Review found zero issues on the actual diff. Merged (`9f9049b`). See
+  `session-zm-brain-readme-update` in `Wiki/log.md`.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)
