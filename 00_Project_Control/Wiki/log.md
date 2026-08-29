@@ -9,7 +9,7 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
-## [2026-08-29] session-role-mode-gstack-phase1 | New sibling plugin `role-mode-gstack` built + partially live-verified, for the new "ZM — Company Brain" project (not Zenny)
+## [2026-08-29] session-gstack-pilot-phase1 | New sibling plugin `gstack-pilot` built + partially live-verified, for the new "ZM — Company Brain" project (not Zenny)
 
 **Trigger:** human is starting a new project and wants teammates to onboard
 onto a properly gstack-wrapped mode system from day one, unlike Zenny's
@@ -38,7 +38,7 @@ mode for real.
 AskUserQuestion — PR-first wrap-up applies to **every** change, no
 trivial-housekeeping exemption (diverges from Zenny's own Branch/PR
 Workflow standing rule on purpose, new-project-specific). Built the new
-repo at `E:\Programming\role-mode-gstack` (copy-and-adapt from
+repo at `E:\Programming\gstack-pilot` (copy-and-adapt from
 `role-modes-plugin`, not a fork): `commands/{advisor,commander,execute,
 init}.md` with the gstack chain paragraphs, `hooks/session-start.js`
 (namespaced sentinel/marker, new Commander pre-session-briefing logic),
@@ -57,7 +57,7 @@ Phase 2).
 composition-mechanism spike (does gstack's real `gstack-skill-start`
 preamble run identically regardless of caller) — done for real, in a
 scratch temp dir, confirmed caller-agnostic. Hook-coexistence test (does
-role-mode-gstack's plugin hook survive alongside gstack's `--team` global
+gstack-pilot's plugin hook survive alongside gstack's `--team` global
 SessionStart hook) — **not run for real**, because doing so would mutate
 the human's actual global `~/.claude/settings.json`/`~/.gstack/
 config.yaml` permanently, outside this plan's disposable-scratch-repo
@@ -69,7 +69,16 @@ registration layers) — high confidence, not full live proof. Left open,
 deferred to Phase 2's real Company Brain run or an explicit human go-ahead
 to run `--team` for real sooner.
 
-**Full detail:** `Wiki/reference/role-mode-gstack-plugin.md`, approved
+**Renamed same session, before Phase 2:** human didn't like the working
+name `role-mode-gstack` ("not preferable to use"); picked `gstack-pilot`
+from a shortlist. Pre-publish rename (nothing pushed yet, no external
+consumer) — directory moved, every internal reference/sentinel/marker
+updated and re-verified (`check-init-sync.js` passed again post-rename),
+the single local commit amended in place (`4f35bd9` → `80db797`) rather
+than adding a second commit, since there was no history to preserve for
+anyone else yet.
+
+**Full detail:** `Wiki/reference/gstack-pilot-plugin.md`, approved
 plan `C:\Users\muhai\.claude\plans\jazzy-plotting-marshmallow.md`.
 **Next:** Phase 2 (publish on GitHub, package with gstack `--team` +
 `project-memory`, hand off to Company Brain teammates) — separate Build

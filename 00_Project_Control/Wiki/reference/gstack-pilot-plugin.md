@@ -1,4 +1,4 @@
-# role-mode-gstack plugin — role-modes natively chained into gstack
+# gstack-pilot plugin — role-modes natively chained into gstack
 
 New sibling plugin (not a fork) to [[reference/role-modes-plugin]],
 built 2026-08-29 for the new "ZM — Company Brain" project, not for
@@ -6,9 +6,12 @@ Zenny — Zenny keeps running plain `role-modes` + gstack global/non-team
 install unchanged for now, migrating onto this plugin only later, once
 proven live on Company Brain (Phase 3, not yet started, not designed).
 
-- **Location:** `E:\Programming\role-mode-gstack`, local git repo,
-  first commit `4f35bd9`. Not yet pushed to GitHub — that's Phase 2
-  ("publish"), not done this session.
+- **Location:** `E:\Programming\gstack-pilot`, local git repo, commit
+  `80db797`. Renamed from an initial working name of `role-mode-gstack`
+  (human didn't like it) before anything was pushed — the single commit
+  was amended in place, not layered with a second rename commit, since
+  nothing external existed yet to preserve history for. Not yet pushed
+  to GitHub — that's Phase 2 ("publish"), not done this session.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)
@@ -42,8 +45,8 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
      Rewritten to a plain stderr reminder, matching Zenny's own
      `session-end.ps1` pattern.
 - **Namespacing, done from day one, not retrofitted:** new sentinel
-  (`.claude-md-seeded-role-mode-gstack`) and marker
-  (`<!-- role-mode-gstack-plugin:v1 -->`) — never reuses
+  (`.claude-md-seeded-gstack-pilot`) and marker
+  (`<!-- gstack-pilot-plugin:v1 -->`) — never reuses
   `.claude-md-seeded` bare, which `project-memory` and `role-modes`
   already collided on once before namespacing fixed it. `mode.json`'s
   path IS shared with `role-modes` on purpose (successor design, never
@@ -93,7 +96,7 @@ project. The locked chain mapping matches that documented order.
   line output (`SKILL_START_PROTO: 1`, `SESSION_ID`, instruction
   blocks) regardless of which agent/plugin context invokes it. This
   directly validates the composition-mechanism assumption: a
-  `role-mode-gstack` command file's "Follow `<skill>/SKILL.md`"
+  `gstack-pilot` command file's "Follow `<skill>/SKILL.md`"
   instruction will trigger the identical real preamble a human-typed
   `/office-hours` would, since the mechanism has no dependency on
   caller identity. **Did not run the skill's actual brainstorming

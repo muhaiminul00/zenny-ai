@@ -10,10 +10,11 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /execute — **`role-mode-gstack` Phase 1 built +
+2026-08-29 (latest) — by /execute — **`gstack-pilot` Phase 1 built +
 partially live-verified — a new sibling plugin for the new "ZM — Company
 Brain" project, NOT touching Zenny's own live mode/gstack setup.** New repo
-`E:\Programming\role-mode-gstack` (copy-and-adapt from `role-modes-plugin`,
+`E:\Programming\gstack-pilot` (renamed pre-publish from `role-mode-gstack`
+per human's own naming pass; copy-and-adapt from `role-modes-plugin`,
 not a fork): Commander's planning phase natively chains into gstack's
 office-hours/plan-eng-review/autoplan, Execute's wrap-up chains into
 gstack's review/qa/ship, **PR-first for every change with no trivial-
@@ -26,14 +27,15 @@ day one; new Commander pre-session-briefing hook; new SessionEnd hook —
 **caught and fixed a real design mistake before shipping**, not after
 (SessionEnd has no Claude-visible context-injection mechanism, confirmed
 against this project's own `session-end.ps1` comment before building, not
-assumed). `check-init-sync.js` ported, passed first run. First commit
-`4f35bd9`, not yet pushed (publishing is Phase 2). **Partially verified,
+assumed). `check-init-sync.js` ported, passed first run. Commit `80db797`
+(rename amended into the original commit, not yet pushed — publishing is
+Phase 2). **Partially verified,
 disclosed not oversold:** composition-mechanism spike done for real in a
 scratch dir; hook-coexistence test reasoned from strong existing evidence
 but not fully live-run (would require mutating the human's real global
 gstack config without asking — deferred to Phase 2's real Company Brain
 run or an explicit go-ahead). Full detail: `Wiki/reference/
-role-mode-gstack-plugin.md`, `Wiki/log.md` session-role-mode-gstack-phase1.
+gstack-pilot-plugin.md`, `Wiki/log.md` session-gstack-pilot-phase1.
 **Next:** Phase 2 (publish on GitHub, package with gstack `--team` +
 `project-memory`, hand off to Company Brain teammates) — separate Build
 Card, awaiting human go-ahead.
