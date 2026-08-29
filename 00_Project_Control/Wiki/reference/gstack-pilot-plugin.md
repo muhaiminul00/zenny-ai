@@ -63,6 +63,18 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   (`829cd00`), same live-verification discipline as prior releases.
 - **`check-gstack.sh` PreToolUse hook confirmed working** (item 6) -
   never blocked any of the above, gstack resolved correctly throughout.
+- **Plugin-declaration portability gap found + fixed in `zm-brain`,
+  2026-08-30 (not a `gstack-pilot` code change):** confirmed against
+  official docs that `extraKnownMarketplaces` in a committed project
+  `.claude/settings.json` DOES auto-register for a teammate on folder-
+  trust, but had gone to the human's global settings instead of the
+  project's - fixed by copying the real marketplace-source shape in.
+  Also found, and correctly did NOT touch or commit, a serious
+  unrelated finding: `zm-brain`'s root `CLAUDE.md` is currently missing
+  3 sections (Current task, all 6 Hard Rules, Definition of done)
+  locally vs. its last commit - flagged to the human, not silently
+  fixed or committed either way. See `session-zm-brain-plugin-
+  declaration-fix` in `Wiki/log.md` for the full narrative.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

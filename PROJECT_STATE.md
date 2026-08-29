@@ -10,7 +10,33 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-30 (latest) — by /execute — **First real-world use of
+2026-08-30 (latest) — by /execute — **`zm-brain`'s plugin declaration
+completed (`extraKnownMarketplaces` was missing, project-scoped only
+`enabledPlugins` before) — and a real, unresolved content-loss found
+and correctly NOT touched.** Confirmed via `claude-code-guide` research
+(not assumed) that Claude Code auto-registers a committed project's
+`extraKnownMarketplaces` on folder-trust, but never auto-installs
+plugin code — natively shows "not installed, run this command," no
+custom hook needed on `gstack-pilot`'s own side. Fixed the real gap:
+`zm-brain`'s marketplace registrations had landed in the human's
+*global* settings, not the project's — copied the real, working shape
+in, merged (not clobbered) alongside the existing `enabledPlugins`/
+PreToolUse hook, committed everything that had been sitting
+uncommitted (`.claude/CLAUDE.md`, `.claude/hooks/state/`,
+`.project-memory/` - checked, nothing sensitive), pushed (`81d2ff4`),
+read back from the real committed `HEAD` to confirm, not assumed.
+**🚩 Found and correctly did NOT commit:** `zm-brain`'s root `CLAUDE.md`
+is missing 3 whole sections locally (Current task, all 6 Hard Rules,
+Definition of done) vs. its last commit — not from anything this or
+the prior session touched. Left untouched, flagged plainly. **Human
+action needed:** resolve this in `zm-brain` (`git checkout CLAUDE.md`
+to restore from the last commit, if the loss wasn't intentional) before
+that repo's state is fully trustworthy. Full detail: `Wiki/reference/
+gstack-pilot-plugin.md`, `Wiki/log.md`
+session-zm-brain-plugin-declaration-fix. **Next:** human resolves the
+`CLAUDE.md` gap; Phase 2 is otherwise functionally complete.
+
+2026-08-30 (prior) — by /execute — **First real-world use of
 `gstack-pilot` (in `zm-brain`) found one genuine bug, fixed same
 session: v1.0.1 released.** Human ran the full 6-item verification
 pass in a real `zm-brain` session. 4/6 clean; item 3/4 (memory-system

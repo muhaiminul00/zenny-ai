@@ -9,6 +9,59 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-30] session-zm-brain-plugin-declaration-fix | extraKnownMarketplaces gap closed; found (and did NOT commit) a serious CLAUDE.md content-loss in zm-brain
+
+**Trigger:** human's own architecture question — pushing a project's
+`.claude/` folder to a shared repo, when the actual plugin code lives
+in the user's global `~/.claude/`, seemed like it might silently break
+for teammates. Real, worth-answering question, researched via
+`claude-code-guide` rather than guessed.
+
+**Confirmed against official docs (v2.1.195+), not assumed:**
+`extraKnownMarketplaces` in a committed project `.claude/settings.json`
+DOES auto-register for a teammate the moment they trust the folder —
+documented, supported, real. But the plugin *code* (cache under
+`~/.claude/plugins/`) never installs automatically either way — Claude
+Code reports it as "not installed" and shows the exact
+`claude plugin install` command, natively, no custom hook needed on
+`gstack-pilot`'s own side. No VS-Code-style `extensions.json`
+auto-install convention exists in Claude Code at all.
+
+**Real gap found and fixed:** `zm-brain`'s committed
+`.claude/settings.json` had `enabledPlugins` (correct, project-scoped)
+but **not** `extraKnownMarketplaces` — that registration had gone to
+the human's *global* settings instead, so a fresh clone would see
+plugins declared but have no idea where to fetch them from. Copied the
+real, working marketplace-source shape from the global config (not
+guessed) into the project's own settings.json, merged alongside the
+existing `enabledPlugins`/PreToolUse hook, nothing clobbered. Also
+committed everything that had been sitting locally uncommitted and
+therefore invisible to any clone: `.claude/CLAUDE.md` (both plugins'
+seed blocks), `.claude/hooks/state/` (mode.json + both sentinels,
+confirmed no collision), `.project-memory/` (checked content first,
+plain scaffold, nothing sensitive). Pushed (`81d2ff4`). Read back from
+the actual committed `HEAD` after pushing, not just assumed correct —
+valid JSON, both marketplaces and both plugins present.
+
+**Found something more serious along the way, correctly NOT touched:**
+`zm-brain`'s root `CLAUDE.md` (the project's own, not `.claude/
+CLAUDE.md`) is currently missing 3 whole sections in the local working
+copy versus the last commit — "Current task," all 6 "Hard Rules," and
+"Definition of done for the Theoretical Grounding Phase" are gone.
+Confirmed this did NOT come from `gstack-team-init` (already verified
+pure-append in the prior session) or from anything this pass touched.
+Left completely unstaged/uncommitted and flagged plainly to the human
+rather than silently committing the loss or guessing at a fix — this
+is exactly the class of thing that project's own Hard Rule #4
+("preserve every original architectural decision... unless a human
+explicitly approves") exists to catch.
+
+**Full detail:** `Wiki/reference/gstack-pilot-plugin.md`. **Next:**
+human needs to resolve the `CLAUDE.md` content gap in `zm-brain`
+(restore from git history via `git checkout CLAUDE.md`, or confirm it
+was an intentional in-progress edit) before that repo's state is fully
+trustworthy again.
+
 ## [2026-08-30] session-gstack-pilot-first-use-verification | Human ran the real Phase 2 verification pass on zm-brain, one real routing bug found and fixed (v1.0.1)
 
 **Trigger:** human completed the blocked plugin installs
