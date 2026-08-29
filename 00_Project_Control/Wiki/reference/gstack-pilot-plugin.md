@@ -6,12 +6,29 @@ Zenny — Zenny keeps running plain `role-modes` + gstack global/non-team
 install unchanged for now, migrating onto this plugin only later, once
 proven live on Company Brain (Phase 3, not yet started, not designed).
 
-- **Location:** `E:\Programming\gstack-pilot`, local git repo, commit
-  `80db797`. Renamed from an initial working name of `role-mode-gstack`
-  (human didn't like it) before anything was pushed — the single commit
-  was amended in place, not layered with a second rename commit, since
-  nothing external existed yet to preserve history for. Not yet pushed
-  to GitHub — that's Phase 2 ("publish"), not done this session.
+- **Location:** `E:\Programming\gstack-pilot`, local git repo, and now
+  **live and public: `github.com/muhaiminul00/gstack-pilot`**. Renamed
+  from an initial working name of `role-mode-gstack` (human didn't like
+  it) before anything was pushed — the single commit was amended in
+  place, not layered with a second rename commit.
+- **Phase 2 slice 1 (publish) done, 2026-08-29:** human created the
+  GitHub repo, pushed by Execute (`80db797` → README rewrite `3bf3bc1`
+  → main). Real repo description set via `gh repo edit`. Production-
+  grade README written (full value prop, complete install sequence,
+  worked usage-transcript example, kept the accurate composition-
+  mechanism/design-constraint sections rather than a blind rewrite).
+  **v0.1.0 tagged and released** (`gh release create`, matched to the
+  exact commit on `main` - live-verified, not just "the command didn't
+  error": tag SHA == `origin/main` HEAD, `isDraft`/`isPrerelease` both
+  false, `plugin.json`'s version readable at the tagged commit, no
+  duplicate version in `marketplace.json`). **Deliberately v0.1.0, not
+  v1.0.0** - the hook-coexistence gap from Phase 1 is still open and
+  disclosed in the release notes themselves, not glossed over for a
+  cleaner-looking 1.0 tag.
+- **Still open for the rest of Phase 2** (not done, not started this
+  slice): the gstack `--team` packaging sequence for a real Company
+  Brain repo, `project-memory` pairing, and the actual handoff to
+  teammates.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

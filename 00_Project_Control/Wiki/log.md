@@ -78,6 +78,21 @@ the single local commit amended in place (`4f35bd9` → `80db797`) rather
 than adding a second commit, since there was no history to preserve for
 anyone else yet.
 
+**Phase 2 slice 1 (publish), same session:** human created the GitHub
+repo (`github.com/muhaiminul00/gstack-pilot`); Execute added `origin`,
+pushed `80db797`, rewrote README.md as production-grade (value prop,
+full install sequence, worked usage transcript), set the real repo
+description via `gh repo edit`, pushed that as `3bf3bc1`. Cut `v0.1.0`
+— tagged, pushed, released via `gh release create`. **Live-verified,
+not just "the command ran"**: tag's dereferenced commit SHA matches
+`origin/main` HEAD exactly, `isDraft`/`isPrerelease` both `false`,
+`plugin.json`'s `version` field readable at the tagged commit
+(`0.1.0`), zero duplicate `version` in `marketplace.json`. Deliberately
+released at `0.1.0`, not `1.0.0` — the hook-coexistence gap from Phase
+1 is still open and stated plainly in the release notes themselves.
+Still open: gstack `--team` packaging sequence, `project-memory`
+pairing, actual Company Brain handoff.
+
 **Full detail:** `Wiki/reference/gstack-pilot-plugin.md`, approved
 plan `C:\Users\muhai\.claude\plans\jazzy-plotting-marshmallow.md`.
 **Next:** Phase 2 (publish on GitHub, package with gstack `--team` +

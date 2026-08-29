@@ -10,35 +10,29 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /execute — **`gstack-pilot` Phase 1 built +
-partially live-verified — a new sibling plugin for the new "ZM — Company
-Brain" project, NOT touching Zenny's own live mode/gstack setup.** New repo
-`E:\Programming\gstack-pilot` (renamed pre-publish from `role-mode-gstack`
-per human's own naming pass; copy-and-adapt from `role-modes-plugin`,
-not a fork): Commander's planning phase natively chains into gstack's
-office-hours/plan-eng-review/autoplan, Execute's wrap-up chains into
-gstack's review/qa/ship, **PR-first for every change with no trivial-
+2026-08-29 (latest) — by /execute — **`gstack-pilot` is now live and
+public: `github.com/muhaiminul00/gstack-pilot`, v0.1.0 released.** New
+sibling plugin to `role-modes` (Zenny's own live mode/gstack setup
+untouched) for the new "ZM — Company Brain" project — role-modes' 3-mode
+system with Commander's planning phase natively chaining into gstack's
+office-hours/plan-eng-review/autoplan and Execute's wrap-up chaining into
+gstack's review/qa/ship, **PR-first for every change, no trivial-
 housekeeping exemption** (human-confirmed divergence from Zenny's own
-Branch/PR Workflow rule, new-project-specific). Chain mapping fact-checked
-live against gstack's real docs (confirmed gstack has no native CLAUDE.md
-planning-routing convention to copy — the mapping matches gstack's own
-documented lifecycle order instead). New namespaced sentinel/marker from
-day one; new Commander pre-session-briefing hook; new SessionEnd hook —
-**caught and fixed a real design mistake before shipping**, not after
-(SessionEnd has no Claude-visible context-injection mechanism, confirmed
-against this project's own `session-end.ps1` comment before building, not
-assumed). `check-init-sync.js` ported, passed first run. Commit `80db797`
-(rename amended into the original commit, not yet pushed — publishing is
-Phase 2). **Partially verified,
-disclosed not oversold:** composition-mechanism spike done for real in a
-scratch dir; hook-coexistence test reasoned from strong existing evidence
-but not fully live-run (would require mutating the human's real global
-gstack config without asking — deferred to Phase 2's real Company Brain
-run or an explicit go-ahead). Full detail: `Wiki/reference/
-gstack-pilot-plugin.md`, `Wiki/log.md` session-gstack-pilot-phase1.
-**Next:** Phase 2 (publish on GitHub, package with gstack `--team` +
-`project-memory`, hand off to Company Brain teammates) — separate Build
-Card, awaiting human go-ahead.
+Branch/PR Workflow rule, new-project-specific). Phase 1 (build+validate,
+commit `80db797`) and Phase 2 slice 1 (publish: repo pushed, production-
+grade README, real `gh repo edit` description, `v0.1.0` tagged/released —
+live-verified: tag SHA matches `origin/main` HEAD, `isDraft`/
+`isPrerelease` both false, `plugin.json` version readable at the tag, no
+duplicate version in `marketplace.json`) both done. **Deliberately v0.1.0,
+not v1.0.0** — one disclosed, still-open gap: the hook-coexistence test
+(does this plugin's SessionStart hook survive alongside gstack's
+`--team`-mode global auto-update hook) is reasoned from strong existing
+evidence, not yet fully live-run — stated plainly in the release notes,
+not glossed over. Full detail: `Wiki/reference/gstack-pilot-plugin.md`,
+`Wiki/log.md` session-gstack-pilot-phase1. **Next:** rest of Phase 2 (the
+gstack `--team` packaging sequence, `project-memory` pairing, actual
+Company Brain handoff) — awaiting human go-ahead. Zenny-migration decision
+stays deferred until Phase 2 is fully proven, per human's own framing.
 
 2026-08-29 (prior) — by /execute — **BC-073 (commerce-ecom node) BUILT,
 LIVE-VERIFIED, and PUBLISHED — first real archetype node on Zenny's own
