@@ -100,6 +100,31 @@ landed — see below), invokes the `commander` Skill itself the same
 way, with a brief 1-2 line summary, to hand back — again a real
 mode-state write, not just a description of intent to hand back.
 
+**Gstack planning bridge (adopted 2026-08-29):** Commander's next
+action after receiving that handback is never to draft the next Build
+Card itself. It sends a short prompt (1-2 lines: what Execute just
+shipped, what's next) to the gstack skill that fits — `/office-hours`
+for an open strategy question, `/plan-ceo-review`/`/plan-eng-review`
+for a scoped unit of work — and lets gstack produce the actual plan:
+architecture decisions, and for infra Build Cards, a build-ready spec
+down to node/table/RPC level with edge cases pre-resolved. Only after
+gstack's plan comes back does Commander translate it into a formal
+Build Card and hand off to Execute. This exists because BC-072 hit the
+alternative failure mode directly: an architecture mismatch
+(schema-per-client vs RLS) was discovered live, mid-build, that
+gstack's planning discipline (live-check, edge-case handling) should
+have caught first. Full split: `Wiki/reference/gstack-skill-playbook.md`.
+
+Scope stays exact, per the Tool Routing Table: gstack produces specs,
+it never performs an n8n/Supabase/VPS/DNS build itself — no gstack
+skill holds those MCP tools. Execute always authors and runs the
+actual infra build against gstack's spec, then does the mandatory
+wrap-up (Wiki/PROJECT_STATE/Workflow_Registry/git). The one domain
+where gstack's execution-shaped skills act directly on the build
+itself is Dashboard-repo code, via the existing `/review` → `/ship`
+release ceremony (Branch/PR Workflow standing rule) — Execute still
+authors the code there too.
+
 This self-chaining is bounded, not indefinite. It stops for a human
 pulse-check (one line: "N cards done, all verified, continue?" — not a
 full review) after either:
@@ -167,7 +192,11 @@ Summary), not just be technically achievable. Before issuing a card,
 Commander checks it against PROJECT_STATE.md and the relevant Wiki
 page — a card that's correct in isolation but drifts from what the
 platform is actually for gets rejected before it's issued, not caught
-after Execute builds it.
+after Execute builds it. For infra/architecture-level cards, the plan
+itself is gstack's output (see the Commander → gstack → Execute
+planning bridge above), not Commander's own derivation — Commander's
+job here is translating that plan into Build Card format and checking
+it for drift, not authoring the plan.
 
 ---
 
@@ -186,6 +215,10 @@ instruction (Wiki only, never GBrain), and the two enforcement seams
 auto-surfaces in the skill listing the same way this section used to be
 manually checked. Full rationale/decision history: `Wiki/reference/
 gstack-skill-playbook.md`.
+
+**Planning now routes through gstack by default, not just review**:
+see the "Gstack planning bridge" under Commander → Execute auto-handoff
+above for the mandatory Commander → gstack → Execute loop.
 
 ---
 

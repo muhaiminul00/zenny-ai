@@ -8419,3 +8419,63 @@ fact: `Wiki/reference/role-modes-plugin.md`, cross-referenced in `index.md`.
 Zenny's own `.claude/commands/*.md` and `.claude/hooks/session-start.ps1`
 are untouched; whether/when to migrate Zenny itself onto the plugin instead
 of maintaining both is an open, not-yet-made decision.
+
+## [2026-08-29] session-gstack-planning-bridge-mandatory | Commander → gstack → Execute planning loop made mandatory
+
+**Trigger:** same session as BC-072. Human's directive, prompted directly
+by BC-072's live architecture-mismatch discovery (schema-per-client vs
+RLS, corrected mid-build instead of caught in planning): from now on,
+Commander must route every planning cycle through gstack, not just when
+asked. Human's own framing: "every architectural planning, execution
+should be done by gstack's skills... use the best potential of gstack &
+its execution skills, [which] already come with good guardrails, live
+check, edge-case etc."
+
+**Clarification pass before editing anything:** checked what gstack's
+"execution" skills (`/ship`, `/review`, `/qa`, `/investigate`) actually
+do — release/verification ceremony around code that already exists in
+this repo, not authorship, and none of them hold n8n or Supabase MCP
+tools. So "execution done by gstack" for infra Build Cards (n8n
+workflows, Supabase migrations) isn't possible even in principle —
+there is no gstack tool that reaches those services. Confirmed with the
+human via AskUserQuestion; the agreed split:
+
+- **Architecture/strategy decisions and infra Build Card planning:**
+  gstack (`/office-hours`, `/plan-ceo-review`/`/plan-eng-review`,
+  `/autoplan`) produces the plan — for infra cards, a build-ready spec
+  down to node/table/RPC level with edge cases pre-resolved. Execute
+  still authors and runs the actual n8n/Supabase/VPS/DNS build (only
+  actor with those MCP tools), then does the mandatory wrap-up.
+- **Dashboard-repo code:** unchanged — Execute authors the code,
+  `/review` → `/ship` owns the release ceremony (Branch/PR Workflow,
+  already standing since 2026-08-29 earlier this same day).
+
+**The bridge itself, per the human's second directive:** Execute
+finishing a Build Card is no longer followed by Commander drafting the
+next card itself. Commander's next action is always a short prompt to
+the fitting gstack skill — what Execute just shipped, what's next —
+and only gstack's resulting plan gets translated into the next Build
+Card. This closes the exact loop BC-072 exposed: gstack's live-check/
+edge-case discipline runs *before* Execute starts building, not
+discovered as a correction mid-build.
+
+**Written into (durable, not just this log entry):**
+- Root `CLAUDE.md` — "Commander → Execute auto-handoff" section gained
+  a new "Gstack planning bridge" subsection (the mandatory loop) plus a
+  scope-reminder paragraph (gstack plans, Execute builds infra; gstack
+  ships Dashboard code via existing `/review`→`/ship`). Also added a
+  sentence to "Commander's scoping responsibility" under Build Card
+  System, and a one-line pointer in the `## gstack` section.
+- `Wiki/reference/gstack-skill-playbook.md` — "Build Card planning" row
+  in the decision map updated to state the bridge is mandatory, not
+  optional; new Status entry (this one, cross-referenced) recording the
+  same trigger/resolution for anyone reading that page instead of this
+  log.
+
+**Explicitly not changed:** the global `role-modes` plugin's own
+command files (`role-modes:commander`/`execute`/`advisor`) — those
+already defer to "this project's own Commander/planning protocol" in
+their own text, so the gstack-specific bridge belongs in this project's
+`CLAUDE.md`, not in the shared plugin definition used by other
+projects. Confirmed as the obviously-correct structural placement
+rather than asked as a separate question.

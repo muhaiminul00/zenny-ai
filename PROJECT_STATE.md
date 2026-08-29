@@ -10,7 +10,30 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /execute — **BC-072 (Shared Runtime Foundation)
+2026-08-29 (latest) — by /commander — **Commander → gstack → Execute
+planning bridge made mandatory.** Prompted directly by BC-072's live
+architecture-mismatch discovery below (schema-per-client vs RLS, caught
+mid-build instead of in planning): every time Execute hands work back to
+Commander, Commander's next action is now a short prompt to the fitting
+gstack skill (`/office-hours`, `/plan-ceo-review`/`/plan-eng-review`, or
+`/autoplan`) — never drafting the next Build Card's plan itself. **Scope
+confirmed via AskUserQuestion before writing anything:** gstack's
+"execution" skills (`/ship`, `/review`, `/qa`, `/investigate`) are
+release/verification ceremony around code that already exists, not
+authorship, and none hold n8n/Supabase MCP tools — so gstack plans infra
+Build Cards (a build-ready spec, node/table/RPC-level, edge cases
+pre-resolved) but Execute still authors and runs every n8n/Supabase/VPS/
+DNS build; Dashboard-repo code is unchanged (Execute authors, `/review`→
+`/ship` ships it, per the existing Branch/PR Workflow standing rule).
+Written into root `CLAUDE.md` ("Gstack planning bridge" subsection under
+Commander → Execute auto-handoff, plus a scoping note under Build Card
+System and a pointer in `## gstack`) and `Wiki/reference/
+gstack-skill-playbook.md` (Build Card planning row + new Status entry).
+Full detail: `Wiki/log.md` session-gstack-planning-bridge-mandatory.
+**Next:** apply this bridge for real on BC-073/074/075 — prompt gstack
+before drafting any of the three archetype Build Cards.
+
+2026-08-29 (prior) — by /execute — **BC-072 (Shared Runtime Foundation)
 built, live-verified, and published — the first real workflows on Zenny's
 own conversation runtime.** Two n8n sub-workflows live: `Zenny Runtime -
 Resolve or Create Conversation Session` (`hA0PJmeEzEeLssNC`) and `Zenny

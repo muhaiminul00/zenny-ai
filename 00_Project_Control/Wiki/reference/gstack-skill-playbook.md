@@ -97,7 +97,7 @@ claims, not something to plan capacity around.
 
 | Area | Resolution |
 |---|---|
-| Build Card planning | gstack's `/office-hours` → `/plan-ceo-review` → `/plan-design-review` → `/plan-eng-review` (or `/autoplan` for the bundled run) generates the plan's *substance*; Commander still packages the result into a Build Card before Execute sees it. Build Card stays the interface to Execute. |
+| Build Card planning | **Mandatory bridge, not optional (adopted 2026-08-29 — see Status below):** every time Execute hands work back to Commander, Commander's next action is a short prompt to the fitting gstack skill (`/office-hours`, `/plan-ceo-review`/`/plan-eng-review`, or `/autoplan` for the bundled run) — never drafting the next Build Card's plan itself. gstack generates the plan's *substance*, including (for infra cards) a build-ready spec down to node/table/RPC level with edge cases pre-resolved; Commander packages the result into a Build Card before Execute sees it. Build Card stays the interface to Execute. |
 | Security review | `/cso` (OWASP Top 10 + STRIDE) — adopt outright, no Zenny equivalent existed. |
 | Destructive-command guardrails | `/careful` / `/freeze` / `/guard` / `/unfreeze` — adopt outright, additive, no collision. |
 | Code review | `/review` wins for the default pre-`/ship` pass. **Live-tested 2026-08-29:** found it hard-requires a remote literally named `origin` and a real branch-vs-base diff — Zenny's remote was `zenny-sync` and work landed direct-to-`main`, so a first run correctly reported "Nothing to review" and stopped rather than fake a pass. **Resolved the same day, not left open:** human approved adopting a real branch/PR workflow specifically to make this work (see Status below and `CLAUDE.md`'s Standing Rule — Branch/PR Workflow) — remote renamed `zenny-sync` → `origin`, feature-branch → PR → `/review` → `/ship` is now the live default for substantive work. `mattpocock-skills:code-review`/`simplify` stay available for ad-hoc use outside a PR. |
@@ -206,6 +206,21 @@ opened via `gh pr create`, and `/review` run against it — see the PR/
 commit referenced in `Wiki/log.md` session-gstack-branch-pr-workflow for
 the actual result (confirms whether it found the diff correctly this
 time, what it flagged, and how the PR was closed).
+
+**Gstack-first planning bridge made mandatory, 2026-08-29 (same session
+as BC-072):** human's explicit call — after BC-072 hit an architecture
+mismatch (schema-per-client vs RLS) live, mid-build, human directed
+that Commander→Execute self-chaining route through gstack's planning
+skills on every cycle, not just on request. Root `CLAUDE.md`'s
+"Commander → Execute auto-handoff" section now names this the "Gstack
+planning bridge": Commander prompts gstack with what Execute just did
+and what's next, gstack produces the plan, Commander translates it into
+a Build Card. Scope stays exactly as the decision map above already
+drew it — gstack has no n8n/Supabase/VPS/DNS MCP tools, so it plans
+infra builds but never performs them; Execute still authors and runs
+every infra build, and still owns Dashboard-code authorship even where
+`/review`→`/ship` (gstack's one real execution-shaped path) owns that
+domain's release ceremony.
 
 **Still open, kept-for-now per human decision (revisit when asked):** 4
 skill/plugin pruning candidates — `neon`/`neon-postgres`, `skill-creator`,
