@@ -10,7 +10,25 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /commander — **Commander → gstack → Execute
+2026-08-29 (latest) — by /commander — **BC-073 (commerce-ecom node) planned
+via gstack's `/plan-eng-review` — first real use of the planning bridge.**
+Real findings, not rubber-stamped: (1) live Convocore-era Tools already exist
+for this archetype (`WF-002` CheckAvailability, `WF-005` CreateCart) — reuse,
+don't rebuild; (2) BC-073 needs its own Agent-based n8n workflow, not
+BC-072's `chainLlm` sub-workflow (no tool-calling there) — caught in
+planning, not mid-build, the exact gap the bridge exists to close; (3) those
+Tools are `Webhook`-triggered, so they wire in as HTTP Request Tools, not
+`toolWorkflow` (a real n8n mechanic, logged as a gstack learning for
+BC-074/075 too); (4) the already-locked commerce-tool guardrail isn't
+satisfied by WF-005 alone — BC-073 must gate CreateCart through the existing
+Verification Approval Queue (BC-053), not call WF-005 directly; (5) lead
+capture (WF-001) resolved out of scope via AskUserQuestion — BC-072's
+`find_or_create_conversation` already covers first contact. Full build-ready
+spec: `docs/designs/zenny-saas-runtime-pivot.md`'s new "BC-073 Eng Review"
+section. Full detail: `Wiki/log.md` session-bc073-gstack-eng-review. **Next:**
+package this spec into the formal Build Card and hand to Execute.
+
+2026-08-29 (prior) — by /commander — **Commander → gstack → Execute
 planning bridge made mandatory.** Prompted directly by BC-072's live
 architecture-mismatch discovery below (schema-per-client vs RLS, caught
 mid-build instead of in planning): every time Execute hands work back to

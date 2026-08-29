@@ -8479,3 +8479,54 @@ their own text, so the gstack-specific bridge belongs in this project's
 `CLAUDE.md`, not in the shared plugin definition used by other
 projects. Confirmed as the obviously-correct structural placement
 rather than asked as a separate question.
+
+## [2026-08-29] session-bc073-gstack-eng-review | BC-073 planned via gstack's /plan-eng-review — first real use of the bridge
+
+**Trigger:** human said "Kick off BC-073 through gstack now," directly
+following the planning-bridge policy change above. Ran gstack's router →
+first-run onboarding fired (added its generic routing block to CLAUDE.md,
+human's call: keep both for now, merge later) → `/plan-eng-review` proper.
+
+**What gstack's review found (real, not rubber-stamped):**
+1. Design Doc Check found the same design doc already in
+   `docs/designs/zenny-saas-runtime-pivot.md` / gstack's local copy — no new
+   `/office-hours` pass needed, BC-073 is a scoped follow-on inside an
+   already-approved architecture.
+2. **Real, live Convocore-era Tools already exist for this exact archetype**
+   — `WF-002` (CheckAvailability, read-only) and `WF-005` (CreateCart, writes
+   to Zenny's own `orders` table, never the client's live store) — found via
+   `Workflow_Registry.md`, not assumed. BC-073's job is wiring an Agent to
+   call them, not rebuilding order/availability logic.
+2. **Architecture mismatch caught in planning, not mid-build (the whole point
+   of the bridge):** BC-072's `chainLlm`-based LLM sub-workflow can't do
+   tool-calling — BC-073 needs its own Agent-based (`@n8n/n8n-nodes-langchain
+   .agent`) workflow instead, per `n8n-agents-official`. Second finding:
+   WF-002/WF-005 are `Webhook`-triggered, not `Execute Workflow Trigger` —
+   so they wire in as HTTP Request Tools, not `toolWorkflow` sub-workflow
+   tools (a real, non-obvious n8n mechanic; logged as a gstack learning for
+   BC-074/075 too).
+3. **Real guardrail gap found, not yet closed by existing code:** the
+   already-locked commerce-tool guardrail ("human confirmation before
+   executing any order/refund/payment tool") isn't satisfied by WF-005 as it
+   stands — its happy path creates the real order row immediately, human
+   review only fires on the escalation (failure) path. BC-073 must gate the
+   Agent's call to CreateCart through the existing Verification Approval
+   Queue (BC-053's `pending_verifications`/`resolve-pending-verification`),
+   not call WF-005 directly.
+4. **One real scope call surfaced via AskUserQuestion, not guessed:** lead
+   capture (`WF-001`) is explicitly out of BC-073's scope — BC-072's
+   `find_or_create_conversation` already covers first-contact recording under
+   the new runtime; a parallel `leads` row would be redundant.
+
+**Full build-ready spec** (node design, tools, Acceptance Criteria,
+Definition of Done) written into `docs/designs/zenny-saas-runtime-pivot.md`'s
+new "BC-073 Eng Review — commerce-ecom node" section (mirrored into gstack's
+local copy) — the GSTACK REVIEW REPORT table gained a new row for this pass.
+Wiki decision page updated to point at it.
+
+**Not run this pass:** a fresh Codex outside-voice review — BC-073 is scoped
+inside an architecture Codex already reviewed (20 findings) at the CEO/Eng
+review stage, not a new strategic bet.
+
+**Next:** Commander packages this spec into the formal BC-073 Build Card and
+hands to Execute (same session). Same bridge applies to BC-074/075.

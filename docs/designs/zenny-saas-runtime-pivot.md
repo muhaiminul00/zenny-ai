@@ -800,6 +800,178 @@ timeline, and a wider Phase 1 scope.
 **commerce-ecom + appointment + consultation** node types. This is now the
 final piece needed to scope the first Build Card — see BC-072 below.
 
+## BC-073 Eng Review — commerce-ecom node (gstack /plan-eng-review, 2026-08-29)
+
+**Trigger:** Commander→gstack→Execute planning bridge, first real use (see
+`Wiki/log.md` session-gstack-planning-bridge-mandatory). BC-072's shared
+runtime foundation is complete, live-verified, published. This review scopes
+BC-073 — the commerce-ecom archetype's own node-type logic — before Execute
+builds it, closing the exact gap BC-072 hit live (an architecture mismatch
+discovered mid-build instead of caught in planning).
+
+**Design Doc Check:** this document (already CEO+ENG cleared for the overall
+runtime pivot). No new office-hours pass needed — BC-073 is a scoped
+follow-on inside an already-approved architecture, not a new strategic bet.
+
+**Step 0 Scope Challenge:**
+1. *What already solves each sub-problem:* real, live, already-published Tools
+   exist for this exact archetype from the Convocore-era build — `WF-002`
+   (CheckAvailability, read-only, Provider Router pattern over
+   Shopify/WooCommerce), `WF-005` (CreateCart, writes to Zenny's own `orders`
+   table as `pending_review`, never the client's live store directly, per
+   `External_Integration_Strategy_v1.md` Part 6.1). Both are real, tested,
+   webhook-triggered n8n workflows — not doc-only sketches. BC-073's job is
+   wiring an LLM Agent to call them, not rebuilding order/availability logic.
+2. *Minimum set:* one new n8n workflow (the commerce-ecom Agent node) plus a
+   confirmation-gate extension to the existing Verification Approval Queue
+   (BC-053) for the one write-shaped tool call. No new tables beyond what
+   BC-072 and BC-053 already provide.
+3. *Complexity check:* 1 new Agent workflow + 2 wired tools + 1 gate extension
+   — well under the 8-file/2-new-service smell threshold. No stop triggered.
+4. *Search check:* n8n's native Agent node (`@n8n/n8n-nodes-langchain.agent`)
+   with tool sub-nodes is current best practice for LLM tool-calling in n8n
+   (per this project's own `n8n-agents-official` skill, already the
+   authoritative in-repo reference — no external search needed to confirm
+   this). No custom router/orchestration code needed.
+5. *TODOS cross-reference:* N/A — this repo has no `TODOS.md` (uses
+   `PROJECT_STATE.md`/Wiki instead, already established in the Eng Review
+   above).
+
+**Architecture Review — 2 real findings, both self-resolved (mechanical,
+Document Resolution Authority discipline — searched first, one obviously
+correct answer given what's already established):**
+
+1. **Agent node, not BC-072's `chainLlm`-based "Call LLM via OpenRouter"
+   sub-workflow.** BC-072's LLM sub-workflow was deliberately built for a raw
+   one-shot prompt/response (per its own description) — it has no tool-calling
+   surface. BC-073 needs tool-calling (CheckAvailability, CreateCart), which
+   `n8n-agents-official` names as the exact trigger for the Agent node over
+   Basic LLM Chain. **BC-073 builds its own Agent-based workflow**, reusing
+   BC-072's OpenRouter *credential* and its timeout/degradation pattern on the
+   Agent's model sub-node, but not BC-072's LLM sub-workflow itself as a
+   callee — different node type, not a composition of it.
+2. **Existing Tools (WF-002/WF-005) are wired as HTTP Request Tools, not
+   `toolWorkflow` sub-workflow tools.** Real finding, not assumed: both are
+   triggered by a `Webhook` node (`POST /check-availability`,
+   `POST /create-cart`), not an `Execute Workflow Trigger` — `toolWorkflow`
+   requires the callee to have the latter (per `n8n-subworkflows-official`).
+   Rebuilding them with an `Execute Workflow Trigger` just to satisfy
+   `toolWorkflow` would duplicate already-live, already-tested logic for no
+   real gain. **Correct wiring: HTTP Request Tool nodes calling their real
+   published webhook URLs** — exactly the calling contract they were already
+   built for as Convocore Custom Tools, now called by Zenny's own Agent
+   instead of Convocore's.
+
+**Commerce-tool guardrail — real gap found, not yet closed by existing code:**
+the Eng Review above locked "any tool that creates/modifies an order, refund,
+or payment requires human confirmation **before** executing." Checked WF-005's
+actual behavior (`06_Infrastructure/n8n/Workflow_Registry.md`, not assumed
+from the doc's prose): its happy path **creates the real `orders` row
+immediately** — human review only enters on the escalation path (stock
+unavailable, threshold exceeded), not universally. This does not yet satisfy
+the locked guardrail. **BC-073 must add the confirmation gate in front of the
+Agent's call to CreateCart**, not rely on WF-005's own internal behavior:
+extend the existing Verification Approval Queue (`pending_verifications`
+table + `resolve-pending-verification` Edge Function, live since BC-053 for
+appointment cancellations and customer updates — `Wiki/infra/
+verification-approval-queue.md`) to a new commerce action type, queuing a row
+instead of calling WF-005 directly; on approval, the Edge Function calls
+WF-005 the same way `resolve-pending-verification` already calls
+`cancel_client_appointment`/`apply_customer_update` today. CheckAvailability
+(read-only) calls through directly, no gate — matches the locked guardrail's
+own read/write split exactly.
+
+**Scope resolved via AskUserQuestion (human, 2026-08-29):** lead capture
+(`WF-001` CreateLead) is explicitly **out of BC-073's scope** — BC-072's
+`find_or_create_conversation` already creates a durable record on first
+contact under the new runtime; a parallel `leads` row for the same event
+would be redundant, not a new capability. Revisit only if a real client needs
+lead-stage reporting distinct from conversation history.
+
+**Code Quality / Test / Performance:** no implementation exists yet to audit
+directly. Test coverage for BC-073's Acceptance Criteria below covers the new
+surface (confirmation-gate branch, tool-call routing); BC-072's already-proven
+tenant-isolation and LLM-degradation tests aren't re-run here, they're
+inherited by construction (every turn still enters through BC-072's shared
+sub-workflow first).
+
+**Outside Voice:** not run this pass — BC-073 is a scoped follow-on inside an
+architecture Codex already reviewed (20 findings) at the CEO/Eng review stage
+above, not a new strategic bet. Re-run if BC-074/075 surface a pattern this
+node-level scoping missed.
+
+### BC-073 Build-Ready Spec
+
+**Build Card ID:** BC-073
+**Target:** New n8n Agent-based workflow (commerce-ecom node type) + a
+commerce-action extension to the Verification Approval Queue
+**Runtime Module:** Zenny Own Runtime (Phase 14), built on BC-072's foundation
+
+**Objective:**
+- **Purpose:** handle a commerce-ecom client's conversation turns — FAQ/
+  product/availability Q&A (auto) and cart creation (gated) — through
+  Zenny's own runtime instead of Convocore.
+- **Inputs:** the loaded `conversation_sessions` row + latest inbound message
+  from BC-072's shared entry sub-workflow; the client's `agent_prompts`/
+  `client_config` rows (already live, reused not rebuilt).
+- **Outputs:** an LLM response persisted via `append_message` (BC-072 RPC);
+  for a cart-creation request, either an immediate response (stock
+  unavailable, per WF-005's own real behavior) or a "pending business
+  confirmation" response plus a real `pending_verifications` row.
+
+**Node design:**
+- `@n8n/n8n-nodes-langchain.agent`, `promptType: 'define'`, system prompt
+  sourced from `get_client_agent_prompt` (existing RPC, BC-062 pattern) —
+  not hardcoded.
+- Model sub-node: `OpenRouter Chat Model`, same credential as BC-072
+  (`openrouter-zm`), same `options.timeout`/`retryOnFail` pattern as BC-072's
+  LLM sub-workflow.
+- Tools:
+  1. `Check availability` — HTTP Request Tool → WF-002's real webhook
+     (`POST /check-availability`), read-only, no confirmation gate.
+  2. `Create cart` — HTTP Request Tool → a new thin gate step (not WF-005
+     directly): writes a `pending_verifications` row (new commerce action
+     type) instead of calling WF-005's webhook; on business-owner approval,
+     `resolve-pending-verification` calls WF-005 for real. **Human review
+     required per the n8n-agents-official skill for any tool with
+     user-visible side effects** (Credential Gate N/A — no new credential,
+     reuses WF-002/WF-005's existing ones).
+- Memory: `memoryBufferWindow`, keyed on the `conversation_sessions.id` from
+  BC-072 (not a fresh per-message session) — matches BC-072's session model.
+
+**Dependencies / Required utilities:**
+- BC-072's shared entry sub-workflow and `append_message`/
+  `find_or_create_conversation` RPCs (built, live).
+- WF-002, WF-005 (built, live, published) — called by URL, not modified.
+- BC-053's Verification Approval Queue infra (`pending_verifications`,
+  `resolve-pending-verification`) — extended with a new commerce action
+  type, not rebuilt.
+
+**Acceptance Criteria:**
+1. A FAQ/availability question gets a correct, auto-answered response with
+   no confirmation gate — live-verified against a real (or real-degraded,
+   per WF-002's own existing behavior) provider response.
+2. A cart-creation request produces a real `pending_verifications` row and a
+   "pending confirmation" response — WF-005 is NOT called directly by the
+   Agent.
+3. Approving that pending row via `resolve-pending-verification` produces the
+   same real `orders` row WF-005 would have created directly — live-verified,
+   not assumed from WF-005's existing (already-verified) behavior.
+4. Tenant isolation and LLM-degradation are inherited, not re-proven: a
+   spot-check confirms the Agent's calls still flow through BC-072's shared
+   sub-workflow (not bypassed).
+
+**Definition of Done:** all 4 Acceptance Criteria live-verified via n8n +
+Supabase MCP; `Workflow_Registry.md` updated (new Agent workflow entry, plus
+a note on the commerce-action extension to the existing BC-053 entry); Wiki
+updated if this surfaces a new durable fact (e.g. the Webhook-vs-
+`toolWorkflow` finding above, if it recurs for BC-074/075).
+
+**Open Verification Items resolved by this card:** none of the still-open
+platform-level items (OpenBSP health, Meta App Review lead time, Convocore
+subscription status) — those belong to the Channel Adapter track, unaffected
+by this node-level card.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
@@ -809,6 +981,7 @@ final piece needed to scope the first Build Card — see BC-072 below.
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 2 architecture findings fixed (tenant isolation, LLM timeout); test plan artifact written |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | not run — no UI scope in this Build Card track (onboarding UX explicitly deferred) |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | not run — not applicable, no external SDK/CLI surface |
+| Eng Review (BC-073) | `/plan-eng-review` | Commerce-ecom node architecture | 1 | CLEAR | 2 findings self-resolved (Agent node not chainLlm; HTTP Request Tool not toolWorkflow); 1 real gap found+closed (WF-005 confirmation-gate placement); lead-capture scope resolved via AskUserQuestion |
 
 - **CODEX:** Outside-voice pass (gpt-5.5, read-only) ran against the fully CEO-reviewed plan — 20 findings, all resolved or explicitly accepted-as-tracked-risk (see the table under "Eng Review" above).
 - **CROSS-MODEL:** One load-bearing tension surfaced — Codex's repeated argument (items 14/19/20) that validating archetype-reuse should precede the runtime build. Presented explicitly to the founder; Approach B (runtime-first) was reaffirmed, not silently overridden. Recorded as an accepted, eyes-open risk, not a resolved disagreement.
