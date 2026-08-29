@@ -9,6 +9,39 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-30] session-zm-brain-reverify-note | Canonical docs re-framed as reference baseline, not final spec — third real PR through the pipeline
+
+**Trigger:** human's own real concern: the 8 canonical documents are
+labeled "frozen," but that freeze happened months ago (July 2026) and
+the plan/market have moved since — "frozen" as currently worded could
+read as "still accurate, build from this directly," which isn't
+actually true.
+
+**Added to `CLAUDE.md`'s Canonical Documents section:** an explicit
+note that "frozen" describes the grounding phase's *internal*
+completeness, not whether the content is still current — the set is
+now a reference starting point for Technical Architecture, not a final
+spec, and every real-world claim in it needs genuine re-verification
+against the present goal/market before building, using gstack's own
+planning skills (`plan-eng-review`, `office-hours`) rather than assumed
+still-true. Deliberately does not touch the separate Document
+Resolution Authority rule (internal precedence between the docs when
+they conflict with each other — an orthogonal concern to external
+re-verification against reality).
+
+**Third real pass through the full pipeline** (PR #3): scope-drift
+detection flagged the same known, still-uncommitted, still-untouched
+file-move from the prior two passes — consistent, not a fluke. Review
+found zero issues on the actual diff. Squash-merged (`ca737b4`),
+confirmed on `main` the unrelated file-move remains isolated,
+uncommitted, exactly as the human left it.
+
+**Full detail:** `Wiki/reference/gstack-pilot-plugin.md`. **Still
+open, unresolved by any of these three passes on purpose:** the
+uncommitted `Idea_and_sollution_ZM_CompanyBrain.txt` move in
+`zm-brain` — the human's own decision to make, not something to
+silently absorb into an unrelated PR.
+
 ## [2026-08-30] session-zm-brain-readme-update | README.md fixed + onboarding pointer added, second real PR through the pipeline
 
 **Trigger:** human asked to also update `zm-brain`'s README as part of

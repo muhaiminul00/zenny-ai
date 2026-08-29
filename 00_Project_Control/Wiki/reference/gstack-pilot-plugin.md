@@ -96,6 +96,17 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   file-move sitting in the repo (not touched, flagged for the human).
   Review found zero issues on the actual diff. Merged (`9f9049b`). See
   `session-zm-brain-readme-update` in `Wiki/log.md`.
+- **Canonical docs re-framed as reference baseline, same day, PR #3:**
+  human's real concern - "frozen" (July 2026) only means internally
+  complete, not still current; the plan/market have moved since. Added
+  a note to `CLAUDE.md`'s Canonical Documents section stating the set
+  is a reference starting point for Technical Architecture, requiring
+  real re-verification via gstack's `plan-eng-review`/`office-hours`
+  before building - separate from, doesn't touch, Document Resolution
+  Authority (internal doc-to-doc precedence). Third pass through the
+  pipeline: scope-drift flagged the same known uncommitted file-move a
+  third time, consistent, still untouched. Zero findings. Merged
+  (`ca737b4`). See `session-zm-brain-reverify-note` in `Wiki/log.md`.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

@@ -10,7 +10,26 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-30 (latest) — by /execute — **`zm-brain`'s README fixed +
+2026-08-30 (latest) — by /execute — **`zm-brain`'s canonical docs
+re-framed as a reference baseline, not a final spec — third real PR
+through the pipeline (PR #3).** Human's real concern: the 8 canonical
+documents are labeled "frozen" (July 2026), but that describes internal
+completeness, not current accuracy — the plan/market have moved since.
+Added an explicit note to `CLAUDE.md`'s Canonical Documents section:
+treat the set as a reference starting point for Technical Architecture,
+every real-world claim needs genuine re-verification against present
+goal/market (via gstack's `plan-eng-review`/`office-hours`) before
+building — not the separate Document Resolution Authority rule
+(internal precedence between docs, untouched, orthogonal concern).
+Scope-drift detection flagged the same known uncommitted file-move a
+third consecutive time — still not touched, still the human's own call.
+Zero review findings. Squash-merged (`ca737b4`). Full detail: `Wiki/
+reference/gstack-pilot-plugin.md`, `Wiki/log.md`
+session-zm-brain-reverify-note. **Next:** human resolves the uncommitted
+file-move whenever convenient; `zm-brain` onboarding + governance is
+otherwise fully done.
+
+2026-08-30 (prior) — by /execute — **`zm-brain`'s README fixed +
 onboarding pointer added, second real PR through the pipeline (PR
 #2).** Found the false-existence claim `/review` flagged in `CLAUDE.md`
 last pass actually originated in README.md itself — fixed at the
