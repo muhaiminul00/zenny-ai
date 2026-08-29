@@ -70,11 +70,23 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   trust, but had gone to the human's global settings instead of the
   project's - fixed by copying the real marketplace-source shape in.
   Also found, and correctly did NOT touch or commit, a serious
-  unrelated finding: `zm-brain`'s root `CLAUDE.md` is currently missing
-  3 sections (Current task, all 6 Hard Rules, Definition of done)
-  locally vs. its last commit - flagged to the human, not silently
-  fixed or committed either way. See `session-zm-brain-plugin-
-  declaration-fix` in `Wiki/log.md` for the full narrative.
+  unrelated finding: `zm-brain`'s root `CLAUDE.md` was then missing 3
+  sections (Current task, Hard Rules, Definition of done) locally vs.
+  its last commit - flagged to the human, not silently fixed or
+  committed either way. See `session-zm-brain-plugin-declaration-fix`
+  in `Wiki/log.md` for the full narrative.
+- **`CLAUDE.md` fully rewritten + run through the real gstack PR/review
+  pipeline, 2026-08-30 - Phase 2 genuinely complete:** the deletion
+  above confirmed intentional; human asked for a proper governance
+  `CLAUDE.md` mirroring Zenny's own pattern. Built (grounded in real
+  project docs, not invented), then actually run through the full
+  Branch/PR Workflow the new file itself states as this project's own
+  rule - PR #1, gstack's real `review` skill fired (surfaced a real
+  onboarding gate, routing-rules injection, handled via
+  AskUserQuestion; found and auto-fixed one real issue - a reference
+  to a document, `marked_for_technical_architecture.md`, that doesn't
+  actually exist anywhere in the repo, verified via find/grep), merged
+  for real. See `session-zm-brain-claude-md-rewrite` in `Wiki/log.md`.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

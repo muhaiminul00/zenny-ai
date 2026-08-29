@@ -9,6 +9,65 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-30] session-zm-brain-claude-md-rewrite | Full CLAUDE.md rewrite, run through the real gstack PR/review pipeline end to end — Phase 2 genuinely complete
+
+**Trigger:** human confirmed the earlier `CLAUDE.md` content deletion
+was intentional, confirmed the routing-fix re-test passed for real
+(`plan-eng-review` fired correctly, citing the exact disambiguator),
+then asked for a proper root `CLAUDE.md` mirroring Zenny's own
+governance pattern for `zm-brain`.
+
+**Scoped via AskUserQuestion first, not assumed:** full rewrite (not
+an extension) structured like Zenny's CLAUDE.md; skip the hand-written
+"planning bridge" policy layer since `gstack-pilot` already handles
+that mechanically (avoids the exact drift risk Zenny's own unmerged
+"## Skill routing" duplication already demonstrates); Standing Rules
+scoped to Document Resolution Authority + Branch/PR Workflow (both
+genuinely relevant), explicitly skipping infra-specific rules
+(Credential Gate, Python venv) that don't apply yet.
+
+**Built, grounded in real project docs, not invented:** Project
+Summary sourced from `README.md` + `Idea_and_sollution_ZM_
+CompanyBrain.txt`; Session Start order pointing at `project-memory`'s
+real paths; Memory System section; the existing Canonical Documents
+list carried over; two adapted Standing Rules; a Build Cards fallback
+pointer; Repo Notes. The `## gstack (REQUIRED)` section carried over
+**byte-for-byte** from `gstack-team-init`'s own generated content —
+diff-verified identical, not eyeballed.
+
+**Then actually ran the full PR/review pipeline for real, on this
+project's own new Branch/PR Workflow rule** (no trivial-housekeeping
+exemption — the file that states that rule was itself the test case):
+branch → push → PR #1 → chained into gstack's real `review` skill.
+
+- **Preamble surfaced a real, legitimate gstack onboarding gate**
+  (routing-rules injection) — asked via AskUserQuestion per the
+  skill's own instruction, human said yes, added gstack's standard
+  trigger→skill table to the end of `CLAUDE.md` (a different, non-
+  colliding section from `gstack-pilot`'s own Mode–gstack Bridge in
+  `.claude/CLAUDE.md`), committed.
+- **Real review pass, real finding:** `marked_for_technical_
+  architecture.md` was referenced as an existing document in both the
+  new `CLAUDE.md` and the pre-existing `README.md` (carried forward
+  unintentionally from README's own claim) — verified via `find`/
+  `grep` across the whole repo that it does not exist. Auto-fixed:
+  reworded to state plainly it's aspirational, not yet created. All
+  other file references cross-checked and confirmed real. Zero
+  critical findings (the checklist's SQL/race-condition/shell-
+  injection/LLM-trust-boundary categories are all code-specific — none
+  apply to a pure markdown diff, correctly not force-fit).
+- **Merged for real:** squash-merged PR #1, remote and local feature
+  branches cleaned up. Review's own bookkeeping (review-log,
+  telemetry) closed out too, not skipped.
+
+**Full detail:** `Wiki/reference/gstack-pilot-plugin.md`. **Phase 2 is
+now genuinely, fully complete** — `zm-brain` is populated, plugin-
+declared correctly (verified), gstack-team-init'd, has a real
+governance `CLAUDE.md`, and the whole thing was proven end to end
+through gstack's actual review/merge pipeline, not just described.
+**Next:** Zenny-migration decision — deferred, human's call, no
+pressure to decide now.
+
 ## [2026-08-30] session-zm-brain-plugin-declaration-fix | extraKnownMarketplaces gap closed; found (and did NOT commit) a serious CLAUDE.md content-loss in zm-brain
 
 **Trigger:** human's own architecture question — pushing a project's

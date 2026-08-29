@@ -10,7 +10,33 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-30 (latest) — by /execute — **`zm-brain`'s plugin declaration
+2026-08-30 (latest) — by /execute — **`gstack-pilot`/`project-memory`
+onboarding for `zm-brain` is fully, genuinely complete — Phase 2 done.**
+Built a proper root `CLAUDE.md` for `zm-brain` (full rewrite, human's
+call, mirroring Zenny's own governance pattern: Project Summary grounded
+in real project docs, Session Start order, Memory System, adapted
+Standing Rules — Document Resolution Authority + Branch/PR Workflow —
+the existing Canonical Documents list carried over, `## gstack
+(REQUIRED)` carried over byte-for-byte, diff-verified). **Then actually
+ran it through the full gstack PR/review pipeline for real**, on this
+project's own new no-exemption Branch/PR rule (the file stating that
+rule was itself the test case): branch → PR #1 → gstack's real `review`
+skill. Preamble surfaced a genuine onboarding gate (routing-rules
+injection), handled via AskUserQuestion. Review found and auto-fixed
+one real issue: `marked_for_technical_architecture.md` was referenced
+as an existing document (carried forward from a pre-existing README
+inaccuracy) — verified via `find`/`grep` it doesn't exist, corrected.
+Zero critical findings (checklist's SQL/race/shell-injection categories
+are all code-specific, correctly didn't apply to a markdown diff).
+Squash-merged, branches cleaned up. Full detail: `Wiki/reference/
+gstack-pilot-plugin.md`, `Wiki/log.md` session-zm-brain-claude-md-
+rewrite. **`zm-brain` is now a fully working example of the whole
+system: populated, plugin-declared, gstack-team-init'd, has a real
+governance doc, proven end to end through the actual pipeline, not just
+described.** **Next:** Zenny-migration decision — human's call, no
+pressure, deferred.
+
+2026-08-30 (prior) — by /execute — **`zm-brain`'s plugin declaration
 completed (`extraKnownMarketplaces` was missing, project-scoped only
 `enabledPlugins` before) — and a real, unresolved content-loss found
 and correctly NOT touched.** Confirmed via `claude-code-guide` research
