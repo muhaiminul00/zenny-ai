@@ -9,6 +9,48 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-30] session-gstack-pilot-team-docs | TEAM_SETUP.md + VERIFICATION_CHECKLIST.md added; a real `!command` misconception corrected first
+
+**Trigger:** human asked to verify `gstack-pilot`'s own install guide
+was properly written, specifically raised whether install commands
+should use `!command` syntax so Claude could retry on failure if a
+step fails.
+
+**Corrected the `!command` premise before building anything:** `!` is
+a convention local to *this* interactive Claude Code chat (lets Claude
+see a typed command's output) — meaningless in a committed
+`README.md` read outside a session with that exact convention. The
+actual fix for "let Claude retry on failure": hand teammates a
+**prompt to paste into their own Claude Code session** (not raw bash
+in a README) for the steps Claude can genuinely run itself. One real
+constraint from this session applies directly: `/plugin marketplace
+add`/`/plugin install` have **no tool-equivalent** — Claude cannot run
+them on a teammate's behalf, only typing them directly works. Built
+`TEAM_SETUP.md` honest to that split (gstack's global install handed
+to Claude with retry instructions; the 4 plugin-install lines typed
+directly by the human) rather than a single block that would silently
+fail on the delegable-looking parts.
+
+**Also found, real, flagged not fixed (pending go-ahead):** README's
+own "Current release: v1.0.0" and "Status: ...not yet run against a
+real team project" lines are now stale — the real release is v1.0.1,
+and `zm-brain`'s 3 real PRs already prove exactly what "Status" claims
+hasn't happened yet. Not touched this pass — human asked only for the
+two new files.
+
+**Built:** `TEAM_SETUP.md` (4-step guide, mechanism-split, explicit
+about the slash-command limitation) and `VERIFICATION_CHECKLIST.md`
+(the 6-item expected-behavior list this session's own `zm-brain`
+verification pass was built from, generalized into a reusable,
+standalone doc). README's Install section links both, doesn't
+duplicate content. Committed direct to `main` (`ba07da8`) — consistent
+with this repo's own established practice, no PR flow exists for
+`gstack-pilot` itself, only for `zm-brain`. No version bump (docs-only,
+same logic as prior README updates here).
+
+**Full detail:** `Wiki/reference/gstack-pilot-plugin.md`. **Open item:**
+the two stale README claims, awaiting the human's go-ahead to fix.
+
 ## [2026-08-30] session-zm-brain-reverify-note | Canonical docs re-framed as reference baseline, not final spec — third real PR through the pipeline
 
 **Trigger:** human's own real concern: the 8 canonical documents are

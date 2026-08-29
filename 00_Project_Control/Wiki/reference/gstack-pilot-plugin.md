@@ -107,6 +107,17 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   pipeline: scope-drift flagged the same known uncommitted file-move a
   third time, consistent, still untouched. Zero findings. Merged
   (`ca737b4`). See `session-zm-brain-reverify-note` in `Wiki/log.md`.
+- **`TEAM_SETUP.md` + `VERIFICATION_CHECKLIST.md` added to
+  `gstack-pilot` itself, same day:** human raised whether install
+  commands should use `!command` syntax for Claude-side retry -
+  corrected (that's a chat-local convention, not a README mechanism);
+  real fix is a prompt handed to Claude for the shell-runnable gstack
+  install (retry-capable), kept separate from the 4 `/plugin
+  marketplace add`/`/plugin install` lines (no tool-equivalent exists,
+  must be human-typed). Also found and flagged, not fixed pending
+  go-ahead: README's "v1.0.0"/"not yet run against a real team
+  project" lines are now stale. Committed `ba07da8`. See
+  `session-gstack-pilot-team-docs` in `Wiki/log.md`.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

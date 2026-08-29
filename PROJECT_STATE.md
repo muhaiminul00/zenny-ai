@@ -10,7 +10,26 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-30 (latest) — by /execute — **`zm-brain`'s canonical docs
+2026-08-30 (latest) — by /execute — **`gstack-pilot` gained
+`TEAM_SETUP.md` + `VERIFICATION_CHECKLIST.md`; corrected a real
+`!command` misconception before building anything.** Human asked
+whether install commands should use `!command` syntax for Claude-side
+retry - corrected: `!` is a convention local to this interactive chat,
+meaningless in a committed README. Real fix: hand teammates a prompt
+for Claude to run itself (the gstack global-install shell steps, with
+retry), but keep the 4 `/plugin marketplace add`/`/plugin install`
+lines as human-typed (no tool-equivalent exists for Claude to run
+them, confirmed earlier this session). Built both docs honest to that
+split. **Found and flagged, not fixed (pending go-ahead):** README's
+"Current release: v1.0.0" and "Status: not yet run against a real
+team project" lines are now stale (real release is v1.0.1; `zm-brain`
+already proves the opposite of what Status claims). Committed direct
+to `main` (`ba07da8`), consistent with this repo's own practice. Full
+detail: `Wiki/reference/gstack-pilot-plugin.md`, `Wiki/log.md`
+session-gstack-pilot-team-docs. **Next:** human's call on fixing the
+two stale README claims.
+
+2026-08-30 (prior) — by /execute — **`zm-brain`'s canonical docs
 re-framed as a reference baseline, not a final spec — third real PR
 through the pipeline (PR #3).** Human's real concern: the 8 canonical
 documents are labeled "frozen" (July 2026), but that describes internal
