@@ -10,7 +10,34 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /execute — **Pipeline health-check + `/doctor`
+2026-08-29 (latest) — by /commander — **Architecture locked for Zenny's own
+conversation runtime (Convocore replacement): MultiNode Runtime v1.0 +
+Channel Adapter v2.0, both real docs in `05_Platform_Builds/Zenny_SaaS/`.**
+Ran the full gstack review pipeline (`/office-hours` → `/plan-ceo-review` →
+`/plan-eng-review`, plus an independent Codex outside-voice pass, 20
+findings) then a real post-review correction pass once the founder surfaced
+facts none of those reviews had: **Convocore is fully stopped** (service
+paused, own-infra commitment already made — not a future option); **Carmelli
+Bakery is decoupled from this build's validation** (separate December
+delivery, unrelated reason); **real demand evidence exists** — a Meta ad run
+generated 7-8 leads/day, nobody converted, stated reason was price (directly
+validates the cost-reduction thesis, stronger than the original "1 thin
+client" framing); **channel parity (web chat + WhatsApp + Instagram) is
+required at launch**, reversing the original fast-follow plan, because the
+unconverted leads were quoted that exact channel set via Convocore; **Phase 1
+now needs 2-3 archetype node types**, not the single commerce-ecom node
+originally scoped around Carmelli; **timeline is honestly dual-stated** —
+founder's target is 1-1.5 months to full production, architecture docs' own
+estimate for the corrected larger scope is 2.5-3 months, both on record, not
+one hiding the other. **Real open item, blocking the next Build Card:** which
+specific 2-3 archetypes (of the 6) the lead pipeline needs — "mixed"
+confirmed, not yet named. No Build Card issued yet; no live n8n/Supabase/VPS
+action taken this session. Full decision record with every AskUserQuestion
+answer: `docs/designs/zenny-saas-runtime-pivot.md`. Wiki:
+`Wiki/decisions/zenny-saas-runtime-pivot.md`, `Wiki/log.md`
+session-zenny-saas-runtime-pivot.
+
+2026-08-29 (prior) — by /execute — **Pipeline health-check + `/doctor`
 cleanup, ahead of Zenny SaaS planning.** `/doctor` disabled 4 zero-lifetime-
 use plugins (`claude-code-setup`, `commit-commands`, `andrej-karpathy-skills`,
 `skill-creator`) in `~/.claude/settings.json` and removed a dead
@@ -846,6 +873,23 @@ INT-012 Sync Notion KB built, published. KB source pivoted from Convocore
 Older entries (BC-045, BC-044, BC-043 and earlier): see `Wiki/log.md`.
 
 ## Current Phase
+
+**Phases 0-13 below (Convocore-based build) are PAUSED, not active** — Zenny
+stopped the Convocore service and committed to its own infrastructure
+(2026-08-29). They're kept below as historical/architectural reference (real
+patterns reused by the new build — WF-017's shared choke point, BC-053's
+Verification Approval Queue, the OpenRouter pattern, etc.) not as an active
+track. **The active track is Phase 14 below.**
+
+Phase 14 — Zenny Own Runtime (SaaS Pivot) — ARCHITECTURE LOCKED, BUILD NOT
+STARTED. MultiNode Runtime v1.0 + Channel Adapter v2.0 (both real docs,
+`05_Platform_Builds/Zenny_SaaS/`). Real demand signal driving this (7-8
+leads/day via Meta ads, blocked on price); channel parity (web+WhatsApp+IG)
+required at launch; 2-3 archetype node types needed (exact archetypes not
+yet named — blocking item); timeline dual-stated (1-1.5mo target / 2.5-3mo
+doc estimate). Full record: `docs/designs/zenny-saas-runtime-pivot.md`,
+`Wiki/decisions/zenny-saas-runtime-pivot.md`.
+
 Phase 8 — Conversion Engine (11 Tools) — COMPLETE (11/11 built and
 live-tested)
 Phase 9 — Recovery Engine — IN PROGRESS (WF-018 SendRecoveryMessage +

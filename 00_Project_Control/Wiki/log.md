@@ -9,6 +9,52 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-29] session-zenny-saas-runtime-pivot | Architecture locked for Zenny's own conversation runtime (Convocore replacement), full gstack review pipeline + post-review correction pass
+
+**Trigger:** human, in Commander mode, asked to plan Zenny's strategy and
+ambition, comparing 4 candidate architecture docs and routing through
+gstack's `/office-hours`/`/plan-ceo-review` per CLAUDE.md's gstack routing
+table. Human also renamed `Future_Custom/` → `Zenny_SaaS/` this session and
+added 2 new architecture docs (`Zenny_MultiNode_Runtime_Architecture_v1.0.md`,
+`Zenny_Channel_Adapter_Architecture_v2.0.md`) as likely first-starting-point
+candidates.
+
+**What happened:** ran the full `/office-hours` diagnostic (goal/stage →
+narrowest-wedge/observation/future-fit forcing questions → landscape search →
+premises → Codex second opinion → 3 architecture alternatives), producing
+`docs/designs/zenny-saas-runtime-pivot.md`. Founder chose the full MultiNode
+Runtime v1.0 + Channel Adapter v2.0 build over Claude's recommended smaller
+probe. Doc then went through `/plan-ceo-review` (HOLD SCOPE; locked OpenRouter
+for LLM connection, human-confirmation guardrail on commerce tools) and
+`/plan-eng-review` (2 architecture fixes: shared entry sub-workflow for tenant
+isolation, LLM timeout/degradation messaging; a 20-finding independent Codex
+outside-voice pass, all resolved or accepted-as-tracked-risk) and a Budget
+section built from live Wiki figures.
+
+**Critical correction, same session:** after the doc was reviewed and
+"complete," the founder surfaced facts that invalidated several locked
+assumptions — Convocore is fully stopped (not still running, no dual-run
+target), Carmelli Bakery is decoupled from this build entirely (separate
+December delivery for unrelated reasons), real demand evidence exists (a Meta
+ad run generated 7-8 leads/day, blocked on price — not a thin 1-client
+hypothesis), channel parity (web chat + WhatsApp + Instagram together) is
+required at launch rather than fast-follow (the leads were quoted that exact
+set via Convocore), the founder's real timeline target is 1-1.5 months
+(vs. the architecture docs' own 2.5-3 month estimate for the corrected
+larger scope), and Phase 1 needs 2-3 archetype node types (not the single
+commerce-ecom node originally scoped around Carmelli). Every affected section
+of the design doc was corrected in place with explicit markers rather than
+silently rewritten — full correction log in the doc's own "POST-REVIEW
+CORRECTION LOG" section.
+
+**Outcome:** architecture is locked (MultiNode Runtime v1.0 + Channel Adapter
+v2.0, both real docs already in the repo). Real open item, not yet resolved:
+which specific 2-3 archetypes (of the 6) the lead pipeline needs — "mixed"
+confirmed, not yet named. No Build Card issued yet; no live n8n/Supabase/VPS
+action taken. Full record, every AskUserQuestion decision, the Codex outside-
+voice output, and the corrected Budget: `docs/designs/zenny-saas-runtime-pivot.md`.
+Durable summary + cross-reference: `Wiki/decisions/zenny-saas-runtime-pivot.md`.
+
 ## [2026-08-29] session-gstack-pipeline-healthcheck | /doctor cleanup applied (4 unused plugins disabled, dead book-to-skill skillOverride removed), then a synthetic-fixture PR (#2) live-proved /review still correctly flags real critical issues post-cleanup
 
 **Trigger:** human asked for a test run of the full pipeline before starting
