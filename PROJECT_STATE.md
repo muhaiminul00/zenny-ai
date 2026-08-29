@@ -10,7 +10,23 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-30 (latest) — by /execute — **`gstack-pilot`/`project-memory`
+2026-08-30 (latest) — by /execute — **`zm-brain`'s README fixed +
+onboarding pointer added, second real PR through the pipeline (PR
+#2).** Found the false-existence claim `/review` flagged in `CLAUDE.md`
+last pass actually originated in README.md itself — fixed at the
+source. Added a short "Working in this repo" pointer to `CLAUDE.md`.
+Caught and fixed a real inaccuracy in my own first draft before
+shipping (`check-gstack.sh` is a `PreToolUse` hook, not a git pre-
+commit hook). Scope-drift detection correctly flagged an unrelated,
+**uncommitted** working-tree change in the repo (`Idea_and_sollution_
+ZM_CompanyBrain.txt` moved to `docs/deck & proposal/`) — not touched,
+flagged for the human to confirm intentional or revert. Review found
+zero issues on the actual diff. Squash-merged (`9f9049b`). Full detail:
+`Wiki/reference/gstack-pilot-plugin.md`, `Wiki/log.md`
+session-zm-brain-readme-update. **Next:** human confirms the uncommitted
+file-move; otherwise `zm-brain` onboarding is fully done.
+
+2026-08-30 (prior) — by /execute — **`gstack-pilot`/`project-memory`
 onboarding for `zm-brain` is fully, genuinely complete — Phase 2 done.**
 Built a proper root `CLAUDE.md` for `zm-brain` (full rewrite, human's
 call, mirroring Zenny's own governance pattern: Project Summary grounded

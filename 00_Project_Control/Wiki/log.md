@@ -9,6 +9,40 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-30] session-zm-brain-readme-update | README.md fixed + onboarding pointer added, second real PR through the pipeline
+
+**Trigger:** human asked to also update `zm-brain`'s README as part of
+this run.
+
+**Found the false-existence claim's actual source:** the
+`marked_for_technical_architecture.md` reference `/review` flagged in
+`CLAUDE.md` last pass was carried forward from README.md itself, which
+originally made the same false claim as a styled markdown link. Fixed
+at the source this time, same treatment (stated plainly as
+aspirational, link styling removed).
+
+**Added a short "Working in this repo" section** pointing a first-time
+reader at `CLAUDE.md` for governance/gstack/plugin setup — deliberately
+brief, not a duplicate of `CLAUDE.md`'s actual content.
+
+**Caught and fixed my own inaccuracy before it shipped:** first draft
+called `check-gstack.sh` a "pre-commit hook" — it's actually a
+`PreToolUse` hook blocking Skill-tool use. Corrected before committing,
+not left wrong for review to catch.
+
+**Second real pass through the full PR/review pipeline** (PR #2):
+scope-drift detection correctly flagged an unrelated, uncommitted
+working-tree change sitting in the repo (`Idea_and_sollution_ZM_
+CompanyBrain.txt` moved to `docs/deck & proposal/`) — not part of this
+task, not committed, not touched, flagged plainly per the same
+discipline as the earlier `CLAUDE.md` content-loss finding. Review
+itself found zero issues on the actual committed diff (all new links
+verified real). Squash-merged (`9f9049b`), branch cleaned up.
+
+**Full detail:** `Wiki/reference/gstack-pilot-plugin.md`. **Open item
+for the human, not resolved here:** the uncommitted file-move in
+`zm-brain` — confirm intentional or revert.
+
 ## [2026-08-30] session-zm-brain-claude-md-rewrite | Full CLAUDE.md rewrite, run through the real gstack PR/review pipeline end to end — Phase 2 genuinely complete
 
 **Trigger:** human confirmed the earlier `CLAUDE.md` content deletion
