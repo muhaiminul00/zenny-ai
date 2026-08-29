@@ -32,10 +32,19 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   `~/.gstack/config.yaml` before/after, confirmed additive not
   destructive). `plugin.json` bumped `0.1.0` → `1.0.0`, tagged, released
   (`048eb8b`), same live-verification discipline as v0.1.0.
-- **Still open for the rest of Phase 2** (not done, not started this
-  slice): the gstack `--team` packaging sequence for a real Company
-  Brain repo, `project-memory` pairing, and the actual handoff to
-  teammates.
+- **Real target repo populated + gstack-team-init'd, 2026-08-30** - the
+  actual Company Brain repo, `github.com/muhaiminul00/zm-brain` (local:
+  `E:\Programming\ZenoManual - Compnay Brain`), pushed as-is (56 files,
+  no restructuring) and `gstack-team-init required` run for real against
+  it (append-only, confirmed not to touch the project's own existing
+  Hard Rules). See `session-zm-brain-onboarding` in `Wiki/log.md`.
+- **Still open for the rest of Phase 2, genuinely blocked on the human
+  now, not a to-do list item:** `/plugin marketplace add` +
+  `/plugin install` for both `gstack-pilot` and `project-memory` are
+  real interactive Claude Code commands with no tool-equivalent - they
+  must run in a session working in `zm-brain` itself. `/gstack-pilot:init`
+  and the actual first-Commander-session live-verification (the real
+  Definition-of-Done proof point) wait on that.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

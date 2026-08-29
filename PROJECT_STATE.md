@@ -10,7 +10,32 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /execute — **`gstack-pilot` v1.0.0 released —
+2026-08-30 (latest) — by /execute — **Phase 2's real target repo,
+`zm-brain`, populated and gstack-team-init'd — plugin installs blocked
+on the human, real stop, not a workaround.** Local folder
+`E:\Programming\ZenoManual - Compnay Brain` (pre-existing content: 8
+frozen canonical architecture docs, root CLAUDE.md with 6 phase-gated
+Hard Rules, pitch-deck materials, full grounding-phase archive) git-
+init'd and pushed as-is, no restructuring, to `github.com/muhaiminul00/
+zm-brain`. `gstack-team-init required` run for real: appended a `##
+gstack (REQUIRED)` section to that repo's own CLAUDE.md (confirmed pure
+append — none of its 6 existing Hard Rules or canonical-doc list
+touched, verified via diff before committing) and registered a
+`PreToolUse` block-hook (`.claude/hooks/check-gstack.sh`) requiring
+gstack be installed globally before any Skill tool use in that repo.
+Pushed. **Genuinely blocked, not routed around:** `/plugin marketplace
+add` + `/plugin install` for `gstack-pilot` and `project-memory` are
+real interactive Claude Code commands with no tool-equivalent, and need
+to run in a session actually working in `zm-brain`, not this Zenny
+session — reported to the human with the exact 5 commands to run there.
+`/gstack-pilot:init` and the first real Commander-session verification
+(the actual live-proof point Phase 2's Definition of Done needs) wait
+on that. Full detail: `Wiki/reference/gstack-pilot-plugin.md`, `Wiki/
+log.md` session-zm-brain-onboarding. **Next:** human runs the 5 plugin
+commands in a zm-brain session; resume the live-verification pass once
+that's done.
+
+2026-08-29 (prior) — by /execute — **`gstack-pilot` v1.0.0 released —
 hook-coexistence gap closed for real, and gstack is now running in
 `--team` mode machine-wide (real, disclosed side effect for Zenny too).**
 Human chose to close the one disclosed v0.1.0 gap immediately rather than

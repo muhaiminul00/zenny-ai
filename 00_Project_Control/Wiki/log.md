@@ -9,6 +9,53 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-30] session-zm-brain-onboarding | Company Brain's real repo (zm-brain) populated + gstack-team-init'd, plugin installs genuinely blocked on the human
+
+**Trigger:** human confirmed the Company Brain repo exists
+(`github.com/muhaiminul00/zm-brain`, created empty) with real local
+content at `E:\Programming\ZenoManual - Compnay Brain`, asked to
+"upload those properly" and continue the Phase 2 onboarding sequence.
+
+**Inspected before touching anything:** the local folder already has a
+real, structured project — 8 frozen canonical architecture docs (the
+"Theoretical Grounding Phase," frozen July 2026), a root `CLAUDE.md`
+with 6 explicit phase-gated Hard Rules (conceptual-only, no invented
+citations, append-only reasoning doc, etc.), pitch-deck materials, and
+a full grounding-phase archive (drafts, pre-grounding originals, team-
+review artifacts). Not a blank slate — checked `gstack-team-init`'s own
+script source first (it only appends a new `## gstack` section and
+skips entirely if one already exists) before running anything against
+this document, specifically to confirm it wouldn't collide with or
+override the existing Hard Rules.
+
+**Done, real, pushed:**
+- `git init` + `origin` + push: all 56 existing files committed as-is,
+  no restructuring, to `zm-brain` main.
+- `gstack-team-init required` run for real (not `--team` again — that's
+  already global from the prior session's work, this is the per-repo
+  bootstrap only): appended `## gstack (REQUIRED)` to `CLAUDE.md`
+  (diffed before committing — confirmed the append landed cleanly after
+  the existing content, none of the 6 Hard Rules or the canonical-
+  document list touched), registered `.claude/hooks/check-gstack.sh`
+  as a `PreToolUse` block-hook via `.claude/settings.json`. One
+  cosmetic gap in the script's own append logic (missing blank line
+  between old and new content) found and fixed before committing.
+  Pushed.
+
+**Genuinely blocked, stopped rather than worked around:**
+`/plugin marketplace add`/`/plugin install` (for both `gstack-pilot`
+and `project-memory`) are real interactive Claude Code commands — no
+tool exists to invoke them, and by design they'd need to run in a
+session actually working in `zm-brain`, not this Zenny session, since
+plugin enablement is scoped to where it's run. Reported to the human
+with the exact 5 commands needed. `/gstack-pilot:init` and the actual
+first-Commander-session live-verification (the real Definition-of-Done
+proof point Phase 2 has been building toward) wait on that.
+
+**Full detail:** `Wiki/reference/gstack-pilot-plugin.md`. **Next:**
+human runs the 5 plugin commands in a `zm-brain` session; resume
+verification once done.
+
 ## [2026-08-29] session-gstack-team-mode-enabled | gstack --team run for real (global), closes gstack-pilot's hook-coexistence gap, v1.0.0 released
 
 **Trigger:** human chose to close `gstack-pilot`'s one disclosed v0.1.0
