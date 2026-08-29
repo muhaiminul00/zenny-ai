@@ -9,6 +9,49 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-29] session-gstack-pipeline-healthcheck | /doctor cleanup applied (4 unused plugins disabled, dead book-to-skill skillOverride removed), then a synthetic-fixture PR (#2) live-proved /review still correctly flags real critical issues post-cleanup
+
+**Trigger:** human asked for a test run of the full pipeline before starting
+Zenny SaaS planning. Not a Build Card — a pipeline health-check.
+
+**/doctor findings applied:** disabled `claude-code-setup`, `commit-commands`,
+`andrej-karpathy-skills`, `skill-creator` plugins (0 lifetime uses each) in
+`~/.claude/settings.json`. Removed the dead `"book-to-skill": "off"`
+`skillOverrides` entry from `.claude/settings.local.json` — it targeted a
+Claude-Code-skill name that never existed (`book-to-skill` is a real CLI in
+`.zenny-py-venv/Scripts/`, unaffected by that key); CLAUDE.md's routing-table
+line was correct the whole time.
+
+**Pipeline test:** branch `test/gstack-review-pipeline-check` → synthetic
+fixture (3 planted issues: SQL string concatenation, `child_process.exec()`
+shell injection, unawaited-race balance update) → PR #2 → gstack `/review`
+correctly flagged all 3 at confidence 8-9/10 with exact file:line citations
+→ PR closed unmerged, branch deleted (remote + local), fixture never touched
+`main`. Full mechanics confirmed live: role-mode `mode.json` transitions,
+`post-edit.ps1` hook (correctly silent — no matcher for this file), the
+branch/PR/review loop end to end.
+
+**Two real gaps found during the test, both logged as gstack learnings (not
+Zenny Wiki items — these are gstack-tool facts, not Zenny decisions):**
+1. `checklist.md`'s Shell Injection critical category is written with
+   Python-only examples (`subprocess`/`os.system`/`eval`) — it still
+   correctly generalized to catch the Node `child_process.exec()` case here,
+   but the written bullets under-specify non-Python stacks.
+2. `bun.exe` is installed at `~/.bun/bin/bun.exe` but `~/.bun/bin` is not on
+   the default PATH this environment's Bash tool sessions inherit (Git Bash
+   on Windows) — `gstack-learnings-log`/`gstack-review-log` and other
+   bun-shelling scripts silently no-op or error unless PATH is fixed up
+   first in that same shell call. Worth a permanent PATH fix at the shell-
+   profile level outside any single session.
+
+**Onboarding gates cleared this session** (one-time, now recorded):
+checkpoint mode set to `continuous` (gstack auto-commits WIP locally during
+long tasks; never auto-pushes; Execute still owns the authoritative
+task-completion commit per Standing Rule — Branch/PR Workflow), telemetry
+set to `community`.
+
+---
+
 ## [2026-08-29] session-gstack-branch-pr-workflow | branch/PR workflow adopted, remote renamed to origin, PR #1 live-proves /review end to end
 
 **Trigger:** human, in response to the `/review` structural gap found

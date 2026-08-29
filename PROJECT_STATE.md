@@ -10,7 +10,28 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /execute — **Branch/PR workflow adopted
+2026-08-29 (latest) — by /execute — **Pipeline health-check + `/doctor`
+cleanup, ahead of Zenny SaaS planning.** `/doctor` disabled 4 zero-lifetime-
+use plugins (`claude-code-setup`, `commit-commands`, `andrej-karpathy-skills`,
+`skill-creator`) in `~/.claude/settings.json` and removed a dead
+`"book-to-skill": "off"` `skillOverrides` entry from
+`.claude/settings.local.json` (it targeted a Claude-Code-skill name that
+never existed; `book-to-skill` is a real CLI in `.zenny-py-venv/Scripts/`,
+unaffected — CLAUDE.md's routing-table reference was correct all along).
+**Then live-proved the gstack pipeline still works post-cleanup**: synthetic
+3-issue fixture → PR #2 → `/review` correctly flagged all 3 (SQL injection,
+shell injection, race condition) with exact file:line citations and
+sane confidence scores → PR closed unmerged, branch deleted, fixture never
+touched `main`. Role-mode `mode.json` transitions and the `post-edit.ps1`
+hook both confirmed working correctly during the run. Two real gstack-tool
+gaps found and logged as gstack learnings (not Zenny decisions): the Shell
+Injection checklist category is Python-example-only (still generalized
+correctly here); `bun.exe` isn't on this environment's default Bash PATH,
+silently breaking gstack's own bun-shelling scripts unless fixed up per
+shell call — worth a permanent PATH fix outside any single session. Full
+detail: `Wiki/log.md` session-gstack-pipeline-healthcheck.
+
+2026-08-29 (prior) — by /execute — **Branch/PR workflow adopted
 (human's explicit call: "use full potential of gstack... production
 grade approach"). gstack's `/review`/`/ship` are now live-usable, not
 just documented.** Remote `zenny-sync` renamed → `origin` (the literal
