@@ -9,6 +9,72 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-29] session-role-mode-gstack-phase1 | New sibling plugin `role-mode-gstack` built + partially live-verified, for the new "ZM — Company Brain" project (not Zenny)
+
+**Trigger:** human is starting a new project and wants teammates to onboard
+onto a properly gstack-wrapped mode system from day one, unlike Zenny's
+current prose-only "seams" between `role-modes` and gstack
+([[reference/gstack-skill-playbook.md]]). Confirmed via advisor-mode Q&A
+first (portable-vs-raw plugin questions), then handed to Commander to plan.
+
+**Planning (Commander):** entered plan mode, dispatched an Explore agent
+(role-modes-plugin + gstack + project-memory-plugin structure) and a Plan
+agent (composition mechanism, chain mapping, repo strategy, rollout
+phasing) in sequence. Locked 3 decisions via AskUserQuestion: new sibling
+repo (not a fork of `role-modes`); Company Brain's `gstack-team-init` runs
+`required`; chain mapping confirmed pending one fact-check. That fact-check
+(separate Explore agent) confirmed gstack has **no** native CLAUDE.md
+planning-routing convention to adopt — the locked mapping
+(Commander→office-hours/plan-eng-review/autoplan, Execute→review/qa/ship)
+is independently consistent with gstack's own documented lifecycle order
+(`docs/skills.md:119`), not copied from an artifact that doesn't exist.
+Human then added scope via ExitPlanMode rejection + follow-up ("raw idea"
+list): seed-block v2 with a non-duplicating Mode–gstack Bridge section, two
+new hooks (Commander pre-session briefing, PR-first wrap-up), an env/
+tooling convention field in the seed template. Re-approved, exited plan
+mode for real.
+
+**Build (Execute):** locked the one remaining flagged divergence via
+AskUserQuestion — PR-first wrap-up applies to **every** change, no
+trivial-housekeeping exemption (diverges from Zenny's own Branch/PR
+Workflow standing rule on purpose, new-project-specific). Built the new
+repo at `E:\Programming\role-mode-gstack` (copy-and-adapt from
+`role-modes-plugin`, not a fork): `commands/{advisor,commander,execute,
+init}.md` with the gstack chain paragraphs, `hooks/session-start.js`
+(namespaced sentinel/marker, new Commander pre-session-briefing logic),
+new `hooks/session-end.js`. **Caught and fixed a real design mistake
+before shipping it, not after:** the first `session-end.js` draft assumed
+`SessionEnd` supports `additionalContext` injection the same as
+`SessionStart` — checked against this project's own `session-end.ps1`
+comment first, which documents plainly that SessionEnd has no
+Claude-visible context-injection mechanism at all; rewrote to a plain
+stderr reminder before it was ever committed. `check-init-sync.js` ported
+and run for real — passed first try. `plugin.json` v0.1.0, README, LICENSE,
+`.gitignore`, first git commit `4f35bd9` (not pushed — publishing is
+Phase 2).
+
+**Partial live verification, disclosed honestly, not oversold:**
+composition-mechanism spike (does gstack's real `gstack-skill-start`
+preamble run identically regardless of caller) — done for real, in a
+scratch temp dir, confirmed caller-agnostic. Hook-coexistence test (does
+role-mode-gstack's plugin hook survive alongside gstack's `--team` global
+SessionStart hook) — **not run for real**, because doing so would mutate
+the human's actual global `~/.claude/settings.json`/`~/.gstack/
+config.yaml` permanently, outside this plan's disposable-scratch-repo
+intent, without asking first. Reasoned instead from direct evidence
+already in hand (Zenny's own `role-modes` plugin hook already fires
+correctly with zero entry in Zenny's own `settings.json` "hooks" key —
+proof plugin-hooks and settings.json-hooks are additive, separate
+registration layers) — high confidence, not full live proof. Left open,
+deferred to Phase 2's real Company Brain run or an explicit human go-ahead
+to run `--team` for real sooner.
+
+**Full detail:** `Wiki/reference/role-mode-gstack-plugin.md`, approved
+plan `C:\Users\muhai\.claude\plans\jazzy-plotting-marshmallow.md`.
+**Next:** Phase 2 (publish on GitHub, package with gstack `--team` +
+`project-memory`, hand off to Company Brain teammates) — separate Build
+Card, not started.
+
 ## [2026-08-29] session-bc072-shared-runtime-foundation | BC-072 built, live-verified, published — first real workflows on Zenny's own runtime
 
 **Trigger:** human confirmed the last blocking item (which 2-3 archetypes:
