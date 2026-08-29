@@ -450,5 +450,33 @@ Full narrative and the live end-to-end proof this actually works:
 - Full governance model (Build Cards, Compliance Checklist, Change
   Requests, Definition of Done): `Claude_Build_Command_Protocol_v2.md`.
 ---
+
+## Skill routing
+
+When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
+
+Key routing rules:
+- Product ideas/brainstorming → invoke /office-hours
+- Strategy/scope → invoke /plan-ceo-review
+- Architecture → invoke /plan-eng-review
+- Design system/plan review → invoke /design-consultation or /plan-design-review
+- Full review pipeline → invoke /autoplan
+- Bugs/errors → invoke /investigate
+- QA/testing site behavior → invoke /qa or /qa-only
+- Code review/diff check → invoke /review
+- Visual polish → invoke /design-review
+- Ship/deploy/PR → invoke /ship or /land-and-deploy
+- Save progress → invoke /context-save
+- Resume context → invoke /context-restore
+- Author a backlog-ready spec/issue → invoke /spec
+
+**TODO, not yet done:** this block was appended verbatim by gstack's own
+onboarding (2026-08-29, same session as the gstack planning bridge above)
+and duplicates ground the existing `using-gstack` SKILL.md + Tool Routing
+Table already cover with more precision. Human's explicit call: keep both
+for now, merge into one final version the next time a Commander cycle
+picks this up — don't let it silently rot as two sources of truth.
+
+---
 #### ZeroManual · Zenny AI Workforce · CLAUDE.md v3.1 · BUILD PHASE
 
