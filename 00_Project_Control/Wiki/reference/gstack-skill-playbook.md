@@ -100,13 +100,13 @@ claims, not something to plan capacity around.
 | Build Card planning | gstack's `/office-hours` → `/plan-ceo-review` → `/plan-design-review` → `/plan-eng-review` (or `/autoplan` for the bundled run) generates the plan's *substance*; Commander still packages the result into a Build Card before Execute sees it. Build Card stays the interface to Execute. |
 | Security review | `/cso` (OWASP Top 10 + STRIDE) — adopt outright, no Zenny equivalent existed. |
 | Destructive-command guardrails | `/careful` / `/freeze` / `/guard` / `/unfreeze` — adopt outright, additive, no collision. |
-| Code review | `/review` wins for the default pre-`/ship` pass **when a PR/feature-branch actually exists.** **Live-tested 2026-08-29, real structural gap found:** `/review`'s Step 0 hard-requires a remote literally named `origin` and diffs the current branch against a base branch (PR's base, or the repo's default branch via `origin/HEAD`). This repo's remote is `zenny-sync` (no `origin` at all), and work lands directly on `main` — no feature-branch/PR flow. Run as designed: `git remote get-url origin` fails → git-native fallback tries `origin/main`/`origin/master`, both fail → defaults to `main` → since the working branch already IS `main`, Step 1 immediately outputs "Nothing to review — you're on the base branch" and stops. **Not worked around by inventing a throwaway branch or an `origin` alias just to force a green run** — that would misrepresent the actual result. `mattpocock-skills:code-review`/`simplify` are the real default for Zenny's current commit-direct-to-main workflow; `/review` stays the intended path *if* Zenny ever adopts a branch/PR workflow (a real workflow decision, not self-resolved here — see Status below). |
+| Code review | `/review` wins for the default pre-`/ship` pass. **Live-tested 2026-08-29:** found it hard-requires a remote literally named `origin` and a real branch-vs-base diff — Zenny's remote was `zenny-sync` and work landed direct-to-`main`, so a first run correctly reported "Nothing to review" and stopped rather than fake a pass. **Resolved the same day, not left open:** human approved adopting a real branch/PR workflow specifically to make this work (see Status below and `CLAUDE.md`'s Standing Rule — Branch/PR Workflow) — remote renamed `zenny-sync` → `origin`, feature-branch → PR → `/review` → `/ship` is now the live default for substantive work. `mattpocock-skills:code-review`/`simplify` stay available for ad-hoc use outside a PR. |
 | Debugging | `/investigate` wins — its 3-failed-attempts stop and auto-`/freeze` on the affected module are concrete safety properties the alternatives lack. Retires `superpowers:systematic-debugging` and `mattpocock-skills:diagnosing-bugs` from the Tool Routing Table's default path. |
 | Browser / QA | `/browse`, `/qa`, `/qa-only`, `/setup-browser-cookies` supersede the Tool Routing Table's Playwright MCP row — `/qa` is diff-aware (auto-detects affected pages from `git diff`) and auto-generates regression tests, strictly more complete for this project's OAuth/dashboard-UI verification needs. |
 | Dashboard design | **Split, not a straight replacement:** gstack's `/design-consultation` → `/design-shotgun` → `/design-html` handle greenfield generation (new screens/systems — fits "building almost from scratch"); Zenny's existing `taste-skill` + `brandkit` + `minimalist-skill` + `frontend-design` bundle is the judgment/critique gate gstack's output must pass before a design pass is called done; `impeccable` keeps the post-ship live-polish-audit job (existing Tool Routing Table row) — gstack's `/design-review` is skipped specifically to avoid two full live-audit passes over the same shipped UI. |
 | Memory | Wiki + PROJECT_STATE.md stay the sole system of record. GBrain, `/setup-gbrain`, `/sync-gbrain`, `/context-save`, `/context-restore`, and `/learn` are all skipped — `/context-save` duplicates PROJECT_STATE.md's exact job, and `/learn`'s auto-biasing across sessions is the opposite instinct from Wiki's explicit "say so if no match, never synthesize" confidence rule. **Confirmed low-risk to skip cleanly (2026-08-29 research):** GBrain is opt-in at every layer — nothing installs it, wires an MCP server, or writes anything to a project's CLAUDE.md without `/setup-gbrain`/`/sync-gbrain` being run explicitly first, and `/sync-gbrain` only writes its CLAUDE.md block after a live round-trip test passes (removes it if the test fails). `/context-save`/`/context-restore`/`/learn` are fully independent of GBrain — plain local files, not a reason to reconsider skipping GBrain itself. |
 | Documentation | Wiki's Promotion Rule and the Per-Workflow Documentation standing rule stay authoritative. `/document-release`/`/document-generate` update the Dashboard repo's own README/Diataxis-style docs — never a substitute for a Wiki page or a `Wiki/log.md` entry. **Correction (2026-08-29 research):** `/document-release` is not merely "usable" — `/ship`'s Step 18 *mandatorily* dispatches it before opening a PR, so it fires automatically every time `/ship` is used. That's fine under this row's existing split (it only ever touches repo-technical docs, never Wiki/PROJECT_STATE.md), but Commander should expect it to run, not treat it as an optional add-on. |
-| Deploy | `/ship` → `/land-and-deploy` → `/canary` → `/setup-deploy` → `/benchmark` are scoped to the **Dashboard repo only**. n8n/Supabase changes keep going through their own MCPs per the Credential Testing and Mandatory MCP Verification standing rules — this pipeline has no concept of either and must never be allowed near live n8n/Supabase/VPS/DNS state directly. This is where seam 1 matters most. |
+| Deploy | `/ship` → `/land-and-deploy` → `/canary` → `/setup-deploy` → `/benchmark` are scoped to **Dashboard changes only** — **correction, 2026-08-29:** the Dashboard is a subfolder of this same repo (`05_Platform_Builds/Dashboard/`), not a separate repository as earlier phrasing implied; the scope boundary is by changed path, not by repo. n8n/Supabase changes keep going through their own MCPs per the Credential Testing and Mandatory MCP Verification standing rules — this pipeline has no concept of either and must never be allowed near live n8n/Supabase/VPS/DNS state directly. This is where seam 1 matters most. |
 | iOS skills (`/ios-qa`, `/ios-fix`, `/ios-design-review`, `/ios-clean`, `/ios-sync`) | Installed (it's a bundle, no per-skill opt-out), never invoked — Zenny has no iOS app. |
 | Niche utilities (`/retro`, `/benchmark-models`, `/pair-agent`, `/make-pdf`, `/diagram`, `/scrape`, `/skillify`, `/codex`, `/plan-tune`) | Available but not built into any dispatch workflow — usable ad hoc if asked for by name. |
 
@@ -135,7 +135,8 @@ should never have been presented as if it were.
    actually broken) verify correctness.
 4. `/qa` (diff-aware) verifies behavior; `/cso` runs before shipping
    anything security-sensitive.
-5. `/ship` → `/land-and-deploy` → `/canary` — **Dashboard repo only.**
+5. `/ship` → `/land-and-deploy` → `/canary` — **Dashboard changes only**
+   (a subfolder of this repo, not a separate one — see Deploy row above).
    n8n/Supabase/VPS/DNS changes never enter this path; they go through
    their own MCPs, verified per the Mandatory MCP Verification rule, and
    documented per Per-Workflow Documentation.
@@ -188,11 +189,23 @@ CLAUDE.md instructions).
 against the dispatch-rewrite commit to confirm the routing actually
 works, not just that it's documented. Found the structural gap recorded
 in the Code review decision-map row above (`origin` remote + PR/branch
-workflow assumed, neither exists here) — a real, disclosed limitation,
-not a pass/fail on the skill itself. **Open, not self-resolved:**
-whether Zenny should adopt a branch/PR workflow to actually use `/review`
-and `/ship`'s pipeline is a real workflow decision for the human, not
-something to decide here.
+workflow assumed, neither existed) — a real, disclosed limitation, not
+a pass/fail on the skill itself. Flagged to the human as an open
+workflow decision rather than self-resolved.
+
+**Resolved the same day — branch/PR workflow adopted, 2026-08-29:**
+human's explicit call ("adopt it... full potential of gstack... that's
+the production grade approach"). Remote renamed `zenny-sync` → `origin`
+(push/fetch/`origin/HEAD` all re-verified live under the new name).
+New Standing Rule — Branch/PR Workflow in root `CLAUDE.md`: substantive
+work goes feature-branch → PR → `/review` → `/ship`; trivial Wiki/log/
+PROJECT_STATE-only housekeeping stays direct-to-`main`. **Live-proved
+end to end, not just declared:** branch `feat/gstack-branch-pr-workflow`
+carrying this exact workflow-adoption change was pushed, a real PR
+opened via `gh pr create`, and `/review` run against it — see the PR/
+commit referenced in `Wiki/log.md` session-gstack-branch-pr-workflow for
+the actual result (confirms whether it found the diff correctly this
+time, what it flagged, and how the PR was closed).
 
 **Still open, kept-for-now per human decision (revisit when asked):** 4
 skill/plugin pruning candidates — `neon`/`neon-postgres`, `skill-creator`,

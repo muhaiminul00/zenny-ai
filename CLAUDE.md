@@ -207,7 +207,7 @@ let Claude pick the right skill within a single-domain bundle.
 | Before claiming a fix is done/verified | superpowers:verification-before-completion — mandatory gate, always (no gstack equivalent) |
 | Isolated risky change | superpowers:using-git-worktrees |
 | Writing a plan, then executing | superpowers:writing-plans → superpowers:executing-plans (feature-planning substance goes through gstack first — see `using-gstack`) |
-| Code/diff review pass, default pre-ship | gstack `/review` **only when a real PR/feature-branch exists** (it hard-requires an `origin` remote + branch-vs-base diff — live-tested 2026-08-29, this repo has neither: remote is `zenny-sync`, work lands direct-to-`main`). Default for Zenny's actual workflow today: `mattpocock-skills:code-review`/`superpowers:requesting-code-review`/`simplify`. See `using-gstack`, `Wiki/reference/gstack-skill-playbook.md`. |
+| Code/diff review pass, default pre-ship | gstack `/review` — now the real default, per the branch/PR workflow adopted 2026-08-29 (Standing Rule — Branch/PR Workflow above). `mattpocock-skills:code-review`/`superpowers:requesting-code-review`/`simplify` stay available for ad-hoc use outside a PR. See `using-gstack`, `Wiki/reference/gstack-skill-playbook.md`. |
 | TDD | mattpocock-skills:tdd |
 | Architecture/codebase design review | mattpocock-skills:codebase-design |
 | Merge conflicts | mattpocock-skills:resolving-merge-conflicts |
@@ -372,11 +372,39 @@ At the END of every session, before ending:
 1. Apply the promotion rule above — update PROJECT_STATE.md's status
    sections (overwrite, don't append) and/or the relevant Wiki page(s).
 2. Commit the full repo via real git commands (not any MCP git tool),
-   add/commit/push to zenny-sync.
+   add/commit/push to `origin` (renamed from `zenny-sync` 2026-08-29 —
+   see Standing Rule — Branch/PR Workflow below for why). Trivial
+   Wiki/log/PROJECT_STATE-only wrap-up commits go direct-to-`main`, same
+   as always; substantive work follows the branch/PR flow instead.
 3. Confirm in your final output that PROJECT_STATE.md/Wiki were updated
    and pushed — part of Definition of Done, not optional cleanup.
 
 ---
+
+## Standing Rule — Branch/PR Workflow
+
+Adopted 2026-08-29 so gstack's `/review`/`/ship` pipeline is actually
+usable, not just documented — both hard-require a remote literally
+named `origin` and a real branch-vs-base-branch diff. The remote
+(`github.com/zeromanualai/zenny-producition-sync`) was renamed
+`zenny-sync` → `origin` for this; nothing else about the remote changed.
+
+**Substantive work** (a Build Card's implementation, code/workflow
+changes, anything Execute builds against an approved scope): feature
+branch → push → `gh pr create` → gstack `/review` → fix findings →
+`/ship` (mandatorily runs `/document-release` first) → merge → delete
+branch. This is the default path now, not an alternative to direct-to-
+`main` commits.
+
+**Trivial session housekeeping** (a Wiki page edit, a `Wiki/log.md`
+entry, a `PROJECT_STATE.md` status update, with no code/workflow
+change riding along) stays direct-to-`main`, same as before adopting
+this — routing pure bookkeeping through a PR would be exactly the
+over-engineering this document already tells both modes to avoid.
+
+Full narrative and the live end-to-end proof this actually works:
+`Wiki/log.md` session-gstack-branch-pr-workflow,
+`Wiki/reference/gstack-skill-playbook.md`.
 
 ## Repo Notes
 

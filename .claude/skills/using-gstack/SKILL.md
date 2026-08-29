@@ -32,15 +32,14 @@ it directly.
   section), `/qa` (diff-aware, auto-generates regression tests),
   `/qa-only` (report without fixing), `/setup-browser-cookies`
   (authenticated testing).
-- **Code review, default pre-ship pass** → gstack `/review`, **but only
-  when a real PR/feature-branch exists** — it hard-requires an `origin`
-  remote and diffs the branch against a base branch (live-tested
-  2026-08-29: this repo's remote is `zenny-sync`, work lands direct-to-
-  `main`, so `/review` immediately reports "Nothing to review — you're on
-  the base branch" and stops). Zenny's actual default today:
-  `mattpocock-skills:code-review`/`simplify`. `/review` becomes the real
-  default the moment Zenny adopts a branch/PR workflow — see
-  `Wiki/reference/gstack-skill-playbook.md`.
+- **Code review, default pre-ship pass** → gstack `/review`. Live as of
+  2026-08-29: Zenny adopted a real branch/PR workflow specifically so
+  this works (remote renamed `zenny-sync` → `origin` — `/review`/`/ship`
+  hard-require that literal name plus a real branch-vs-base diff; see
+  root `CLAUDE.md`'s Standing Rule — Branch/PR Workflow). Feature branch
+  → PR → `/review` → fix → `/ship` is the default for substantive work;
+  ad-hoc review outside a PR still has `mattpocock-skills:code-review`/
+  `simplify` available.
 - **Debugging with unclear root cause** → gstack `/investigate` (3-failed
   -attempts stop, writes the same freeze-dir state `/freeze` uses).
   Retires `superpowers:systematic-debugging` and
