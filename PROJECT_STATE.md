@@ -10,7 +10,30 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-29 (latest) — by /commander — **BC-073 (commerce-ecom node) planned
+2026-08-29 (latest) — by /execute — **BC-073 (commerce-ecom node) BUILT,
+LIVE-VERIFIED, and PUBLISHED — first real archetype node on Zenny's own
+runtime.** Extended BC-072's shared sub-workflow with customer resolution (a
+real gap found live — conversations never linked to a customer); built two
+new workflows (`Zenny Runtime - Queue Commerce Cart Verification`,
+`Zenny Runtime - Commerce-Ecom Node`, an Agent with tool-calling); extended
+`resolve-pending-verification` with a `CreateCart` branch. **5 real bugs
+found and fixed live during the build** (not anticipated in planning):
+`channel_type_enum` missing `web_chat`/`instagram`; a hyphen-vs-underscore
+mismatch between `channel_type_enum` and `source_channel_enum`; a check
+constraint rejecting the new `CreateCart` tool_name across 11 schemas; a
+scalar-RPC response-parsing bug; a prompt placeholder colliding with n8n's
+own `{{ }}` expression syntax. **Live-verified with real external calls:** a
+genuine WF-002 stock check, a grounded OpenRouter response, cross-turn memory
+recall correctly blocking an out-of-stock order, and an independently-proven
+cart-verification queue (real lead + real `pending_verifications` row).
+**One thing not fully verified, disclosed:** the approval Edge Function's new
+branch needs a real dashboard JWT to test live — none exists yet, same
+disclosed gap BC-053/BC-063 already carry. Full detail: `06_Infrastructure/
+n8n/Workflow_Registry.md`'s 3 new BC-073 entries, `Wiki/log.md`
+session-bc073-commerce-ecom-node-build. **Next:** BC-074/075 (appointment,
+consultation), same bridge and foundation.
+
+2026-08-29 (prior) — by /commander — **BC-073 (commerce-ecom node) planned
 via gstack's `/plan-eng-review` — first real use of the planning bridge.**
 Real findings, not rubber-stamped: (1) live Convocore-era Tools already exist
 for this archetype (`WF-002` CheckAvailability, `WF-005` CreateCart) — reuse,

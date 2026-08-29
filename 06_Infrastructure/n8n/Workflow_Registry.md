@@ -1189,6 +1189,49 @@ Architecture: `05_Platform_Builds/Zenny_SaaS/Zenny_MultiNode_Runtime_Architectur
 
 **LAST VERIFIED:** BC-072, 2026-08-29 — live via `execute_workflow` (a temporary Manual Trigger was added for direct invocation, since Execute Workflow Trigger sub-workflows can't be called directly through the MCP's `execute_workflow`, then removed after verification). Real call to `openai/gpt-4.1-mini` returned "connection verified" for a controlled test prompt — genuine external API round trip, not simulated (`test_workflow` was deliberately avoided here since it auto-pins credentialed nodes, which would have only proven the wiring, not the actual OpenRouter connection).
 
+**UPDATED BC-073 (customer resolution added, found live during planning — a real gap, not a build choice):** `find_or_create_conversation` never resolved a `customer_id` — the `conversations` table has no customer link at all — but every commerce tool (CreateCart, pending_verifications) requires one. Extended this shared sub-workflow (not duplicated per-node, matching the WF-017 shared-choke-point convention) to also find-or-create the customer via `find_client_customer_by_channel`/`insert_client_customer`/`insert_client_channel_identity_link` — the same find-or-create-customer chain WF-001 already uses. **Return shape gained `customer_id`.** Also found and fixed live: `channel_type_enum` (reused for both `conversations.channel` and customer-identity matching) was missing `web_chat`/`instagram` — two of the three channels required at launch — added both (additive, non-breaking). Re-verified both branches (not-found→create, found→reuse) against `client_test_002_acme_commerce_test`; synthetic rows cleaned up after.
+
+### Zenny Runtime - Queue Commerce Cart Verification
+**n8n ID:** `Rt9PupfwwV9NMNvS` · **published**, active (sub-workflow, no production trigger — wired as a `toolWorkflow` agent tool)
+
+**PURPOSE:** BC-073's commerce-tool guardrail enforcement point. The commerce-ecom Agent never calls `insert_client_cart`/WF-005 directly for a cart-creation request — it calls this instead, which mints a lead (`insert_client_lead`, required by `insert_client_cart`'s FK) then queues a `pending_verifications` row. **Real gap found and closed, not assumed safe:** checked WF-005's actual behavior before building this — its happy path creates the real order immediately, human review only fires on its own escalation (failure) path, which does not satisfy the eng review's locked guardrail ("human confirmation before executing"). This sub-workflow is that missing pre-execution gate.
+
+**TRIGGER:** Execute Workflow Trigger (Define Below): `client_schema_name`, `customer_id`, `channel`, `items` (array), `conversation_summary` (all string except `items`).
+
+**OUTPUT / END STATE:** `{ status: "pending_confirmation", pending_verification_id, message }` — always this shape; the real order is only created later, on business-owner approval (see `resolve-pending-verification`'s new `CreateCart` branch below).
+
+**REAL DEPENDENCIES:** `insert_client_lead`, `queue_pending_verification` RPCs (both pre-existing); `zenny-vault-suparbase` credential.
+
+**REAL NEW DB OBJECT:** extended `pending_verifications_tool_name_check` (every schema carrying the table — 5 `tpl_*` + 6 client/test schemas) to allow `CreateCart` alongside BC-053's `CancelAppointment`/`UpdateCustomer` — found live when the first real test call was rejected by the check constraint.
+
+**FIXED (found live, not assumed):** `channel_type_enum` (`web_chat`) vs `source_channel_enum` (`web-chat`, hyphen) are two different enums for conceptually the same value — `insert_client_lead`'s `p_source_channel` needs the hyphenated form. Mapped inline (`web_chat` → `web-chat`) rather than unifying the enums, since `source_channel_enum` already has its own established history (BC-071's platform-wide rename) this card doesn't touch. Also fixed: `queue_pending_verification` `RETURNS uuid` (scalar) — PostgREST's `application/vnd.pgrst.object+json` Accept header is for object-returning functions and broke JSON parsing on this scalar return; fixed by dropping that header and reading the plain-text response instead.
+
+**LAST VERIFIED:** BC-073, 2026-08-29 — live via `execute_workflow` (temporary Manual Trigger, same pattern as BC-072). Full real chain proven: a real lead created (`insert_client_lead`), a real `pending_verifications` row queued (`queue_pending_verification`), confirmed via the `Return` node's real `pending_verification_id`. Synthetic rows cleaned up after.
+
+### Zenny Runtime - Commerce-Ecom Node
+**n8n ID:** `IKOAp1dmnqul5uuQ` · **published**, active (sub-workflow, no production trigger — the first real archetype node, called by whatever channel/routing layer arrives later)
+
+**PURPOSE:** BC-073's commerce-ecom archetype node — an `@n8n/n8n-nodes-langchain.agent` (tool-calling), not BC-072's `chainLlm` LLM sub-workflow (which has no tool-calling surface — a real architecture finding from `/plan-eng-review`, caught in planning not mid-build). Handles FAQ/product/availability Q&A (auto) and cart-creation requests (gated) for a commerce-ecom client's conversation turn.
+
+**TRIGGER:** Execute Workflow Trigger (Define Below): `client_id`, `channel`, `external_id`, `message_text`.
+
+**FLOW:** resolves the conversation+customer via BC-072's shared sub-workflow → fetches the client's `business_name` (`control.clients` via REST, `Accept-Profile: control` — the same pattern UTIL-001 already uses) and the `commerce_ecom_agent_system` prompt (`get_client_agent_prompt` RPC, BC-062 pattern) → interpolates the business name into the prompt → persists the inbound message (`append_message`) → runs the Agent (model: OpenRouter `openai/gpt-4.1-mini`, credential `openrouter-zm`; memory: `memoryBufferWindow` keyed on `conversation_id`; tools: `Check_availability` — HTTP Request Tool → WF-002's real webhook, read-only, no gate; `Create_cart` — `toolWorkflow` → "Zenny Runtime - Queue Commerce Cart Verification", gated) → persists the response (`append_message`) → returns `{ response, conversation_id }`.
+
+**REAL FINDINGS, both closed before/during build:**
+1. **Tool wiring split found via Mandatory MCP Verification, not assumed from the design doc:** WF-002/WF-005 are `Webhook`-triggered, not `Execute Workflow Trigger` — `toolWorkflow` requires the latter. `Check_availability` wires as an HTTP Request Tool against WF-002's real webhook URL; `Create_cart` wires as `toolWorkflow` against the newly-built Queue Commerce Cart Verification sub-workflow (which does have a real Execute Workflow Trigger, built for this purpose).
+2. **Placeholder-delimiter collision:** the prompt's `{{business_name}}` placeholder collided with n8n's own `{{ }}` expression syntax inside a Set node expression, throwing "invalid syntax". Fixed by changing the DB-stored placeholder to `[[business_name]]` (all 3 seeded copies: `tpl_commerce`, `client_test_002_acme_commerce_test`, `control.agent_prompts`).
+3. **No conversational system prompt existed for any archetype** (`agent_prompts` only ever held Email Manager's `classify_email`/`draft_email`) — seeded `commerce_ecom_agent_system`, content genericized from Carmelli's real, already-used Convocore Global Prompt (`05_Platform_Builds/Convocore/BC-071_Carmelli_Build_Package/03_GlobalPrompt_and_Nodes_Spec.md`), not authored from scratch.
+
+**REAL DEPENDENCIES:** `hA0PJmeEzEeLssNC` (BC-072, extended), `Rt9PupfwwV9NMNvS` (this card), WF-002 (called by URL, not modified), `get_client_agent_prompt`/`append_message` RPCs, `openrouter-zm` + `zenny-vault-suparbase` credentials.
+
+**LAST VERIFIED:** BC-073, 2026-08-29 — live, real external calls, not simulated:
+- FAQ/availability path: real message → real customer created → real WF-002 call (genuinely returned `available:false`, this test roster's real stock state) → real OpenRouter response, correctly grounded in the tool result → both messages persisted via `append_message`.
+- Continuity/guardrail path: a follow-up message on the same conversation ("order 2 sourdough loaves") correctly recalled the prior turn's out-of-stock result from memory and did **not** call `Create_cart` — asked the customer for an alternative instead, matching the system prompt's "use Check availability before promising anything is in stock" instruction. Proves memory continuity and that the guardrail isn't bypassable by skipping the check.
+- `Create_cart` tool mechanism itself verified independently via the sub-workflow's own direct test above (this test roster's real store has no in-stock item to trigger it through the full agent flow — a known, disclosed roster limitation, same one WF-002/WF-005's own BC-031 tests already documented).
+- **Not fully verified:** `resolve-pending-verification`'s new `CreateCart` branch requires a real dashboard-user JWT (`dashboard_get_my_client()`) to invoke — no real dashboard login exists to test with, the same disclosed limitation BC-053/BC-063 already carry for this Edge Function. The RPC it calls (`insert_client_cart`) is WF-005's own already-proven RPC (BC-031); the new branch's call shape was verified by code review against that proof, not a fresh live call.
+
+Synthetic rows cleaned up after every test.
+
 ---
 
 ## Referenced In Docs But Not Found As A Real Built Workflow

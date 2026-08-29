@@ -1,13 +1,13 @@
 # Decision: Zenny's Own Conversation Runtime (Convocore Replacement)
 
 **Status:** DECIDED, architecture locked — 2026-08-29. **BC-072 (Shared
-Runtime Foundation) built, live-verified, and published same day** — see
-`06_Infrastructure/n8n/Workflow_Registry.md`'s "Zenny Own Runtime (Phase 14)"
-section. **BC-073 (commerce-ecom node) planned via gstack's
-`/plan-eng-review`** — the first real use of the Commander→gstack→Execute
-planning bridge — see `docs/designs/zenny-saas-runtime-pivot.md`'s "BC-073
-Eng Review" section for the full spec; approved, handed to Execute. Next:
-BC-074/075 (appointment, consultation), same bridge.
+Runtime Foundation) and BC-073 (commerce-ecom node) both built, live-verified,
+and published same day** — see `06_Infrastructure/n8n/Workflow_Registry.md`'s
+"Zenny Own Runtime (Phase 14)" section. BC-073 was the first real use of the
+Commander→gstack→Execute planning bridge (`/plan-eng-review` spec →
+Build Card → Execute) — see `docs/designs/zenny-saas-runtime-pivot.md`'s
+"BC-073 Eng Review" section for the full spec and its live-build corrections.
+Next: BC-074/075 (appointment, consultation), same bridge.
 
 ## What was decided
 

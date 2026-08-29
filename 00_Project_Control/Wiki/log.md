@@ -8530,3 +8530,74 @@ review stage, not a new strategic bet.
 
 **Next:** Commander packages this spec into the formal BC-073 Build Card and
 hands to Execute (same session). Same bridge applies to BC-074/075.
+
+## [2026-08-29] session-bc073-commerce-ecom-node-build | BC-073 built, live-verified, published — first archetype node on Zenny's own runtime
+
+**Trigger:** Commander packaged the gstack-produced spec into a Build Card
+and handed to Execute, same session.
+
+**What was built:**
+- BC-072's "Resolve or Create Conversation Session" (`hA0PJmeEzEeLssNC`)
+  extended with customer resolution (find-or-create, reusing WF-001's proven
+  chain) — a real gap found live: the shared sub-workflow never resolved a
+  `customer_id`, but every commerce tool needs one.
+- `Zenny Runtime - Queue Commerce Cart Verification` (`Rt9PupfwwV9NMNvS`,
+  new) — mints a lead then queues a `pending_verifications` row instead of
+  calling WF-005 directly, closing the commerce-tool guardrail gap: WF-005's
+  own happy path creates the real order immediately, with no pre-execution
+  human confirmation.
+- `Zenny Runtime - Commerce-Ecom Node` (`IKOAp1dmnqul5uuQ`, new) — the
+  archetype's Agent-based node, tools: `Check_availability` (HTTP Request
+  Tool → WF-002's real webhook, read-only) and `Create_cart` (`toolWorkflow`
+  → the queueing sub-workflow above, gated).
+- `resolve-pending-verification` Edge Function extended with a `CreateCart`
+  branch (calls `insert_client_cart` directly, not WF-005's webhook, since
+  the lead+items are already resolved by the queueing step).
+- New `commerce_ecom_agent_system` prompt seeded (`tpl_commerce`,
+  `client_test_002_acme_commerce_test`, `control.agent_prompts`) — genericized
+  from Carmelli's real, already-used Convocore Global Prompt, not authored
+  from scratch. No conversational system prompt existed for any archetype
+  before this (`agent_prompts` only ever held Email Manager's prompts).
+
+**Real findings during the build, beyond what planning caught (Mandatory MCP
+Verification doing its job — caught live, fixed before publish):**
+1. `channel_type_enum` (conversations/customer-identity) was missing
+   `web_chat`/`instagram` — two of the three launch channels. Added both.
+2. `channel_type_enum` (`web_chat`) and `source_channel_enum` (`web-chat`,
+   hyphen, from BC-071's rename) are two *different* enums for the same
+   concept — `insert_client_lead` needs the hyphenated form. Mapped inline.
+3. `pending_verifications_tool_name_check` only allowed BC-053's
+   `CancelAppointment`/`UpdateCustomer` — rejected `CreateCart` on the first
+   real test call. Extended across all 11 schemas carrying the table.
+4. `queue_pending_verification` `RETURNS uuid` (scalar) — the
+   `application/vnd.pgrst.object+json` Accept header (right for
+   object-returning RPCs) broke JSON parsing on this scalar return. Fixed by
+   requesting plain text instead.
+5. A prompt placeholder (`{{business_name}}`) collided with n8n's own
+   `{{ }}` expression delimiter, throwing "invalid syntax" inside a Set
+   node. Changed the stored placeholder to `[[business_name]]`.
+
+**Live-verified, real external calls, not simulated:**
+- FAQ/availability path: real customer created, real WF-002 call (genuinely
+  returned `available:false`, this roster's real stock state), grounded
+  OpenRouter response, both messages persisted.
+- Continuity/guardrail path: a same-conversation follow-up correctly recalled
+  the prior turn's out-of-stock result from memory and did not call
+  `Create_cart` — asked for an alternative instead, proving the "check
+  before promising" instruction isn't bypassable.
+- `Create_cart` mechanism verified independently (real lead + real
+  `pending_verifications` row) — this test roster's store has no in-stock
+  item to trigger it through the full agent flow, a known disclosed
+  limitation WF-002/WF-005's own BC-031 tests already carry.
+- **Not fully verified:** `resolve-pending-verification`'s `CreateCart`
+  branch needs a real dashboard-user JWT to invoke — no real dashboard login
+  exists to test with (same disclosed gap BC-053/BC-063 already carry for
+  this function). Its RPC call (`insert_client_cart`) is WF-005's own
+  already-proven RPC (BC-031); verified by code review against that proof.
+
+All synthetic test data cleaned up after every test. Full detail:
+`06_Infrastructure/n8n/Workflow_Registry.md`'s three new BC-073 entries under
+"Zenny Own Runtime (Phase 14)".
+
+**Next:** BC-074/075 (appointment, consultation) — same
+Commander→gstack→Execute bridge, same shared foundation.

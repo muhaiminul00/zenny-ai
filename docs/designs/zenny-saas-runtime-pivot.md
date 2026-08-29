@@ -800,6 +800,22 @@ timeline, and a wider Phase 1 scope.
 **commerce-ecom + appointment + consultation** node types. This is now the
 final piece needed to scope the first Build Card — see BC-072 below.
 
+## BC-073: Commerce-Ecom Node — COMPLETE (2026-08-29)
+
+Built, live-verified, and published same session as the plan below. Real
+corrections found live during the build, not anticipated in the plan: (1)
+BC-072's `find_or_create_conversation` never resolved a `customer_id` — the
+shared sub-workflow was extended to also find-or-create the customer (WF-001's
+proven chain), not duplicated per-node; (2) `channel_type_enum` was missing
+`web_chat`/`instagram` — added; (3) `pending_verifications_tool_name_check`
+rejected the new `CreateCart` tool_name — extended across all 11 schemas
+carrying the table; (4) a prompt placeholder (`{{business_name}}`) collided
+with n8n's own `{{ }}` expression syntax — changed to `[[business_name]]`;
+(5) no conversational system prompt existed for any archetype — seeded one,
+genericized from Carmelli's real Convocore Global Prompt. Full detail:
+`06_Infrastructure/n8n/Workflow_Registry.md`'s three new BC-073 entries,
+`Wiki/log.md` session-bc073-commerce-ecom-node-build.
+
 ## BC-073 Eng Review — commerce-ecom node (gstack /plan-eng-review, 2026-08-29)
 
 **Trigger:** Commander→gstack→Execute planning bridge, first real use (see
