@@ -9179,3 +9179,48 @@ Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
 bump landing in a merge commit is not sufficient by itself — the tag +
 `gh release create` step needs to actually run in the same
 sitting, not just be implied by the version-file diff.
+
+## 2026-08-31 gstack-pilot-gh-setup-loud-nudge | BC-2026-08-31-gh-setup-loud-nudge shipped
+
+Locked via `/plan-eng-review` (2 decisions confirmed with human:
+placement in both `hooks/session-start.js` and `commands/init.md`
+sharing one sentinel, matching the plugin's own CLAUDE.md-seed
+duplication precedent; and deferring "re-nudge on gh auth regression"
+to `TODOS.md`). Built via Zenny's own `/role-modes:execute` operating
+on the `gstack-pilot` repo (not `gstack-pilot`'s own `:execute`
+mechanism) — a forked subagent, per the user's explicit instruction to
+use Zenny's own Execute while leaning on gstack skills for the wrap-up.
+
+Closes the gap the `v1.1.0` design doc explicitly flagged and accepted:
+the per-task `DISCLOSED:` line in `pre-flight-sync.js` (kept untouched)
+re-prints forever with no escalation, so a team that never finished
+`gh` setup looked identical to one that deliberately doesn't use it.
+New one-time nudge fires in `hooks/session-start.js` and
+`commands/init.md`, sharing sentinel
+`.claude/hooks/state/.gh-setup-checked-gstack-pilot`.
+
+All 10 Acceptance Criteria live-verified: real-gh session run twice
+back to back (no re-nudge); both not-installed/not-authenticated
+message branches confirmed via an in-process mock of `execFileSync`
+after a Windows PATH-shim approach was tried first and abandoned as a
+genuine platform quirk (Windows `CreateProcess` doesn't resolve a bare
+command name against PATHEXT the way a POSIX shebang script would —
+not a code defect); `pre-flight-sync.js` confirmed zero diff; nothing
+exited non-zero in any scenario.
+
+`/review` found one real, auto-fixed finding: `VERIFICATION_CHECKLIST.md`
+(teammate-facing) hadn't been updated for the new nudge — added item 7,
+committed as a follow-up on the same PR before merge.
+
+Wrap-up: feature branch → PR #2 → `/review` (1 finding, auto-fixed) →
+`qa` judged inapplicable (no web surface, disclosed not skipped,
+substituted with live-dogfood) → `ship`'s applicable parts (no
+VERSION/CHANGELOG in this repo) → squash-merged → branch deleted →
+`v1.2.0` tag + `gh release create` cut in the same sitting as the merge
+this time, confirmed live via `git tag --list`/`gh release list` —
+the exact gap from `v1.1.0` above, not repeated.
+
+Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
+
+**Next:** none blocking. `TODOS.md` gained a 4th deferred item
+("Re-nudge on gh auth regression") for a future card.

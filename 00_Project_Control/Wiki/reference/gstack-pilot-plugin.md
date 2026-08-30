@@ -203,6 +203,64 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
     release notes written matching the established v1.0.0/v1.0.1 voice.
     `gh release list` now shows `v1.1.0` as latest. No code change, no
     new Build Card — a release-metadata gap on already-shipped work.
+- **Build Card BC-2026-08-31-gh-setup-loud-nudge shipped, 2026-08-31 —
+  one-time loud gh-setup nudge.** Scoped and locked via `/plan-eng-review`
+  (2 decisions confirmed with human: placement in both
+  `hooks/session-start.js` and `commands/init.md` sharing one sentinel,
+  matching the plugin's existing CLAUDE.md-seed duplication precedent;
+  and deferring "re-nudge on gh auth regression" to `TODOS.md` rather
+  than building it now). Closes the gap the `v1.1.0` design doc
+  explicitly flagged and accepted: the per-task `DISCLOSED:` line in
+  `pre-flight-sync.js` (untouched by this card) re-prints forever with
+  no escalation, so a team that never finishes `gh` setup looked
+  identical to one that deliberately doesn't use it.
+  - **Files:** `hooks/session-start.js` (new `checkGhSetupOnce()`),
+    `commands/init.md` (identical check as a manual-init step, shared
+    sentinel `.claude/hooks/state/.gh-setup-checked-gstack-pilot`),
+    `TODOS.md` (new "Re-nudge on gh auth regression" entry),
+    `.claude-plugin/plugin.json` (`1.1.0` → `1.2.0`), `README.md`
+    (Releases entry + comparison-table row). Plus one file added during
+    `/review` itself (see below): `VERIFICATION_CHECKLIST.md`.
+  - **All 10 Acceptance Criteria live-verified, not assumed.** Real-gh
+    session run twice back to back — identical `additionalContext`
+    output, no re-nudge (AC1–AC3). Both not-installed/not-authenticated
+    message branches produced the exact expected text — verified via an
+    in-process mock of `execFileSync` after a Windows-native
+    `execFileSync('gh', ...)` PATH-shim approach was tried first and
+    abandoned as a test-harness dead end (Windows `CreateProcess`
+    doesn't resolve a bare command name against PATHEXT the way a POSIX
+    shebang script would, so a fake `gh` script placed earlier on PATH
+    was silently skipped in favor of the real, already-authenticated
+    system `gh.exe` — a genuine platform quirk, not a code defect) (AC7).
+    Sentinel written in every branch tested, including the already-clean
+    case (AC3, AC1/AC7 combined). `git diff --stat -- scripts/pre-flight-sync.js`
+    confirmed zero diff (AC5). Nothing exited non-zero in any scenario
+    (AC6). `init.md`'s wording verified to match `session-start.js`'s
+    strings directly, not just visually (AC4, AC7). `TODOS.md` entry
+    matches the existing 3 entries' format (AC8). `plugin.json` bumped
+    (AC9, first half). `README.md` updated with a Releases entry and a
+    comparison-table row (AC10).
+  - **One real finding from `/review`, auto-fixed:** `VERIFICATION_CHECKLIST.md`
+    (a teammate-facing, 6-item checkable-behaviors doc) hadn't been
+    updated for the new nudge — a genuine documentation-staleness gap
+    caught by Step 5.6 of gstack's `/review`. Added item 7 (gh setup
+    nudges once, never repeats, never blocks) in the same voice as the
+    existing 6, committed as a follow-up commit on the same PR before
+    merge.
+  - **Wrap-up chain actually run:** feature branch
+    (`feature/gh-setup-loud-nudge`) → PR #2 → gstack's `/review` (ran
+    for real — scope-drift check clean, critical pass clean beyond the
+    one auto-fixed doc-staleness finding above) → `qa` judged
+    inapplicable (no web/UI surface, same call as BC-2026-08-31,
+    substituted with the live-dogfood verification above and disclosed
+    explicitly, not silently skipped) → `ship`'s applicable parts only
+    (no `VERSION`/`CHANGELOG.md` in this repo, same as BC-2026-08-31 —
+    version bump and TODOS.md cross-reference are `plugin.json`'s and
+    `ship`'s actual mechanism here) → squash-merged → branch deleted.
+  - **`v1.2.0` tag/release cut in the same sitting as the merge this
+    time** — the exact gap from `v1.1.0` above, not repeated. Confirmed
+    live: `git tag --list` and `gh release list` both show `v1.2.0` as
+    latest immediately after.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)
