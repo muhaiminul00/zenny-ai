@@ -261,6 +261,51 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
     time** — the exact gap from `v1.1.0` above, not repeated. Confirmed
     live: `git tag --list` and `gh release list` both show `v1.2.0` as
     latest immediately after.
+- **Build Card BC-2026-08-31-readme-reposition-and-clear-compact
+  shipped, 2026-08-31 — README repositioning + contextual `/clear` vs
+  `/compact` guidance.** Content authorship (human-dictated README
+  reposition) plus a small, precisely-specified prose fix — no
+  architecture decision, so this card skipped the `/plan-eng-review`
+  chain and was packaged directly by Commander.
+  - **README reframed** around the actual problem gstack-pilot solves
+    (which gstack skill to invoke and how to prompt it well is tribal
+    knowledge by default; the plugin moves that into the plugin itself)
+    rather than leading with "gstack-aware role-modes successor." New
+    sections: "The problem this solves," "Who this is for," "Example
+    use cases," "Pairs well with project-memory" (names gstack's own
+    `gbrain` memory layer explicitly — verified accurate against
+    gstack's actual installed `setup-gbrain` skill before shipping,
+    per the Build Card's own accuracy-check requirement). All existing
+    technical sections (Composition mechanism, A real design
+    constraint, Gates and stop conditions, full Releases history,
+    Status) preserved verbatim — reframe of the opening, not a rewrite
+    of the accurate technical record.
+  - **`/clear` vs `/compact` guidance made contextual.** Previously
+    `commander.md` only ever suggested `/clear`; `execute.md` suggested
+    "`/clear` or `/compact`" undifferentiated. Now both recommend
+    `/compact` when more approved work is still queued this session
+    (keeps branch state/decisions, cheaper than a fresh session
+    re-deriving them) and `/clear` when the current unit of work is the
+    last thing pending (nothing left to preserve). Neither mode can
+    self-invoke either command — this only changes what's recommended
+    in prose.
+  - **All 7 Acceptance Criteria live-verified.** TOC anchors confirmed
+    against actual rendered headings (all 15 match exactly); Releases
+    section's v0.1.0–v1.2.0 history preserved verbatim with a new
+    v1.2.1 entry appended; `commander.md`/`execute.md` wording read
+    back after editing, not just diffed mentally; `plugin.json` at
+    `1.2.1`; `gbrain` claim verified against gstack's real
+    `setup-gbrain/SKILL.md` (accurate, no correction needed).
+  - **Wrap-up chain actually run:** feature branch
+    (`feature/readme-reposition-clear-compact`) → PR #3 → gstack's
+    `/review` (scope-drift check CLEAN, zero findings — a pure prose/
+    JSON-version diff has no SQL/concurrency/LLM-trust/shell-injection/
+    enum-completeness surface to flag) → `qa` judged inapplicable (no
+    web/UI surface, same call as the two prior cards) → `ship`'s
+    applicable parts → squash-merged → branch deleted.
+  - **`v1.2.1` tag/release cut in the same sitting as the merge**,
+    continuing the discipline established after the `v1.1.0` gap.
+    Confirmed live: `gh release list` shows `v1.2.1` as latest.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

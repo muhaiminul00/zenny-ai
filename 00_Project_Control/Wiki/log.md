@@ -9224,3 +9224,45 @@ Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
 
 **Next:** none blocking. `TODOS.md` gained a 4th deferred item
 ("Re-nudge on gh auth regression") for a future card.
+
+## [2026-08-31] session-gstack-pilot-readme-reposition-clear-compact | gstack-pilot: README reposition + contextual /clear vs /compact shipped (BC-2026-08-31-readme-reposition-and-clear-compact)
+
+Content authorship (human-dictated README reposition) plus a small,
+precisely-specified prose fix — no architecture decision, so this card
+skipped the `/plan-eng-review` chain and was packaged directly by
+Commander.
+
+README reframed around the actual problem gstack-pilot solves — gstack
+is a 55+ skill suite, but knowing which skill to invoke and how to
+prompt it well is tribal knowledge by default; the plugin moves that
+into the plugin itself, making a solo-founder-oriented tool usable by
+a team sharing one project. New sections: "The problem this solves,"
+"Who this is for," "Example use cases," "Pairs well with project-memory"
+(names gstack's own `gbrain` memory layer — verified accurate against
+gstack's actual installed `setup-gbrain/SKILL.md` before shipping, no
+correction needed). All existing technical sections (Composition
+mechanism, A real design constraint, Gates and stop conditions, full
+Releases history, Status) preserved verbatim.
+
+`/clear` vs `/compact` guidance made contextual: `commander.md` and
+`execute.md` now recommend `/compact` when more approved work is still
+queued this session (keeps branch state/decisions, cheaper than a
+fresh session re-deriving them) and `/clear` when the current unit of
+work is the last thing pending — instead of defaulting to `/clear`
+alone (commander.md) or an undifferentiated either/or (execute.md).
+
+All 7 Acceptance Criteria live-verified: all 15 TOC anchors confirmed
+against actual rendered headings; Releases history preserved verbatim
+with a new v1.2.1 entry appended; reworded lines read back after
+editing; `plugin.json` at `1.2.1`; `gbrain` claim verified.
+
+Wrap-up: feature branch → PR #3 → `/review` (scope-drift CLEAN, zero
+findings — pure prose/JSON-version diff, no SQL/concurrency/LLM-trust/
+shell-injection/enum-completeness surface) → `qa` judged inapplicable
+(no web surface) → `ship`'s applicable parts → squash-merged → branch
+deleted → `v1.2.1` tag + `gh release create` cut in the same sitting as
+the merge, confirmed live via `gh release list`.
+
+Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
+
+**Next:** none blocking.
