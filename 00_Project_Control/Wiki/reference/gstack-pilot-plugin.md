@@ -126,6 +126,72 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   end to end** - built, released, live-proven, accurately documented,
   team-onboarding docs in place. See `session-gstack-pilot-readme-
   status-fix` in `Wiki/log.md`.
+- **Build Card BC-2026-08-31 shipped, 2026-08-31 — Execute pre-flight
+  sync gate + live PR-scope collision check, hook-enforced.** Full chain
+  run before build: `office-hours` → `plan-eng-review` (3 adversarial
+  review rounds + 1 Codex outside-voice pass) locked the architecture
+  first — design doc `docs/designs/sync-gate-and-collision-check.md`
+  (APPROVED). Closes the gap where a resumed or fresh Execute session
+  had no git-freshness awareness at task start: could branch from a
+  stale base, work over a dirty tree, or collide with an already-open
+  PR touching the same files, with nobody any the wiser until a merge
+  conflict. **Enforcement is structural, not prose** — a new
+  `PreToolUse` hook blocks any file-mutating tool call until a valid
+  `.claude/hooks/state/preflight-ok` marker exists for the current
+  branch, written only by a new deterministic script
+  (`scripts/pre-flight-sync.js`) after dirty-tree/stale-base/collision
+  checks pass; a corrupted or unparseable marker fails closed (treated
+  as missing), non-negotiable per the Failure Modes review. This was a
+  real user override of the initially-recommended design — the outside-
+  voice review argued prose-only enforcement doesn't guarantee the gate
+  "runs every time," and the human chose the stronger, more expensive
+  hook mechanism over the cheaper prose-consistent option.
+  - **Files touched (7 scoped + 3 necessitated):**
+    `scripts/pre-flight-sync.js` (new), `hooks/pre-tool-use.js` (new) +
+    `hooks/hooks.json`, `commands/execute.md`, `hooks/session-start.js`
+    (so a *resumed* session also sees the requirement, not just a fresh
+    one), `skills/build-cards/SKILL.md` (new `Scope` field, genuinely
+    new schema — no such field existed before), `TEAM_SETUP.md` (`gh`
+    CLI install step), `.claude-plugin/plugin.json` (`1.0.1` →
+    `1.1.0`), plus `.gitignore` (new state dir) and `README.md` (docs
+    sync) — both directly necessitated by the new marker file, not
+    scope creep.
+  - **All 10 Acceptance Criteria live-verified, not assumed:** dirty
+    tree stops Execute before any mutation; stale base silently
+    fast-forwards (`git fetch origin <base>:<base>`, no checkout); a
+    genuinely diverged base stops and reports, never forces; a resumed
+    session with an existing task branch doesn't create a duplicate;
+    an open PR authored by someone else touching overlapping `Scope`
+    triggers a real stop (own-PR self-overlap correctly excluded); `gh`
+    missing vs. unauthenticated produce distinct messages; the
+    `--limit 200` cap on `gh pr list` discloses itself rather than
+    silently claiming full coverage; headless hits BLOCKED, never a
+    silent proceed; a hand-corrupted marker is rejected (fail-closed).
+  - **2 real bugs found and fixed during live verification, not
+    hypothetical:** (1) the base-branch-resolution fallback was
+    silently using the current checked-out branch as base, which would
+    have broken any resumed session already sitting on its own task
+    branch; (2) gstack's own `/review` caught an unguarded `JSON.parse`
+    on `gh pr list` output that would crash uncaught on malformed
+    input.
+  - **Wrap-up chain run for real, gstack-pilot's own established
+    practice:** `review` (1 fix applied), `qa` (judged inapplicable —
+    no web surface on this repo, live-dogfood substituted instead,
+    stated explicitly rather than silently skipped), `ship`'s
+    applicable parts (its VERSION/CHANGELOG/test-suite machinery
+    doesn't match this repo's actual conventions of
+    `plugin.json`+README-Releases, so only the parts that fit ran: base-
+    currency check, `TODOS.md` cross-reference, merge). Merged via
+    PR #1, squash, branch deleted, `main` fast-forwarded,
+    `check-init-sync.js` still passes.
+  - **3 genuinely-deferred ideas landed in a new `TODOS.md`, not
+    silently dropped:** semantic collision detection (shared
+    APIs/migrations/contracts, not just path overlap — deferred until
+    the shipped path-overlap mechanism gets real usage data),
+    local-branch collision detection (same-machine unpushed branches —
+    narrower payoff than the PR-scope check), base-branch override
+    field on Build Cards (no current project needs a non-default
+    integration branch yet).
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

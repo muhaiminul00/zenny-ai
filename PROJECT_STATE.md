@@ -10,7 +10,17 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-30 (latest) — by /execute — **`gstack-pilot`'s README fully
+2026-08-31 (latest) — by /execute — **`gstack-pilot`: Build Card
+BC-2026-08-31 shipped — Execute's pre-flight sync gate + live PR-scope
+collision check, hook-enforced (not prose-only) via a new `PreToolUse`
+hook + `scripts/pre-flight-sync.js`, fail-closed on a corrupt marker.
+2 real bugs found+fixed live (base-branch-resolution fallback bug on
+resumed sessions; an unguarded `JSON.parse` crash caught by `/review`).
+Merged PR #1, `plugin.json` `1.0.1`→`1.1.0`. Full detail: `Wiki/
+reference/gstack-pilot-plugin.md`, `Wiki/log.md`
+session-bc-2026-08-31-sync-gate-shipped.
+
+2026-08-30 (prior) — by /execute — **`gstack-pilot`'s README fully
 current now — both flagged stale claims fixed.** "Current release:
 v1.0.0" → v1.0.1 with the real patch reason stated; `## Status`
 rewritten from a false "not yet run against a real team project" to

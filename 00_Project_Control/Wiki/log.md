@@ -9088,3 +9088,68 @@ All synthetic test data cleaned up after every test. Full detail:
 
 **Next:** BC-074/075 (appointment, consultation) — same
 Commander→gstack→Execute bridge, same shared foundation.
+
+## [2026-08-31] session-bc-2026-08-31-sync-gate-shipped | gstack-pilot: Execute pre-flight sync gate + PR-scope collision check shipped (BC-2026-08-31)
+
+Architecture locked previously via the full `office-hours` →
+`plan-eng-review` chain (3 adversarial review rounds + 1 Codex
+outside-voice pass) — design doc `docs/designs/sync-gate-and-collision-check.md`
+(APPROVED) and Build Card `BC-2026-08-31-sync-gate-and-collision-check.md`
+committed to `gstack-pilot` (`0dcf7a6`). This session invoked Zenny's own
+`/role-modes:execute` (not `gstack-pilot:execute`) to build it, using
+gstack's `review`/`qa`/`ship` skills for the wrap-up per gstack-pilot's
+own established practice.
+
+**Built:** a structural, hook-enforced pre-flight gate for Execute mode —
+not prose alone. A new `PreToolUse` hook (`hooks/pre-tool-use.js`)
+blocks any `Write`/`Edit` tool call until a valid
+`.claude/hooks/state/preflight-ok` marker exists for the current
+branch. The marker is written only by a new deterministic script
+(`scripts/pre-flight-sync.js`) after: dirty-working-tree check, silent
+stale-base fast-forward (`git fetch origin <base>:<base>`, no
+checkout, never forces on real divergence), and a live PR-scope
+collision check (`gh pr list`, excluding the current user's own open
+PRs, matching the Build Card's new `Scope` field). A corrupted or
+unparseable marker is treated as missing — fails closed, per the
+design's own critical Failure Mode.
+
+**Files changed:** `scripts/pre-flight-sync.js` (new),
+`hooks/pre-tool-use.js` (new) + `hooks/hooks.json`, `commands/execute.md`,
+`hooks/session-start.js` (so a *resumed* session sees the requirement
+too), `skills/build-cards/SKILL.md` (new `Scope` field), `TEAM_SETUP.md`
+(`gh` CLI install step), `.claude-plugin/plugin.json` (`1.0.1` →
+`1.1.0`), plus `.gitignore` and `README.md` (both directly necessitated
+by the new marker file).
+
+**All 10 Acceptance Criteria live-verified**, not assumed — screenshots/
+output logs, not simulated. Self-overlap-exclusion, prefix-matching,
+draft-inclusion, and base-filtering were verified at the logic level
+(no second-author open PR existed in the real repo to exercise the
+collision check fully end to end) — disclosed, not glossed over.
+
+**2 real bugs found and fixed during live verification:**
+1. Base-branch-resolution fallback silently used the *current checked-
+   out branch* as base — would have broken any resumed session already
+   sitting on its own task branch.
+2. gstack's own `/review` caught an unguarded `JSON.parse` on `gh pr
+   list` output that would crash uncaught on malformed input.
+
+**Wrap-up:** `review` (1 fix applied, above), `qa` judged inapplicable
+(no web surface on this repo — live-dogfood substituted, stated
+explicitly), `ship`'s applicable parts run (base-currency check,
+`TODOS.md` cross-reference, merge — its VERSION/CHANGELOG/test-suite
+machinery doesn't fit this repo's real `plugin.json`+README-Releases
+convention). Merged via PR #1, squash, branch deleted, `main`
+fast-forwarded, `check-init-sync.js` still passes.
+
+**3 deferred ideas landed in a new `TODOS.md`, not dropped:** semantic
+collision detection (shared APIs/migrations, not just path overlap),
+local-branch collision detection (same-machine unpushed branches),
+base-branch override field on Build Cards.
+
+Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
+
+**Next:** none — this closes BC-2026-08-31. The `TODOS.md` items stay
+deferred until real usage data justifies them. Zenny's own migration
+onto a gstack-native mode plugin (`gstack-pilot` or a future Company
+Brain-proven successor) remains the human's own unhurried call.
