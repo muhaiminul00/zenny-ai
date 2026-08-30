@@ -192,6 +192,17 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
     narrower payoff than the PR-scope check), base-branch override
     field on Build Cards (no current project needs a non-default
     integration branch yet).
+  - **`v1.1.0` tag/release cut after the fact, 2026-08-31.** `plugin.json`
+    was correctly bumped to `1.1.0` in the PR #1 merge commit, but the
+    matching `git tag`/`gh release create` step (done for every prior
+    version — `v0.1.0`/`v1.0.0`/`v1.0.1`) was missed at the time — human
+    caught it (`gh release list` still showed `v1.0.1` as latest).
+    Confirmed live via `git tag --list`/`gh release list` before and
+    after; tag `v1.1.0` created on the correct commit (plugin.json
+    verified at `1.1.0` at HEAD, clean tree, `main` up to date), pushed,
+    release notes written matching the established v1.0.0/v1.0.1 voice.
+    `gh release list` now shows `v1.1.0` as latest. No code change, no
+    new Build Card — a release-metadata gap on already-shipped work.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

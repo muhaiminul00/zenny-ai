@@ -9153,3 +9153,29 @@ Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
 deferred until real usage data justifies them. Zenny's own migration
 onto a gstack-native mode plugin (`gstack-pilot` or a future Company
 Brain-proven successor) remains the human's own unhurried call.
+
+## [2026-08-31] session-gstack-pilot-v1.1.0-release-gap | Missing v1.1.0 tag/release cut after the fact
+
+**Trigger:** human noticed `gh`/GitHub still showed `v1.0.1` as latest
+despite the prior session's report saying `plugin.json` was bumped to
+`1.1.0`. Checked directly: `git tag --list` and `gh release list` both
+confirmed only `v0.1.0`/`v1.0.0`/`v1.0.1` existed — `plugin.json` at
+`main` HEAD (30b23b9, the BC-2026-08-31 PR #1 merge) correctly read
+`1.1.0`, but the matching `git tag`/`gh release create` step (done for
+every prior version) was never run. A real gap, not a display lag.
+
+**Fix:** confirmed `main` clean and up to date, confirmed `plugin.json`
+reads `1.1.0` at HEAD, created annotated tag `v1.1.0`, pushed it, and
+ran `gh release create v1.1.0` with notes matching the established
+v1.0.0/v1.0.1 voice (what BC-2026-08-31 shipped, the 2 real bugs found
+in live verification, the 3 deferred TODOS items, plus a note that this
+release was cut after the fact). Verified `gh release list` now shows
+`v1.1.0` as latest. No code change — release metadata only, on an
+already-merged, already-verified commit.
+
+Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
+
+**Next:** none. Worth remembering for future version bumps: `plugin.json`
+bump landing in a merge commit is not sufficient by itself — the tag +
+`gh release create` step needs to actually run in the same
+sitting, not just be implied by the version-file diff.
