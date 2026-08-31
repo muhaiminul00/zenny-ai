@@ -114,6 +114,48 @@ doesn't crash or lie about success) — but the underlying UTIL-006
 reliability gap is real and should be fixed independently. See Active
 Blockers.
 
+## Real double-fulfillment race — FIXED (BC-2026-08-31)
+
+**Found live during a multi-tenant/concurrency audit, not anticipated in
+planning:** `resolve-pending-verification`'s approve path read the row's
+status via `get_pending_verification_for_action` (plain SELECT), checked
+`status !== 'pending'` in application code, and only wrote the new
+status at the very end via `resolve_pending_verification` (plain UPDATE,
+no `WHERE status = 'pending'` guard, no row lock in between). Two
+concurrent approve calls on the same `pending_verification_id` (a
+double-click, or two staff members approving at once) both passed the
+pending-check before either resolved it — `insert_client_cart`/
+`cancel_client_appointment`/the calendar-delete above could fire twice
+for one request. A real money-shaped bug, not cosmetic.
+
+**Fix:** a new `'processing'` intermediate status (added to
+`pending_verifications_status_check` in all 11 schemas) and a new RPC,
+`claim_pending_verification(p_schema, p_id)` — an atomic
+`UPDATE ... SET status = 'processing' WHERE status = 'pending' RETURNING *`.
+Zero rows returned means someone else already claimed it. The Edge
+Function now calls this claim **first**, before any of the three
+execution branches — a losing concurrent call gets an immediate `409
+ALREADY_RESOLVED`, no execution attempted. On an execution failure
+*after* a successful claim, a companion `unclaim_pending_verification`
+reverts the row to `'pending'` (not a dead-end `'failed'` state) so it
+stays retryable/reviewable rather than silently lost — the edge case a
+naive version of this fix misses. **Live-verified:** two concurrent
+claims on the same real `pending_verification_id` — exactly one
+succeeded (`status: "processing"`), the other returned `null`; this is
+Postgres's atomic conditional-UPDATE guarantee under MVCC, provably
+race-safe regardless of timing, not something that needs a forced
+microsecond-level race to "prove" once. Full pattern, plus the sibling
+`find_or_create_conversation`/`queue_pending_verification` fixes from
+the same audit: `Wiki/platform-quirks/n8n-concurrency-race-patterns.md`.
+
+**Stale claim flagged, not fixed this card:** this page's own "Edge
+Function" section above still says `verify_jwt: false` for
+`resolve-pending-verification` — the live function is actually deployed
+`verify_jwt: true` and derives `client_id`/`client_schema_name` from the
+caller's session JWT (per BC-063, `Wiki/index.md`'s
+`anon-grant-exposure-bc052` entry). Out of this card's scope to rewrite;
+flagged here so the next session touching this page corrects it.
+
 ## Incident during this card, fixed same session
 
 A copy-paste error in one of BC-053's own migrations briefly overwrote

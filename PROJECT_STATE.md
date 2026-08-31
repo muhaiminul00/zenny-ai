@@ -10,7 +10,46 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-31 (latest) — by /execute — **`gstack-pilot`: Build Card
+2026-08-31 (latest) — by /execute — **BC-2026-08-31-concurrency-hardening
+shipped: 4 real multi-tenant/multi-concurrent-user gaps in BC-072/073
+found + fixed, human-flagged before any more archetype nodes get built
+on the same foundation.** gstack `/investigate` found 3 SQL-level race
+conditions (duplicate conversations, double-fulfillment on verification
+approval, duplicate verification-queue rows — all check-then-act with
+no DB guarantee) plus, on a second human-requested scan of the full n8n
+chain, a 4th: the Commerce-Ecom Agent's real memory is n8n's in-process
+`memoryBufferWindow`, never rehydrated from BC-072's own Postgres
+`messages` table, so a container restart silently wipes live
+conversation context. `/plan-eng-review` produced the fix spec; human
+picked the smaller memory-rehydration fix over a full custom
+Postgres-backed memory system (pre-launch, single n8n instance — not
+over-engineering for scale not yet needed). All 4 fixed: partial unique
+indexes + `ON CONFLICT`/atomic-UPDATE rewrites across all 11 schemas (5
+`tpl_*` + 6 client schemas) for findings 1-3; a new `get_recent_messages`
+RPC + 4-node rehydration chain in `Zenny Runtime - Commerce-Ecom Node`
+for finding 4. **1 real security bug caught mid-build:** the 2 new
+claim/unclaim RPCs picked up Postgres's default PUBLIC execute grant
+(same exposure class as BC-052/064) — fixed before anything else
+touched them. **2 real n8n bugs found live-testing the memory fix:** a
+zero-item-output starves downstream nodes (n8n doesn't run a node on a
+zero-item input) — broke the exact cold-buffer branch meant to catch
+this; a new HTTP node's credential was never auto-assigned. Both fixed,
+re-verified live. **All 5 ACs live-verified** — genuinely concurrent
+calls against the fixed RPCs, plus a real n8n execution via a temporary
+Manual Trigger test harness for the memory path (`execute_workflow`
+can't start `executeWorkflowTrigger` workflows directly). All synthetic
+test data cleaned up after. **Standing outcome:** every future archetype
+Build Card (BC-074/075+) designed and verified against concurrent
+multi-client/multi-user load from the start — not just single-session
+correctness. Full detail: `Wiki/platform-quirks/
+n8n-concurrency-race-patterns.md`, `Wiki/infra/
+verification-approval-queue.md`, `06_Infrastructure/n8n/
+Workflow_Registry.md`, `Wiki/log.md`
+session-bc-2026-08-31-concurrency-hardening. **Next:** BC-074/075
+(appointment, consultation archetypes), building on this now-hardened
+foundation, with the concurrency standard applied from the start.
+
+2026-08-31 (prior) — by /execute — **`gstack-pilot`: Build Card
 BC-2026-08-31 shipped — Execute's pre-flight sync gate + live PR-scope
 collision check, hook-enforced (not prose-only) via a new `PreToolUse`
 hook + `scripts/pre-flight-sync.js`, fail-closed on a corrupt marker.
