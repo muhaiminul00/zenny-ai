@@ -364,6 +364,34 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   - **`v1.3.0` tag/release cut in the same sitting as the merge**,
     continuing the discipline. Confirmed live: `gh release list` shows
     `v1.3.0` as latest.
+- **Build Card BC-2026-08-31-readme-trim-hygiene-and-role-modes
+  shipped, 2026-08-31 — v1.3.0's own README changes trimmed further.**
+  Human's direct feedback on the just-shipped README: the new "Repo
+  hygiene" section (v1.3.0's own addition, explaining our internal
+  `docs/build-cards`/`docs/designs` git-tracking process) and the full
+  "What's different from role-modes" feature-comparison table both
+  read as internal/maintainer-facing content with no relevance to
+  someone installing the plugin.
+  - **"Repo hygiene" section removed entirely** — no replacement
+    text, pure deletion (TOC entry too).
+  - **"What's different from role-modes" trimmed, not removed** — one
+    real pushback surfaced before executing: two other README sections
+    (`A real design constraint`, `Gates and stop conditions`) reference
+    role-modes and rely on this section introducing it first; full
+    removal would leave those dangling. Resolved via AskUserQuestion:
+    keep the heading, cut the table down to one short paragraph stating
+    only the shared `mode.json` path + never-co-install rule.
+  - **4 now-dangling `#repo-hygiene` anchor links** in the Releases
+    section (added by v1.3.0 itself, pointing at the section just
+    deleted) — caught during verification, not by the Build Card's
+    original text, and fixed by rewording each to plain text.
+  - **Wrap-up chain:** feature branch
+    (`fix/readme-trim-hygiene-and-role-modes`) → PR #5 → gstack
+    `/review` (Scope Check: CLEAN, 0 findings — pure prose/markdown
+    diff, no critical-category surface) → `qa` inapplicable (no web/UI
+    surface) → squash-merged → branch deleted.
+  - **`v1.3.1` tag/release cut in the same sitting as the merge.**
+    Confirmed live: `gh release list` shows `v1.3.1` as latest.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)

@@ -9362,3 +9362,32 @@ applicable parts → squash-merged → branch deleted → `v1.3.0` tag +
 Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
 
 **Next:** none blocking.
+
+## [2026-08-31] gstack-pilot BC-2026-08-31-readme-trim-hygiene-and-role-modes shipped (v1.3.1)
+
+Direct human feedback on v1.3.0's own README additions: the "Repo
+hygiene" section and the full "What's different from role-modes"
+comparison table both read as internal/maintainer-facing content, not
+something a plugin consumer needs. Two fixes:
+
+- "Repo hygiene" removed entirely (TOC entry too) — pure deletion, no
+  replacement text.
+- "What's different from role-modes" trimmed, not removed. Flagged
+  before executing: two other README sections (`A real design
+  constraint`, `Gates and stop conditions`) reference role-modes and
+  depend on this section introducing it first. Resolved via
+  AskUserQuestion: keep the heading, cut the feature table down to one
+  short paragraph (shared `mode.json` path + never-co-install rule).
+- Caught during verification, not scoped in the original card: 4
+  `#repo-hygiene` anchor links (added by v1.3.0 itself) went dangling
+  once the section was deleted — reworded to plain text.
+
+Wrap-up: feature branch → PR #5 → `/review` (Scope Check: CLEAN, 0
+findings — pure prose/markdown diff) → `qa` inapplicable (no web
+surface) → squash-merged → branch deleted → `v1.3.1` tag +
+`gh release create` cut in the same sitting, confirmed live via
+`gh release list`.
+
+Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
+
+**Next:** none blocking.
