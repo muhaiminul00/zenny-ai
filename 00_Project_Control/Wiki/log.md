@@ -91,6 +91,90 @@ business-memory.md` and `Wiki/index.md` updated to match. Files edited
 directly by Commander (docs-only), not committed this entry — see the
 following entry for the formal Build Card packaging and handoff.
 
+## [2026-08-31] session-bc076-first-slice
+
+Formal BC-076 Build Card packaged by Commander and handed to Execute.
+Given the card's real size (5 ingestion workflows + 1 new tool + wiring
+into 3 Agents + a coordinated schema migration), Execute checked in with
+the human before building the whole thing in one pass — human chose to
+split: schema + Shopify + Notion ingestion + tool wiring now, the rest
+(WooCommerce/Sheets/Baserow + D9's demo-business verification) as a
+follow-up session. **Shopify and Notion-generalized ingestion were not
+actually reached this pass either** — schema + tool + wiring alone
+surfaced enough real complexity to fill the session; disclosed plainly
+below, not silently dropped.
+
+**Schema migration (`control.client_kb_source`):** live-verified before
+touching anything — found it's a single `control`-schema table (not
+per-client-schema, correcting the Build Card's own wrong assumption),
+PK on `client_id` alone, 2 dependent RPCs + SCH-004's direct PostgREST
+query all keyed on the old `notion_page_id` column. Migrated cleanly
+(composite PK, `source_type` enum, `source_ref` rename, `sync_status`,
+new `upsert_client_kb_source` RPC), backward-compatible defaults so
+INT-011/012 keep working unchanged (live-verified: calling with only
+`p_client_id` still resolves correctly). **Real bug found and fixed
+mid-migration:** `CREATE OR REPLACE FUNCTION` with a changed argument
+signature doesn't replace the old function — it creates a second
+overload, orphaning the old one (now broken, since its body still
+referenced the renamed column) and exposing the new one to anon/
+authenticated via a schema-level default-grant this project's other
+RPCs don't carry (found via a live `pg_proc.proacl` diff against
+`insert_client_lead`'s clean ACL, same recurring class as
+BC-052/064/072). Fixed: dropped the orphaned overloads, explicit
+revokes on all 3 affected functions.
+
+**Pinecone index:** the `create-index-for-model` MCP tool only supports
+Pinecone-integrated-embedding indexes (3 fixed models, none matching
+this project's `text-embedding-3-small`-via-OpenRouter convention) —
+created the real `zenny-business-kb` index (matching `zenny-email-kb`'s
+exact shape) via a raw REST call through a throwaway HTTP-Request-Tool
+workflow instead, confirmed `Ready` via `describe-index`.
+
+**Search Business KB tool:** built as a `toolWorkflow` sub-workflow
+(embed → Pinecone query → KB-match or fallback → format), wired into
+all 3 shipped Agents. Live-verified standalone (real embed, real
+Pinecone query, real fallback RPC call) and wired into the Commerce-Ecom
+Agent's live conversation flow.
+
+**2 severe pre-existing bugs found and fixed, unrelated to BC-076,
+affecting all 3 Agents since BC-073/074/075 shipped:** `Memory Cold?`'s
+`rightValue` was an empty string instead of boolean `true` (crashes
+under strict type validation before the Agent ever runs); `Get Recent
+History (RPC)` legitimately returns 0 rows for a first-time customer,
+and n8n's zero-item propagation silently killed the entire rest of the
+chain while the execution still reported success. First fix attempt
+(`alwaysOutputData: true` alone) was itself wrong per this project's own
+zero-item-safety guidance — it forces a synthetic empty item that then
+crashes `Rehydrate Memory` a different way. Correct fix: a new `Has
+History?` gate. Live-verified end to end on Commerce-Ecom after both
+fixes; Appointment/Consultation got the identical fix applied but not
+independently live-tested this session (flagged, not blocking).
+
+**Real gap found in the same live test, not fixed:** the LLM did not
+call the new KB tool for a real hours/policy question — the existing
+system prompt (predates BC-076) explicitly instructs it to say "I don't
+know" rather than search. The tool is correctly wired but functionally
+inert until each archetype's `agent_prompts` content is updated to
+mention it — flagged as necessary follow-up, not attempted this session
+(would have meant threading through `agent_prompts`' versioning system,
+genuinely separate scope).
+
+**Real operational quirk found:** `update_workflow` edits land on a new
+draft version; `executeWorkflow`/production sub-workflow calls run the
+last *published* (active) version, not the latest draft, until
+`publish_workflow` is called explicitly. Cost real debugging time this
+session (a fix appeared to not work, twice, before this was diagnosed).
+
+All temp test/harness workflows (`TEMP - Part 8 Credential Verify`,
+`TEMP - Create zenny-business-kb Pinecone Index`, `TEMP - Test Search
+Business KB Tool`, `TEMP - Test KB Tool via Commerce-Ecom Agent`)
+archived after use. `06_Infrastructure/n8n/Workflow_Registry.md`
+updated (new Search Business KB Tool entry, updates to all 3 Agent
+entries + SCH-004) from live `get_workflow_details` reads, per the
+Per-Workflow Documentation standing rule. PROJECT_STATE.md rewritten.
+Branch `bc-076-business-kb`, PR pending per the Branch/PR Workflow
+standing rule (substantive code/workflow changes, not docs-only).
+
 ## [2026-08-31] session-zenny-launch-blueprint-production-gate
 
 Fourth pass on `docs/designs/zenny-launch-blueprint.md`. Human's explicit

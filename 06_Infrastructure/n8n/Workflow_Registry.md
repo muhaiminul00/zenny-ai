@@ -1098,6 +1098,8 @@ Published (`a5c4b85d-7adb-480b-a92c-38a41ef5188d`).
 
 **LAST VERIFIED:** BC-049, 2026-08-13 — genuine live manual run (not `test_workflow`-pinned), post-GRANT-fix: successfully enumerated and dispatched to every client with a real `notion_page_id` (Client A only, at present), which re-confirmed the full live Notion→Pinecone round trip already proven in this same session (see INT-012's entry).
 
+**UPDATED BC-076 (2026-08-31, column rename):** `control.client_kb_source` generalized beyond Notion-only — `notion_page_id` renamed to `source_ref`, `source_type` enum added (multiple source rows per client now possible). This node's raw PostgREST query (`?select=client_id,notion_page_id&notion_page_id=not.is.null`) was updated in the same migration to `?select=client_id,source_ref&source_type=eq.notion&source_ref=not.is.null` — same filter semantics, confirmed via an equivalent direct SQL check (not a live execution — this workflow cascades into a real INT-012 sync for every matching client, which the environment's own permission classifier correctly blocked as too broad an action for a targeted verification). See the new "Zenny Runtime - Search Business KB Tool (BC-076)" entry below for the generalized schema's full shape.
+
 ---
 
 ### INT-007 — Zenny Recovery Engine - StopRecovery (INT-007)
@@ -1212,6 +1214,29 @@ Architecture: `05_Platform_Builds/Zenny_SaaS/Zenny_MultiNode_Runtime_Architectur
 
 **LAST VERIFIED:** BC-073, 2026-08-29 — live via `execute_workflow` (temporary Manual Trigger, same pattern as BC-072). Full real chain proven: a real lead created (`insert_client_lead`), a real `pending_verifications` row queued (`queue_pending_verification`), confirmed via the `Return` node's real `pending_verification_id`. Synthetic rows cleaned up after.
 
+### Zenny Runtime - Search Business KB Tool (BC-076)
+**n8n ID:** `uZdHEI8tQ1qeeHzt` · **published**, active (sub-workflow, `toolWorkflow` target for all 3 shipped archetype Agents)
+
+**PURPOSE:** BC-076's cross-archetype business-memory tool — one shared implementation, wired as a `toolWorkflow` into Commerce-Ecom, Appointment, and Consultation's Agents alike. Closes the business-memory gap flagged since BC-074/075's eng review (a durable per-client KB beyond the static `agent_prompts` string). Generalizes INT-011's own retrieval leg (`Wiki/platform-quirks/notion-pinecone-kb-pattern.md`) into a tool call, against a NEW dedicated Pinecone index rather than reusing Email Manager's `zenny-email-kb`.
+
+**TRIGGER:** Execute Workflow Trigger (Define Below): `client_id`, `query`.
+
+**FLOW:** `Embed Query (OpenRouter)` (`POST /embeddings`, `openai/text-embedding-3-small`, `openRouterApi` credential `openrouter-zm`) → `Query Pinecone` (`POST https://zenny-business-kb-nikbo1h.svc.aped-4627-b74a.pinecone.io/query`, `topK:4`, `namespace: client_id`, `pineconeApi` credential `zenny-pinecone-api`) → `Has KB Matches?` (IF, loose type validation) → true: `Build Grounding (KB)` (join matched chunk text) → `Format Tool Response`; false: `Get Fallback Context` (`get_client_kb_fallback_context` RPC, same fallback INT-011 already uses) → `Build Grounding (Fallback)` → `Format Tool Response`. Returns `{ answer: "<grounded text>" }`.
+
+**REAL NEW INFRA:** Pinecone index `zenny-business-kb` (1536-dim, cosine, AWS us-east-1 serverless, dense) — created via a raw REST call (`POST https://api.pinecone.io/indexes`) through a throwaway HTTP-Request-Tool workflow, since the `create-index-for-model` MCP tool only supports Pinecone-integrated-embedding indexes (wrong shape for this project's OpenRouter-embeds convention) — confirmed live via `describe-index` after creation.
+
+**REAL SCHEMA CHANGE:** `control.client_kb_source` generalized — `source_type` enum (`notion`/`shopify`/`woocommerce`/`google_sheets`/`baserow`) added, PK changed from `(client_id)` to `(client_id, source_type)` (one client can now have multiple simultaneous sources), `notion_page_id` renamed to `source_ref`, `sync_status` column added. `get_client_kb_source`/`update_client_kb_last_synced` RPCs updated with a backward-compatible `p_source_type DEFAULT 'notion'` parameter (live-verified: calling with only `p_client_id`, exactly how INT-011/012 already call it, correctly resolves to the notion row, unchanged JSON shape including the original `notion_page_id` key). New RPC `upsert_client_kb_source` for future ingestion workflows to register a source.
+
+**REAL BUG FOUND AND FIXED (grant gap, same recurring class as BC-052/064/BC-072):** `CREATE OR REPLACE FUNCTION` with a changed argument signature creates a NEW function object, not a true replace — the orphaned old 1-arg overloads were left behind with bodies still referencing the renamed `notion_page_id` column (would have broken on next real call), and the new 2-arg functions picked up this project's default-privilege auto-grant to `anon`/`authenticated` (a schema-level default this project's other RPCs don't carry, confirmed via `pg_proc.proacl` diff against `insert_client_lead`'s clean ACL). Fixed: dropped the orphaned 1-arg overloads, explicitly revoked `anon`/`authenticated` on both changed functions and the new one.
+
+**REAL DEPENDENCIES:** `openrouter-zm` (embeddings), `zenny-pinecone-api` (new index), `zenny-vault-suparbase` (fallback RPC). No new credentials needed.
+
+**LAST VERIFIED:** BC-076, 2026-08-31 — live, not `test_workflow`-pinned: (1) sub-workflow standalone (temporary Manual Trigger harness): real OpenRouter embed call (real 1536-dim vector, real token cost), real Pinecone query against the new empty namespace (`matches: []`), correctly fell through to the fallback branch, real Supabase RPC call succeeded — full mechanism proven end to end. (2) Wired into the Commerce-Ecom Agent and called through a real conversation turn — the Agent ran successfully with the tool present in its toolset (no crash, no wiring error); **the LLM did not actually invoke the tool for this test question**, because the archetype's existing system prompt (predates BC-076) explicitly instructs "if you do not have a confirmed answer... say so plainly" with no mention of the new tool — **flagged as real follow-up work, not fixed here:** each archetype's `agent_prompts` system-prompt content needs an explicit instruction to use `Search_business_kb` for exactly this kind of question, or the tool stays functionally inert regardless of correct wiring.
+
+**NOT YET BUILT (deferred to a follow-up session, per explicit human scope-split):** the WooCommerce, Google Sheets, and Baserow ingestion legs (D9's remaining 3 of 5 sources) and the full D9 per-archetype demo-business verification pass. Shopify and the generalized-Notion ingestion legs were also not built this pass — this entry covers the tool + schema only; see `docs/designs/zenny-launch-blueprint.md`'s BC-076 spec for the complete 5-leg design.
+
+---
+
 ### Zenny Runtime - Commerce-Ecom Node
 **n8n ID:** `IKOAp1dmnqul5uuQ` · **published**, active (sub-workflow, no production trigger — the first real archetype node, called by whatever channel/routing layer arrives later)
 
@@ -1239,6 +1264,13 @@ Architecture: `05_Platform_Builds/Zenny_SaaS/Zenny_MultiNode_Runtime_Architectur
 Synthetic rows cleaned up after every test.
 
 **FIXED, cross-cutting (found live while building BC-074/075, 2026-08-31):** `Check_availability`'s HTTP Request Tool node had an explicit `options.response.response.responseFormat: 'json'` set — this crashes with `Cannot read properties of undefined (reading 'data')` (`HttpRequestV3.node.ts:1158`) on any real tool call, the same crash class as WF-001's documented `FIXED BC-029 #6`, never previously hit on this specific node because BC-073's own live verification never got a real successful tool-call response through it (the roster's stock state always returned `available:false` early, via a different code path). **This means any real customer asking about availability since BC-073 shipped (2026-08-29) would have silently gotten a generic "having trouble checking" apology instead of a real answer — undetected until this session.** Fixed by removing the explicit `responseFormat`, matching the already-proven working pattern elsewhere in this repo. Republished same day.
+
+**FIXED, cross-cutting, severe (found live during BC-076 verification, 2026-08-31 — affects all 3 shipped Agents identically, not new to this workflow):**
+1. **`Memory Cold?`'s `rightValue` was an empty string (`""`) instead of the real boolean `true`** its own `{type:'boolean', operation:'true'}` operator requires under `typeValidation:'strict'` — every genuinely first-time customer conversation crashed here with `Wrong type: '' is a string but was expecting a boolean`, never reached the Agent at all. Fixed by matching WF-017's own already-correct `rightValue: true` pattern.
+2. **`Get Recent History (RPC)` legitimately returns 0 rows for a first-time customer, and n8n skips every downstream node on a zero-item input** — the entire rest of the chain (`Rehydrate Memory`, `Get Business Name`, the Agent itself) silently never ran, while the parent execution still reported `success`. A naive `alwaysOutputData:true` fix (first attempted, reverted) forces a synthetic `{}` item that then crashes `Rehydrate Memory` (`templateMapper[undefined] is not a constructor`) — the correct fix, per this project's own zero-item-safety guidance, is a new `Has History?` IF gate: real rows → `Rehydrate Memory` → `Get Business Name`; empty → straight to `Get Business Name`, skipping rehydration.
+Together, these two bugs meant **every brand-new customer's first message to this Agent has silently failed since BC-073 shipped (2026-08-29)** — a "successful" execution that did nothing, no response ever sent. Live-verified after both fixes: a genuinely first-time conversation now runs the full chain end to end (real Agent LLM call, real response, real message persistence). Not BC-076's own bug, found only because BC-076's tool-wiring test was the first thing to exercise a truly cold, zero-history conversation through this exact node since launch.
+
+**BC-076 (2026-08-31):** new `Search_business_kb` tool (`toolWorkflow` → `uZdHEI8tQ1qeeHzt`) added to this Agent's toolset alongside `Check_availability`/`Create_cart`. Wired and live-verified not to break the existing flow; **the LLM did not invoke it in the live test** because the current system prompt has no instruction to use it — see the new Search Business KB Tool entry above for the flagged follow-up.
 
 ---
 
@@ -1270,6 +1302,10 @@ Synthetic rows cleaned up after every test.
 - **Not live-verified this session:** `Cancel_appointment`'s tool-call wiring specifically (same `httpRequestTool` pattern as the 3 proven tools, same fix already applied, calling WF-013 which is independently proven live since BC-026/053/BC-2026-08-31) — a live spot-check is recommended before the next session touching this workflow, not blocking.
 
 All synthetic rows (conversations/messages/sessions/leads) cleaned up after testing.
+
+**FIXED, cross-cutting, severe (found+fixed during BC-076 verification, 2026-08-31) — same `Memory Cold?`/`Get Recent History (RPC)` cold-path bugs documented in full under the Commerce-Ecom Node entry above, identical root cause, identical fix (`rightValue: true`; new `Has History?` gate).** Every brand-new customer's first message to this Agent had the same silent-failure exposure since BC-074 shipped. Not re-verified with a full live conversation this session (the Commerce-Ecom Agent's live proof covers the shared mechanism) — recommended spot-check before the next session touching this workflow.
+
+**BC-076 (2026-08-31):** new `Search_business_kb` tool (`toolWorkflow` → `uZdHEI8tQ1qeeHzt`) added alongside the 4 existing tools. Wired, not live-verified against a real conversation this session (see Commerce-Ecom Node entry for the tool's own proof and the flagged system-prompt gap, which applies here identically).
 
 ---
 
@@ -1311,6 +1347,10 @@ All synthetic rows (conversations/messages/sessions/leads) cleaned up after test
 - **Not live-verified this session:** `Get_booking_status`'s tool-call wiring specifically (same proven pattern as BC-074's identical tool) and the full qualifying-question → scored-booking conversational flow through the Agent itself (verified via the direct sub-workflow test instead, which proves the backend chain but not the Agent's own multi-turn qualifying behavior) — recommended spot-checks before the next session touching this workflow, not blocking.
 
 All synthetic rows cleaned up after testing.
+
+**FIXED, cross-cutting, severe (found+fixed during BC-076 verification, 2026-08-31) — same `Memory Cold?`/`Get Recent History (RPC)` cold-path bugs documented in full under the Commerce-Ecom Node entry above, identical root cause, identical fix.** Every brand-new customer's first message to this Agent had the same silent-failure exposure since BC-075 shipped. Not re-verified with a full live conversation this session — recommended spot-check before the next session touching this workflow.
+
+**BC-076 (2026-08-31):** new `Search_business_kb` tool (`toolWorkflow` → `uZdHEI8tQ1qeeHzt`) added alongside the 3 existing tools. Wired, not live-verified against a real conversation this session (see Commerce-Ecom Node entry for the tool's own proof and the flagged system-prompt gap, which applies here identically).
 
 ---
 

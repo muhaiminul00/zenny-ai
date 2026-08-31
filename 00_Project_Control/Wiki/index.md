@@ -90,7 +90,11 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
   locked too (fifth pass)** — schema, 5-leg ingestion design (Shopify/
   WooCommerce/Notion/Sheets/Baserow), the `Search Business KB` tool's
   wiring into all 3 shipped Agents, and a per-archetype demo-business
-  verification plan. See
+  verification plan. **BC-076's first build slice has now shipped**
+  (schema + tool + wiring into all 3 Agents; 2 severe pre-existing
+  cold-conversation bugs found+fixed along the way) — remaining
+  ingestion legs and demo-business verification are a follow-up
+  session. See
   [[../decisions/agent-capability-scope-and-business-memory]]. Every
   other part still gets its own `/plan-eng-review` pass when Commander
   schedules it — this doc is a map, not a full spec.
