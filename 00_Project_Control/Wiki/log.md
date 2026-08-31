@@ -9,6 +9,28 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-31] agent-capability-scope-and-business-memory-flagged | human raises capability-breadth + business-memory gap, routed to gstack planning ahead of BC-074/075
+
+Immediately after BC-2026-08-31-concurrency-hardening's handback, human
+raised two related but distinct points, explicitly not a build request:
+(1) whether an archetype agent's built tool-calling scope actually
+covers its full job (FAQ, sales-style product recommendation, etc.), not
+just the narrow flows built so far; (2) the agent needs a second memory
+class — durable per-client **business memory** (business info, product/
+catalog details, policies) distinct from per-conversation chat memory —
+and this applies across all 6 archetypes, not just commerce-ecom.
+
+No RPC/table/workflow exists for this yet — nothing decided, nothing
+built. Logged as an open Wiki decision
+([[decisions/agent-capability-scope-and-business-memory]]) rather than
+resolved inline, per CLAUDE.md's Commander→gstack→Execute planning
+bridge: this is an architecture-shaped question that belongs in gstack's
+planning pass for BC-074/075, not something Commander derives itself.
+Closest existing precedent to check first: Email Manager's Notion+
+Pinecone KB pattern ([[platform-quirks/notion-pinecone-kb-pattern]]) and
+the per-client-schema-overridable `agent_prompts` pattern
+([[platform-quirks/n8n-openrouter-direct-llm-pattern]]).
+
 ## [2026-08-31] session-bc-2026-08-31-concurrency-hardening | BC-072/BC-073 multi-tenant/concurrency audit + fix, first real use of gstack /investigate + /plan-eng-review on shipped infra
 
 **Trigger:** human's own suspicion, unprompted by any prior finding, that
