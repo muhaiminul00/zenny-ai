@@ -1,5 +1,55 @@
 # Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
 
+## BC-076-Card2b build-ready spec locked + build started, blocked on Credential Gate (2026-09-01, seventh pass)
+
+Full detail: `docs/designs/zenny-launch-blueprint.md`'s "BC-076-Card2b
+build-ready spec" section + its seventh-pass GSTACK REVIEW REPORT,
+`06_Infrastructure/n8n/Workflow_Registry.md`'s SCH-004 + new Sheets
+Ingestion entries, `Wiki/log.md` session-bc076-card2b-blocked.
+
+**Ten real decisions locked (D14-D23):** client-designated key column over
+row index (D14); one designated tab per sheet (D15); cross-leg deletion
+deferred to Card 3, narrowed (D16); continue-past-bad-row partial failure
+(D17); new `source_config jsonb` column over more delimited `source_ref`
+segments (D18); composite vector ID + full metadata contract, an
+outside-voice catch correcting a real collision bug in the first draft
+(D19); delete-then-reinsert per row key every sync, another outside-voice
+catch closing 2 bugs (shrinking chunk count, edited key values) with one
+mechanism (D20); client-designated column whitelist over ingest-everything,
+closing a real content-leak risk (D21); one global service account for now,
+blast-radius tradeoff documented explicitly (D22); proceed with the
+revised Card 2b rather than a separate hardening pre-card, since D18-D21's
+fixes already generalize past Sheets (D23).
+
+**A real live incident found and fixed before it happened, unrelated to
+the new build but discovered while starting it:** `SCH-004`'s published
+version was still querying a column (`notion_page_id`) renamed away during
+BC-076's first slice — its next scheduled run would have broken the
+nightly Notion KB sync for every client. A prior session's own registry
+note had wrongly asserted this was already fixed, without ever confirming
+the fix was published, not just drafted. See Workflow_Registry.md.
+
+**Real design corrections made during the build itself, not just
+planning:** Pinecone's docs don't clearly confirm delete-by-metadata-filter
+works on serverless indexes, so D20's cleanup mechanism uses delete-by-ID
+against deterministic candidate IDs instead — same outcome, no unverified
+claim underneath it. `content_hash`/`source_ref_hash` dropped for simpler
+mechanisms with no unverified crypto-module dependency in n8n's Code node
+sandbox. D17's "blank cell" trigger narrowed to the key column specifically
+(a blank whitelisted content column is legitimate data, not a failure).
+
+**Blocked, Credential Gate (Standing Rule) — not a workaround target:**
+the new Sheets ingestion workflow (13 nodes, structurally validated) and
+SCH-004's generalized dispatcher are both built and correct, but neither
+can publish until a real Google service-account credential exists — none
+does yet (`list_credentials` confirmed 0 results). Live-verified this
+session (closing a real gap, not assuming): n8n's Google Sheets node does
+natively support `authentication: 'serviceAccount'`, confirmed from its
+type definition, not just the read operation's existence as the fifth
+pass had checked. Human needs to create the GCP service account + n8n
+credential + share a test Sheet before Execute can finish live-verifying
+this card.
+
 ## BC-076-Card1 SHIPPED (2026-08-31) — the severe client_id bug is fixed, live-verified
 
 Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s Search Business

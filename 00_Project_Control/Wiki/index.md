@@ -113,7 +113,16 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
   reason manual-only verification isn't enough).** **Card 1 then
   shipped the same session — the client_id bug is FIXED and
   live-verified (real seeded content, correct-tenant retrieval AND
-  cross-tenant non-leakage both proven across 2 archetypes).** See
+  cross-tenant non-leakage both proven across 2 archetypes).** **Card 2b's
+  build-ready spec locked (seventh pass, 10 decisions D14-D23, 6 of them
+  outside-voice-forced corrections to a real ID-collision bug) and its
+  build started — the Sheets ingestion workflow + SCH-004's generalized
+  dispatcher are both built and structurally validated, but blocked on a
+  real Credential Gate (no Google service-account credential exists yet).
+  A genuine live incident was found and fixed along the way: SCH-004's
+  published version was still querying a column renamed away during the
+  first slice, one scheduled run away from breaking the nightly Notion
+  sync for every client.** See
   [[../decisions/agent-capability-scope-and-business-memory]]. Every
   other part still gets its own `/plan-eng-review` pass when Commander
   schedules it — this doc is a map, not a full spec.

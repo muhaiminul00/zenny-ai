@@ -9,6 +9,78 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## session-bc076-card2b-blocked (2026-09-01)
+
+Commander invoked gstack `/plan-eng-review` (seventh pass) for BC-076
+Card 2b (Google Sheets ingestion leg, service account per D11), triggered
+by the human's update that Google OAuth branding verification is already
+approved and only the explainer video remains before scope submission —
+noted as non-blocking context (D11 already avoids depending on that
+timeline), not a design change.
+
+**Plan-eng-review, 10 decisions locked (D14-D23):** client-designated key
+column (D14), single designated tab per sheet (D15), cross-leg deletion
+deferred to Card 3 narrowed by same-leg resync hygiene (D16), continue-
+past-bad-row (D17), new `source_config jsonb` column (D18), composite
+vector ID + metadata contract (D19), delete-then-reinsert per row key
+(D20), column whitelist (D21), single global service account (D22),
+proceed with Card 2b as revised rather than a separate hardening pre-card
+(D23). Outside-voice review (Codex, gpt-5.5) found 18 issues on the first
+draft; 6 promoted to human decisions (D18-D23), all accepted as
+recommended — the first draft had a real vector-ID collision bug (bare
+row-key as ID, no handling for multi-chunk rows or shared namespaces) and
+2 real staleness bugs (shrinking chunk count, edited key values) that
+D16's "defer to Card 3" would have wrongly also deferred.
+
+**Execute build, real findings during the work itself:**
+- Live-verified n8n's Google Sheets node DOES support
+  `authentication: 'serviceAccount'` (type definition, not assumed) —
+  closes an unverified claim the fifth pass had left open (only the read
+  operation's existence was checked then, never the auth mode).
+- Found and fixed a real live incident before it fired: `SCH-004`'s
+  *published* version still queried `client_kb_source.notion_page_id`,
+  a column renamed to `source_ref` during BC-076's first-slice migration.
+  Its next scheduled run (03:00 UTC) would have 400'd, silently breaking
+  the nightly Notion KB sync for every connected client. A prior session's
+  own Workflow_Registry note had claimed this was "updated in the same
+  migration" without ever confirming the fix reached the *published*
+  version, not just the draft — the exact draft-vs-published quirk this
+  project has hit before, compounded by an unverified written claim.
+  Fixed and published for real.
+- Migrated `control.client_kb_source` to add `source_config jsonb` (D18)
+  and extended `upsert_client_kb_source` to 5 args — applied this
+  project's own logged `postgres-create-or-replace-signature-change`
+  pitfall correctly: explicitly dropped the old 4-arg signature before
+  `CREATE OR REPLACE`, then caught and revoked a real `anon` EXECUTE grant
+  the schema-level default re-added to the new signature.
+- Built and structurally validated (13 nodes) the new
+  `Zenny Runtime - Sheets KB Ingestion (BC-076-Card2b)` workflow, and
+  generalized SCH-004 into a real per-`source_type` dispatcher (Switch
+  node) rather than adding another special case.
+- Design corrections made during the build itself: switched D20's cleanup
+  from delete-by-metadata-filter to delete-by-ID against deterministic
+  candidate IDs (Pinecone's docs don't clearly confirm filter-delete on
+  serverless indexes — avoided building on an unverified claim); dropped
+  `content_hash`/`source_ref_hash` for simpler mechanisms with no
+  unverified crypto-module dependency; narrowed D17's "blank cell"
+  failure trigger to the key column specifically (a blank whitelisted
+  content column is legitimate data, not a failure).
+
+**Stopped at a real Credential Gate, not a workaround target:** no
+`googleApi` (Google Service Account) credential exists in this n8n
+instance. Both new/changed workflows are built and correct but cannot
+publish until it exists — n8n's own publish-time dependency check
+correctly refused. Per the Credential Gate standing rule: built every
+non-secret field, left the credential slot empty, documented exactly what
+the human needs to do (create the GCP service account + n8n credential +
+share a real test client's Sheet), stopped rather than inventing or
+working around it. Full detail: `docs/designs/zenny-launch-blueprint.md`'s
+BC-076-Card2b spec + seventh-pass GSTACK REVIEW REPORT,
+`06_Infrastructure/n8n/Workflow_Registry.md`'s SCH-004 + new Sheets
+Ingestion entries, `Wiki/decisions/agent-capability-scope-and-business-memory.md`.
+
+---
+
 ## [2026-08-31] session-bc076-card1-shipped
 
 Executed the Build Card the sixth planning pass produced. n8n MCP was
