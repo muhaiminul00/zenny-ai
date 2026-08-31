@@ -9,6 +9,66 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-31] session-bc-2026-08-31-concurrency-hardening | BC-072/BC-073 multi-tenant/concurrency audit + fix, first real use of gstack /investigate + /plan-eng-review on shipped infra
+
+**Trigger:** human's own suspicion, unprompted by any prior finding, that
+BC-072/073 (shipped 2026-08-29) weren't built to handle multiple clients
+or multiple concurrent users at once — correct, and confirmed the same
+session.
+
+**Investigation (gstack `/investigate`, Execute mode per the live-infra
+handoff rule):** found 3 real SQL-level race conditions by reading the
+actual RPC bodies and table constraints, not guessing: (1)
+`find_or_create_conversation` — check-then-insert, no unique constraint,
+duplicate conversation rows possible under concurrent messages; (2)
+`resolve-pending-verification`'s approve path — check-then-update, no
+row lock, double-fulfillment possible under concurrent approvals; (3)
+`queue_pending_verification` — bare insert, no idempotency, duplicate
+pending orders possible under tool-call retries. Second scan (n8n
+workflow chain, human-requested widening beyond just the Agent's memory
+node) found (4): the Commerce-Ecom Agent's real cross-turn memory is
+n8n's in-process `memoryBufferWindow`, never rehydrated from BC-072's
+own Postgres `messages` table — a container restart silently wipes live
+conversation context.
+
+**Planning (gstack `/plan-eng-review`):** produced the fix spec for all
+4 findings; human chose the smaller rehydrate-native-memory fix over a
+full custom Postgres-backed memory implementation for Finding 4 (Zenny
+is pre-launch/single-instance — not over-engineering for scale the
+product doesn't have yet).
+
+**Build (Execute):** all 4 fixes shipped — partial unique indexes +
+`ON CONFLICT`/atomic-conditional-UPDATE rewrites for 1-3 (11 schemas:
+5 `tpl_*` + 6 client schemas); a new `get_recent_messages` RPC +
+4-node rehydration chain in `Zenny Runtime - Commerce-Ecom Node` for
+Finding 4. **1 real security bug found and fixed mid-build:** the two
+brand-new RPCs (`claim_pending_verification`/`unclaim_pending_verification`)
+picked up Postgres's default PUBLIC execute grant, exposing them to
+anon/authenticated via PostgREST — same exposure class as BC-052/064,
+caught by habit (checking grants on every new function) before it
+shipped, not after. **2 real n8n bugs found live-testing Finding 4:**
+`groupMessages:false` meant zero historical messages produced zero
+output items, and n8n doesn't run downstream nodes on a zero-item
+input — the cold-buffer branch never fired in exactly the case it
+exists to detect; the new RPC node's Supabase credential was never
+auto-assigned at creation. Both fixed, both re-verified live. All 5
+Acceptance Criteria live-verified with genuinely concurrent calls where
+that mattered (parallel tool invocations against the fixed RPCs, plus a
+real n8n execution via a temporary Manual Trigger test harness for the
+memory rehydration path — `execute_workflow` can't start
+`executeWorkflowTrigger`-based workflows directly). All synthetic test
+data cleaned up after. Full detail: `Wiki/platform-quirks/
+n8n-concurrency-race-patterns.md`, `Wiki/infra/
+verification-approval-queue.md`, `06_Infrastructure/n8n/
+Workflow_Registry.md`'s Commerce-Ecom Node and Resolve/Queue-Cart
+entries.
+
+**Standing outcome:** every future archetype Build Card (BC-074/075+)
+must be designed and verified against concurrent multi-client/multi-user
+load from the start, not just single-client/single-session correctness
+— logged as a durable expectation in the new platform-quirks page, not
+just this session's memory.
+
 ## [2026-08-30] session-gstack-pilot-readme-status-fix | Stale release/status claims corrected — README now matches reality
 
 **Trigger:** human's go-ahead on the two stale README claims flagged
@@ -9262,6 +9322,42 @@ shell-injection/enum-completeness surface) → `qa` judged inapplicable
 (no web surface) → `ship`'s applicable parts → squash-merged → branch
 deleted → `v1.2.1` tag + `gh release create` cut in the same sitting as
 the merge, confirmed live via `gh release list`.
+
+Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
+
+**Next:** none blocking.
+
+## [2026-08-31] gstack-pilot BC-2026-08-31-public-repo-hygiene-and-gstack-mandatory shipped (v1.3.0)
+
+Human raised four questions about the public gstack-pilot repo in one
+message. Two resolved without a decision (root `CLAUDE.md` confirmed
+correct as-is — used for real every time a Claude Code session works
+on gstack-pilot's own code; README's Install section had gstack listed
+as optional when `TEAM_SETUP.md` already correctly had it as mandatory
+step 1). Two needed real decisions, both via AskUserQuestion directly
+in this Commander session (no `/plan-eng-review` chain — hygiene/
+mechanism-reuse fixes, not architecture): `docs/build-cards/` and
+`docs/designs/` untracked from git but kept on disk (not moved to
+Zenny's Wiki), so `plan-eng-review`'s repo-local design-doc search
+mechanism isn't orphaned; a new gstack global-config nudge built,
+mirroring the existing `gh`-setup nudge exactly, informational-only,
+never writes to `~/.gstack/config.yaml`.
+
+README Install section reordered: gstack now stated as a mandatory
+prerequisite before the plugin-install commands. 5 now-dead
+`docs/build-cards`/`docs/designs` path citations in the Releases
+history reworded, pointing at a new "Repo hygiene" README section.
+
+One real snag: a `git stash`/`git stash pop` (used mid-task to test an
+unrelated pre-existing `check-init-sync.js` failure) silently reverted
+the `git rm --cached` staging — caught by re-checking `git ls-files`
+before committing, re-applied cleanly.
+
+Wrap-up: feature branch → PR #4 → `/review` (scope-drift CLEAN, zero
+findings) → `qa` judged inapplicable (no web surface) → `ship`'s
+applicable parts → squash-merged → branch deleted → `v1.3.0` tag +
+`gh release create` cut in the same sitting, confirmed live via
+`gh release list`.
 
 Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
 

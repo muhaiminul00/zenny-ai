@@ -306,6 +306,64 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
   - **`v1.2.1` tag/release cut in the same sitting as the merge**,
     continuing the discipline established after the `v1.1.0` gap.
     Confirmed live: `gh release list` shows `v1.2.1` as latest.
+- **Build Card BC-2026-08-31-public-repo-hygiene-and-gstack-mandatory
+  shipped, 2026-08-31 — four repo-hygiene/onboarding fixes.** Human
+  raised four questions in one message about the public repo; two
+  resolved to real fixes without a decision needed (this repo's own
+  root `CLAUDE.md` confirmed correct as-is — used for real every time
+  a Claude Code session, ours, works on gstack-pilot's own code, not
+  something a plugin consumer ever sees; README's Install section had
+  gstack listed as optional when `TEAM_SETUP.md` already correctly
+  treated it as mandatory step 1 — an inconsistency, not a design
+  question), two needed a real decision and got one via
+  AskUserQuestion directly in this Commander session (no
+  `/plan-eng-review` chain — same judgment call as the prior
+  README-reposition card: these are hygiene/mechanism-reuse fixes, not
+  architecture decisions).
+  - **`docs/build-cards/` and `docs/designs/` untracked from git,
+    kept on disk.** `.gitignore`'d going forward (`git rm -r --cached`,
+    not `git rm` — files remain on disk for `plan-eng-review`'s
+    repo-local design-doc search to keep working when we're the ones
+    developing gstack-pilot). Decision locked: keep-on-disk over
+    Zenny's-Wiki-only, so the existing local-search mechanism isn't
+    orphaned. Verified live: fresh clone of the pushed branch had no
+    `docs/` directory at all.
+  - **gstack global-config nudge, new** — mirrors the `gh`-setup nudge
+    mechanism exactly (new sentinel
+    `.gstack-config-checked-gstack-pilot`), surfaces
+    `~/.gstack/config.yaml`'s `proactive`/`checkpoint_mode`/
+    `routing_declined` values once per project. Explicitly
+    informational-only, never writes to the file — that file is
+    gstack's own global, per-machine config, outside any project's
+    scope, a materially bigger blast radius than `mode.json` if forced.
+    Verified live in a scratch repo: fires once, doesn't repeat, file
+    checksum unchanged before/after.
+  - **README Install section reordered** — gstack now stated as a
+    mandatory prerequisite, moved before the plugin-install commands
+    (was worded as an optional "if your project also wants gstack"
+    extra, undersold that the plugin does nothing useful without it).
+    5 now-dead `docs/build-cards`/`docs/designs` path citations in the
+    Releases history reworded to point at a new "Repo hygiene" README
+    section explaining they're internal references, not resolvable
+    paths in a consumer's clone.
+  - **One real snag caught mid-execution:** an earlier `git stash` /
+    `git stash pop` (used to test an unrelated pre-existing
+    `check-init-sync.js` failure) silently reverted the `git rm
+    --cached` staging for Target 1 — caught by re-checking `git
+    ls-files` before committing, re-applied cleanly. Worth remembering:
+    stash/pop around a staged deletion needs a post-pop verification
+    pass, not just a diff glance.
+  - **Wrap-up chain actually run:** feature branch
+    (`task/public-repo-hygiene-and-gstack-mandatory`) → PR #4 →
+    gstack's `/review` (scope-drift check CLEAN, zero findings — docs
+    + a config-read-only hook change has no SQL/concurrency/LLM-trust/
+    shell-injection surface) → `qa` judged inapplicable (same call as
+    prior cards, no web/UI surface) → `ship`'s applicable parts (no
+    `VERSION`/`CHANGELOG.md` in this repo, same as every prior card) →
+    squash-merged → branch deleted.
+  - **`v1.3.0` tag/release cut in the same sitting as the merge**,
+    continuing the discipline. Confirmed live: `gh release list` shows
+    `v1.3.0` as latest.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)
