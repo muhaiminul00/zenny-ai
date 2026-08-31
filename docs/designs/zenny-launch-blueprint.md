@@ -383,6 +383,145 @@ use, never on an unrelated archetype's leg:
 tuning per source type, exact Baserow table schema/column names for the
 embedded catalog page, the demo businesses' real synthetic data content.
 
+### BC-076 unblock sequence (locked 2026-08-31, sixth pass — the severe client_id bug + everything it was blocking)
+
+The fifth pass's build-ready spec shipped its first slice, then a same-day
+follow-up found `Search Business KB`'s `client_id` parameter resolves to
+`null` on every call — confirmed via a real n8n community thread describing
+the identical symptom (`toolWorkflow` node invoked as an `ai_tool` cannot
+reliably resolve `$()`/`$json`/`$node[]` references to sibling main-chain
+nodes; unresolved upstream, no official n8n fix exists). This sixth pass
+plans the full unblock, plus three new gaps the human raised directly:
+no verification/smoke-test practice exists, no real (non-synthetic)
+integration-testing process exists, and Google Sheets' OAuth path would
+have collided with a real, already-flagged constraint (see D11 below).
+
+Step 0 fired a real STOP a second time — bug fix + 5 ingestion legs + a
+new verification system + a new credential-testing process + a Sheets
+design decision is 5 separate pieces of work, not one Build Card. Human
+confirmed the 5-card split below. **Only Card 1 is build-ready from this
+pass — Cards 2a/2b/3/4 are scoped, not specced; each gets its own
+`/plan-eng-review` pass when Commander picks it up, matching this doc's
+own established convention (Parts 3-9 are outlines until picked up).**
+
+**D11 — Google Sheets via service account, not OAuth (locked).** Human
+raised a real, correct concern before this was decided: the app's existing
+Gmail (restricted scope) + Calendar (sensitive scope) OAuth consent screen
+has not passed Google's verification review and is capped at 100 lifetime
+users (unresettable) — adding a third sensitive scope (Sheets) would widen
+what an eventual verification submission has to cover and could force
+re-consent from already-connected clients, for no real benefit. **Real
+alternative found and locked instead:** a Google **service account**
+(Zenny's own fixed identity, not a client's delegated OAuth grant) — the
+client shares their specific Sheet with the service account's email
+(Viewer access), the same flow as sharing a doc with a colleague. Zero
+OAuth consent screen, zero new scope, zero verification exposure — and
+per n8n's own docs, service accounts are the recommended pattern for
+automated/production access, not a workaround. Sync cadence: extend
+SCH-004's existing cron job (already polls `client_kb_source` for due
+clients) to also handle `source_type='google_sheets'` rows — reuses
+proven scheduling/due-client logic rather than a second scheduler.
+**Flagged, not solved here:** the service account fix removes ONE future
+scope-creep risk but does NOT resolve the existing Gmail/Calendar
+unverified-app status or its 100-user lifetime cap — that's a separate,
+larger, still-open item (cross-references Part 1's launch gate) that
+needs its own decision before scaling past a handful of real clients,
+not before Card 2a/2b below (unverified apps still function under the
+cap, with a warning screen, which is acceptable for a 2-3-test-client
+phase).
+
+**D12 — verification/smoke-test mechanism: scheduled automated canary,
+not manual-only (locked).** This exact session found 2 severe bugs
+(a boolean-typed IF-node condition; an n8n zero-item-input silently
+skipping downstream nodes while the execution still reported "success")
+that had been silently breaking every brand-new customer's first message
+since the 3 shipped archetypes launched — undetected for days because
+nothing was watching, and "run `/qa` before shipping" is exactly the
+practice that already failed to catch this class of bug. **Locked
+design, refined by outside-voice review (see VERDICT below):** a
+scheduled canary workflow fires a synthetic message per shipped
+archetype against a dedicated canary test client, using a **fresh
+`external_id`/conversation every run** (not a reused warm one — the bugs
+found were specifically in the cold, first-message path, so a canary
+that only ever exercises a warm conversation would never have caught
+them), and asserts the **actual grounded response content**, not just
+"no error was thrown" (a "success" execution that silently did nothing
+is exactly what slipped through last time). Alerts via the existing
+`zenny-notification-sender` credential — Card 4 must include a one-time
+real test that the alert path itself fires, not just that it's wired.
+
+**D13 — Card 1's tenant-isolation correction (locked, outside-voice
+catch).** The fix everyone already agreed to (give `Search_business_kb` a
+real Webhook trigger, call it via `httpRequestTool` like `Check_availability`
+instead of the broken `toolWorkflow` mechanism) had a real security gap in
+its first draft: `client_id` was going to be `$fromAI`-supplied, meaning
+the LLM would control tenant identity — a cross-tenant data-leak vector if
+the model hallucinates or is manipulated via injected conversation text.
+**Corrected:** `client_id` is a static expression referencing the calling
+Agent's own main-chain trigger node (`$('<Archetype> Node Trigger').item.json.client_id`)
+— the exact pattern `Check_availability`/`Cancel_appointment`/
+`Get_booking_status` already use successfully. The LLM never sees or
+supplies `client_id`; only `query` is `$fromAI`. Zero added effort — this
+is correcting the design to match the pattern already proven safe
+elsewhere in this codebase, not a new mechanism.
+
+**Card 1 — full build-ready spec (ready now):**
+- Give `Zenny Runtime - Search Business KB Tool (BC-076)` (`uZdHEI8tQ1qeeHzt`)
+  a real Webhook trigger (same shape as WF-002/WF-013/WF-015), replacing
+  its `executeWorkflowTrigger`.
+- Rewire all 3 Agent workflows (Commerce-Ecom `IKOAp1dmnqul5uuQ`, Appointment
+  `VcaqfwExxxiknOrO`, Consultation `pTtw04cyetGDPKGd`) to call it via a new
+  `httpRequestTool` node instead of the current `toolWorkflow` node —
+  `client_id` static (per D13), `query` via `$fromAI`.
+- **Definition of Done, tightened per outside-voice review:** a real
+  seeded Pinecone fact + a real live Agent conversation must prove (a) the
+  tool is actually invoked, (b) the returned content matches the seeded
+  fact for THAT client's namespace specifically, and (c) a second client's
+  namespace does NOT see it — a coherent-sounding answer alone does not
+  satisfy this bar.
+- **Flagged, not fixed here (pre-existing, inherited by this fix, not
+  introduced by it):** none of `Check_availability`/`Cancel_appointment`/
+  `Get_booking_status`'s real production webhooks appear to carry any
+  auth beyond the URL itself, and this fix's new webhook inherits the
+  same gap. Worth a dedicated security pass across all tool webhooks
+  before real client traffic scales — not blocking this fix, which only
+  matches existing parity.
+
+**Card 2a — dashboard OAuth investigation + test-client provisioning:**
+investigate the human's real Google OAuth reconnect error on the dashboard
+(root cause unknown, error details not yet gathered), and confirm whether
+the dashboard even supports creating new test-client logins today (a real
+open unknown, not assumed either way) before provisioning Client A
+(Calendar + Gmail + Shopify) and Client B (Google Calendar + WooCommerce).
+**Real sequencing risk, not a footnote:** Card 3 depends on these real
+clients existing and being genuinely connected — if the dashboard doesn't
+support test-login creation today, that becomes Card 2a's actual scope,
+not a quick provisioning step.
+
+**Card 2b — Google Sheets ingestion leg (service account, per D11):**
+independent of Card 2a's OAuth investigation — doesn't touch the broken
+flow at all, can ship even if 2a stalls.
+
+**Card 3 — remaining ingestion legs (Shopify, WooCommerce, generalized-
+Notion, Baserow), built against Card 2a's real clients:** **honesty
+flag from outside-voice review:** these 4 legs are not equivalent effort
+— different auth models, pagination, rate limits, and deleted-content
+semantics per source (Notion is page/database-grant-based, not a flat
+API list; Shopify/WooCommerce paginate differently; Baserow's batch ops
+don't exist on the others). Card 3's own future `/plan-eng-review` pass
+should decide whether it stays one card or splits per-leg once scoped in
+full — not decided here. **New requirement, not in the original fifth-pass
+spec:** a deletion/staleness strategy — the original spec's deterministic
+vector IDs (e.g. `shopify_product_id`) make re-ingestion idempotent but
+say nothing about content REMOVED from the source; without a stale-chunk
+cleanup step, a discontinued product stays answerable forever. Card 3
+must design this, not just the upsert path.
+
+**Card 4 — scheduled canary/smoke-test workflow, per D12.**
+
+**Sequencing:** Card 1 → Card 2a/2b (parallel, independent) → Card 3.
+Card 4 can build in parallel with Card 3 once Card 1 is done.
+
 ### Part 3 — Capability-breadth verification
 Cheap, should ride alongside Part 1/2, not its own multi-day Build Card:
 for each archetype, a real live test proving the Agent answers FAQ-style
@@ -496,6 +635,19 @@ gate, the priority order is now:
    cheap, run in parallel, for the 3 shipped archetypes only.
 3. BC-076 backend build + demo-business verification (D6) — now
    launch-critical, the single biggest remaining build in the gate.
+   **Sixth pass (2026-08-31) locked the actual unblock sequence: Card 1
+   (fix `Search_business_kb`'s client_id bug) → Card 2a/2b (test-client
+   provisioning + dashboard OAuth investigation; Sheets ingestion via
+   service account, parallel to 2a) → Card 3 (remaining ingestion legs)
+   → Card 4 (canary/smoke-test, parallel with Card 3). Only Card 1 is
+   build-ready; 2a/2b/3/4 need their own `/plan-eng-review` pass each
+   when picked up.** **Cross-reference, needs a direct human check before
+   this sequence's Card 2a lands:** `Provider_App_Setup_Guide_v1.md`
+   §1.8 already decided Google OAuth verification submission "should not
+   wait for the rest of the build to finish" — confirm whether that
+   submission was actually started; if not, the Gmail/Calendar unverified-
+   app status (100-user lifetime cap, no reset) is older and more
+   pressing than this pass discovered it to be.
 4. Part 6's two launch-critical pieces (existing dashboard screens
    verified against new schema; BC-076's self-serve KB/catalog screen,
    D8) — the rest of Part 6 stays fast-follow.
@@ -622,3 +774,43 @@ this is the spec Commander packages into a formal Build Card next.
 - Part 1-EXT (Emergency, Engagement, Commerce-Restaurant) — untouched, still sequenced after Part 1's gate substantially clears.
 - Part 3-7, 9 of the blueprint's own gate items (capability audits, channel-gateway parity, onboarding confirmation, dashboard's existing-screen verification, minimum alerting, final QA) — untouched by this pass, each still needs picking up per Part 1's sequencing.
 - Everything under "Not decided here" in Part 2 and Part 6 (first and second pass) — still open, unchanged.
+
+---
+
+## GSTACK REVIEW REPORT — BC-076 unblock sequence (2026-08-31, sixth pass)
+
+Scope: plan the full unblock for the severe `client_id`-resolves-to-null
+bug found in a same-day follow-up to the fifth pass, plus 3 new gaps the
+human raised directly (no verification/smoke-test practice, no real
+integration-testing process, a Sheets-OAuth collision risk) — a proper
+step-by-step plan first, THEN a Build Card, per explicit human
+instruction, not a single narrow bug-fix card.
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | Not run — infra/architecture planning, not a product-scope question. |
+| Codex Review | `/codex review` | Independent 2nd opinion | 1 | issues_found, all resolved | See CODEX/CROSS-MODEL below. |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | clean (post-resolution) | See table below. |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | Not run — no UI in this pass's scope. |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | Not run — not applicable to this infra plan. |
+
+| Section | Status | Findings |
+|---|---|---|
+| Step 0 (scope challenge) | Done, fired a real STOP | Bug fix + 5 ingestion legs + a new verification system + a new credential-testing process + a Sheets design decision is 5 pieces of work, not one Build Card. Human confirmed a sequenced split (initially 4 cards, refined to 5 after the outside-voice pass — see Card 2 split below). |
+| 1. Architecture review | Done, 3 decisions locked (D11, D12, D13) | D11 (Google Sheets via service account, not OAuth — human raised the real concern first, live-search-grounded before deciding); D12 (scheduled automated canary, not manual-only — grounded in this exact session's own undetected-bug history); D13 (Card 1's `client_id` binding corrected to a static main-chain reference, never LLM-supplied — a real tenant-isolation gap the outside-voice pass caught in the human-approved draft, not a hypothetical). |
+| 2. Code quality review | No issues — no code changes in this pass, spec-only. | — |
+| 3. Test review | Card 1's Definition of Done tightened per outside-voice review | "A coherent response" was too weak — now requires proving tool invocation, correct-tenant content match, AND cross-tenant non-leakage. Card 4's canary design tightened the same way: asserts actual grounded content (not "no error"), and uses a fresh conversation every run (not a warm one) specifically because the bugs it exists to catch were in the cold, first-message path. |
+| 4. Performance review | No new findings this pass | Carried forward unchanged from the fifth pass: embedding/upsert cost scales with catalog size regardless of source — still Execute's watch-item for Card 3. |
+
+**CODEX:** Ran (gpt-5.5, high reasoning). 21 findings — 2 promoted to human decisions (tenant-isolation binding in Card 1, Card 2's split), the rest folded directly into the written spec as scope corrections (deletion/staleness strategy added to Card 3; ingestion legs' non-equivalent effort made explicit; canary's weak "non-error" bar tightened and its cold-path-exercise requirement added; the "locked plan" framing corrected to "Card 1 build-ready, Cards 2a/2b/3/4 scoped not specced"; a cross-reference surfaced to `Provider_App_Setup_Guide_v1.md`'s pre-existing (and possibly stalled) Google verification-submission decision).
+
+**CROSS-MODEL:** No disagreement — Codex's 2 promoted findings were genuine gaps in the human-approved draft, not a competing architectural stance; both were corrected via AskUserQuestion and accepted as recommended, not contested.
+
+**VERDICT:** Card 1 (fix `Search_business_kb` — webhook trigger + `httpRequestTool`, static `client_id` binding per D13, tightened Definition of Done) is build-ready — packaged into a formal Build Card and handed to Execute next. Cards 2a/2b/3/4 are scoped and sequenced but each needs its own `/plan-eng-review` pass before a Build Card is written, per this doc's own established convention. CEO + ENG CLEARED for Card 1 — eng review required for 2a/2b/3/4 individually when picked up.
+
+**UNRESOLVED DECISIONS:**
+- Whether `Provider_App_Setup_Guide_v1.md` §1.8's Google-verification submission was actually started — a direct human check needed before Card 2a proceeds; if not started, this is older and more pressing than this pass discovered.
+- Whether the dashboard currently supports creating new test-client logins at all — Card 2a's own first task, not assumed either way.
+- Root cause of the human's real dashboard OAuth reconnect error — not yet investigated, Card 2a's other first task.
+- A dedicated security pass on tool-webhook auth (Check_availability/Cancel_appointment/Get_booking_status and the new Search_business_kb webhook all appear to carry no auth beyond the URL itself) — flagged, not scheduled.
+- Everything already listed as unresolved in the fifth pass above — still open, unchanged.

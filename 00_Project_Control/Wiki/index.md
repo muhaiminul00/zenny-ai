@@ -102,7 +102,15 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
   confirmed 6 different ways), meaning it can never retrieve real
   content for any client even once ingestion is built.** This is now
   the actual blocker on BC-076, ahead of the remaining ingestion legs.
-  See
+  **A real `/plan-eng-review` pass (sixth) then locked the actual
+  unblock sequence — 5 pieces of work, not one card: Card 1 (fix the
+  bug, build-ready now, tenant-isolation-corrected per an outside-voice
+  catch) → Card 2a (dashboard OAuth investigation + test clients) / Card
+  2b (Google Sheets via service account, not OAuth — avoids stacking a
+  3rd sensitive scope onto an already-unverified Gmail/Calendar OAuth
+  app) → Card 3 (remaining ingestion legs) → Card 4 (scheduled canary/
+  smoke-test, this session's own undetected-bug history being the
+  reason manual-only verification isn't enough).** See
   [[../decisions/agent-capability-scope-and-business-memory]]. Every
   other part still gets its own `/plan-eng-review` pass when Commander
   schedules it — this doc is a map, not a full spec.

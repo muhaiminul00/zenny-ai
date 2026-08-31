@@ -9,6 +9,51 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-31] session-bc076-unblock-sequence-planned
+
+Human's explicit instruction: stop cycling ad-hoc "what's next" answers,
+run a real gstack `/plan-eng-review` pass and get a proper step-by-step
+plan before any more Build Cards. Also reported a live dashboard error
+trying to reconnect Gmail/Calendar (details not yet gathered — Card 2a's
+job) and proposed the 2-3-test-client integration-testing shape used as
+input to this plan.
+
+`/plan-eng-review` ran for real: Step 0 fired a STOP (5 pieces of work,
+not 1 card), human chose the sequenced-cards path. Two real architecture
+decisions surfaced mid-review from a fact the human raised themselves —
+Google OAuth verification exposure — resolved via live web search rather
+than assumption: D11 (Sheets via service account, not OAuth) and, once
+Codex's outside-voice pass ran, D13 (Card 1's `client_id` binding
+corrected from LLM-`$fromAI`-supplied to a static main-chain reference —
+a real tenant-isolation gap in the human-approved draft). Codex also
+caught that Card 2 was really 2 independent pieces (dashboard-OAuth-
+investigation+test-clients vs. Sheets-service-account-build) — split
+into 2a/2b. A dozen smaller Codex findings (deletion/staleness strategy
+for Card 3, a weak "no error" bar on the Card 4 canary, the canary
+needing to exercise the actual cold path that broke, honesty about
+"locked" vs. "scoped" cards) were folded directly into the written spec
+without needing separate votes — they were gaps, not competing
+architectural stances.
+
+**Real cross-reference surfaced, not previously connected:**
+`Provider_App_Setup_Guide_v1.md` §1.8 already decided (in an earlier,
+separate planning pass) that Google OAuth verification submission
+"should not wait for the rest of the build to finish" — whether that
+submission actually started is now an open, flagged question, since if
+it didn't, the Gmail/Calendar unverified-app 100-user cap is older and
+more pressing than tonight's Sheets-scope conversation made it look.
+
+Only Card 1 (fix `Search_business_kb`'s severe `client_id` bug) is a
+formal Build Card from this pass — packaged and handed to Execute
+immediately after. Cards 2a/2b/3/4 are sequenced and scoped but each
+needs its own `/plan-eng-review` pass before a Build Card is written,
+matching this doc's own established convention for the blueprint's
+other Parts. Full detail: `docs/designs/zenny-launch-blueprint.md`'s
+"BC-076 unblock sequence" section + its sixth-pass GSTACK REVIEW REPORT,
+`Wiki/decisions/agent-capability-scope-and-business-memory.md`.
+
+---
+
 ## [2026-08-31] session-bc076-followup-kb-client-id-bug
 
 Human's chosen next step, per the pulse-check at the prior session's

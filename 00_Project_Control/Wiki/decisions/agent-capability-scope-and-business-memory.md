@@ -1,5 +1,41 @@
 # Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
 
+## BC-076 unblock sequence locked (2026-08-31, sixth pass — gstack `/plan-eng-review`)
+
+Human explicitly asked for a proper step-by-step plan before any more
+Build Cards, not another ad-hoc "what's next." Full detail:
+`docs/designs/zenny-launch-blueprint.md`'s new "BC-076 unblock sequence"
+section + its sixth-pass GSTACK REVIEW REPORT. Summary:
+
+- **Card 1 (build-ready now):** fix `Search_business_kb` — real Webhook
+  trigger + `httpRequestTool` (same pattern as `Check_availability`),
+  `client_id` bound as a static main-chain reference, never LLM-supplied
+  (a real tenant-isolation gap in the first draft, caught by Codex's
+  outside-voice pass, corrected before being accepted).
+- **Card 2a:** investigate the human's real dashboard Google OAuth
+  reconnect error + confirm whether the dashboard supports creating new
+  test-client logins today, then provision Client A (Calendar+Gmail+
+  Shopify) and Client B (Google Calendar+WooCommerce).
+- **Card 2b (independent of 2a):** Google Sheets ingestion via a
+  **service account** (client shares their Sheet with Zenny's service
+  account email), not OAuth — human raised the real concern first: the
+  app's existing Gmail/Calendar OAuth is unverified (100-user lifetime
+  cap), and a 3rd sensitive scope would only make that worse. Cross-
+  references `Provider_App_Setup_Guide_v1.md` §1.8's pre-existing (and
+  possibly stalled) verification-submission decision — needs a direct
+  human check.
+- **Card 3:** remaining ingestion legs (Shopify/WooCommerce/Notion/
+  Baserow) against Card 2a's real clients, plus a new deletion/staleness
+  requirement (Codex catch — the original spec's deterministic vector
+  IDs handle re-ingestion but not content removed from the source).
+- **Card 4:** a scheduled automated canary/smoke-test — this session's
+  own 2 severe undetected-bug findings are the reason manual-only
+  verification isn't enough; must use a fresh conversation each run and
+  assert real grounded content, not just "no error."
+
+Only Card 1 is a formal Build Card from this pass; 2a/2b/3/4 are scoped,
+each needs its own `/plan-eng-review` when picked up.
+
 ## BC-076 severe unfixed bug found (2026-08-31, follow-up pass) — the tool cannot retrieve real content for any client
 
 The same-day follow-up pass that wired all 3 archetypes' system prompts
