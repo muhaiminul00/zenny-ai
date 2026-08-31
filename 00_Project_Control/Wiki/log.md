@@ -9,6 +9,140 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-31] session-zenny-launch-blueprint-broaden | Dashboard architecture (D3) + spreadsheet catalog sync (D4) locked, scope broadened per explicit human instruction
+
+**Trigger:** human asked to re-run the architecture pass, this time
+reading `02_Agent_Runtime_System/Agent_Runtime_System_v1.md` first,
+looking for real open-source projects/patterns to reuse rather than
+building from scratch, and explicitly broadening the blueprint's scope
+(not shrinking it) to cover the client-facing dashboard (channels,
+integrations, chats, metrics, settings) and Google Sheets/Excel +
+"our own sheet page" catalog sync for non-Shopify/WooCommerce clients.
+
+**What happened:** read the runtime spec (confirmed it corroborates,
+doesn't contradict, this session's D1/D2 direction — its Level-3 Business
+Memory concept originally pointed at a Business Config/KB source; its
+Module 2 audit already flags product-catalog/inventory-aware
+recommendation as [MVP] gaps). Ran real WebSearch research before
+deciding anything (Chatwoot, Baserow, Grist, NocoDB's license change).
+Continued the same `/plan-eng-review` pass on the same blueprint file
+(scope gate skipped correctly — path explicitly named, consistent with
+the skill's own exception rule) and locked two more decisions via real
+AskUserQuestion, both option A:
+
+1. **D3 — dashboard architecture**: keep the existing custom React/Vite/TS
+   dashboard, explicitly reference Chatwoot's (MIT-licensed, open-source
+   Intercom/Zendesk alternative) UX/information-architecture as a design
+   input for channels/integrations/chats/business-info/metrics/settings
+   screens — no new runtime dependency. Adopting Chatwoot as real
+   infrastructure (self-hosted, Agents wired in via its Agent Bot API)
+   was named explicitly as the bigger, more ambitious road not taken, not
+   silently dropped.
+2. **D4 — spreadsheet catalog sync**, extending D1: native Google Sheets
+   sync (n8n's likely built-in node, flagged for live MCP verification,
+   not assumed) for clients with an existing sheet; an embedded
+   open-source spreadsheet UI — Baserow (MIT) or Grist (Apache-2.0) — as
+   the actual "sheet-type page" for clients with neither Shopify/
+   WooCommerce nor an existing sheet. NocoDB explicitly checked and
+   rejected — switched off AGPL to a Sustainable Use License mid-2026,
+   no longer safe to embed commercially.
+
+**Written:** `docs/designs/zenny-launch-blueprint.md`'s Part 2 extended
+with D4, Part 6 fully rewritten from "verify it still works" into a real
+scoped dashboard architecture, plus a second GSTACK REVIEW REPORT section
+appended (not replacing the first). `Wiki/decisions/agent-capability-
+scope-and-business-memory.md` and `Wiki/index.md` updated to match.
+
+**Not done:** the actual dashboard screen-by-screen design/build, the
+Sheets/Baserow-Grist sync implementation, and the choice between Baserow
+vs. Grist — all explicitly deferred to a future Build Card (BC-076
+candidate), same as the first pass's deferred items. Not committed
+(Commander cannot git-write) — pending human review or a trivial Execute
+handoff to commit both blueprint sessions together.
+
+## [2026-08-31] session-zenny-launch-blueprint-part2-lock | Business-memory module boundary + catalog-sync mechanism locked via real /plan-eng-review
+
+**Trigger:** human reviewed the light launch blueprint and flagged it
+skipped two concrete questions: how a client's live product catalogue
+actually gets into Zenny, and how "channels"/"integrations"/"business
+info" relate as distinct parts of one archetype agent. Pointed at
+`Zenny_Raw_Product_Definition_v1.md` as the source-of-truth the blueprint
+should expand, and asked to invoke gstack skills to resolve it properly.
+
+**What happened:** first invoked `/plan-ceo-review` per the skill-routing
+table's "strategy/scope" mapping — wrong fit, its git-diff/PR-review
+machinery doesn't suit a from-scratch roadmap; dropped before doing any
+work. Then invoked `/office-hours` — also wrong fit on reflection before
+any AskUserQuestion fired: its six-question startup-validation diagnostic
+and "whoa"/delight framing are for validating whether a NEW idea is worth
+building, not resolving two concrete technical decisions inside an
+already-locked architecture. Corrected to `/plan-eng-review`, the same
+skill BC-073/074/075's real architecture decisions were made through
+directly — matched the shape of the actual ask.
+
+**Result — two decisions locked via real AskUserQuestion, both option A:**
+1. **Catalog/business-data sync**: phased — reuse already-built Shopify/
+   WooCommerce credentials for e-commerce clients' catalogs (periodic
+   pull, SCH-00x cadence pattern), generalize the existing Notion+Pinecone
+   KB pattern (INT-011/012) cross-archetype for everyone else (hours,
+   policies, FAQ, non-catalog archetypes). Generic website scraping and
+   client-feed-upload explicitly considered and rejected as primary
+   mechanisms (fragile / pushes burden onto small-business clients).
+2. **Module boundary**: 4 parts per archetype Agent — Channel (already a
+   param), Integrations (`client_connections`, already exists),
+   Business-Info/KB (persona `agent_prompts` + the new catalog/KB layer),
+   Tool-calling core (the Agent workflow, gains a `Search Business KB`
+   tool). Names a boundary that mostly already exists in the built code.
+   Rejected: folding business info into a bigger system prompt (caps out
+   fast); a full microservice split (solves a scale problem this
+   pre-launch platform doesn't have — same reasoning the concurrency-
+   hardening card already applied against an equivalent over-build).
+
+A live WebSearch check confirmed the recommended shape matches current
+industry practice for catalog-grounded support agents (platform-connector
+ingestion + KB/CMS layer), not a novel invention.
+
+**Written:** `docs/designs/zenny-launch-blueprint.md`'s Part 2 rewritten
+with the real architecture + a terminal GSTACK REVIEW REPORT section;
+`Wiki/decisions/agent-capability-scope-and-business-memory.md` updated
+with the locked decisions; `Wiki/index.md` updated.
+
+**Not done:** the `Search Business KB` tool's exact schema/ingestion
+workflow and the sync cadence/diffing strategy — explicitly deferred to a
+future Build Card (BC-076 candidate). Not committed (Commander cannot
+git-write) — pending human review or a trivial Execute handoff to commit.
+
+## [2026-08-31] session-zenny-launch-blueprint | Light 9-part launch blueprint drafted, direct by Commander (not gstack)
+
+**Trigger:** human asked for a full, light, part-by-part blueprint of
+everything needed before Zenny can go live with real paying clients,
+after flagging business memory as a cross-archetype gap and giving
+go-ahead to continue BC-074/075 (handled in the prior session entry).
+
+**What happened:** invoked gstack's `/plan-ceo-review` first per CLAUDE.md's
+skill-routing table ("Strategy/scope → /plan-ceo-review"); recognized on
+reading its own preamble that its machinery (git-diff scope audit against
+a base branch, 10x-expansion ceremonies) is built to review an
+already-scoped branch/PR, not to draft a from-scratch product roadmap —
+running it here would itself be the tool-process over-engineering
+CLAUDE.md tells both modes to avoid. Dropped it and wrote the blueprint
+directly as Commander's own light-planning output instead: single new
+file (`docs/designs/zenny-launch-blueprint.md`), no code/infra touched.
+
+**Result:** 9-part blueprint — (1) remaining 3 archetypes (Emergency,
+Engagement, Commerce-Restaurant), (2) business memory / cross-archetype
+KB tool, (3) capability-breadth verification, (4) channel-gateway parity
+re-check on the own-runtime, (5) onboarding pipeline update, (6) dashboard
+alignment, (7) ops/monitoring, (8) the disclosed `zenny-notification-
+sender` credential blocker (human action), (9) pre-launch QA pass. Each
+part explicitly deferred to its own gstack `/plan-eng-review` pass when
+Commander schedules it — this doc is a map, not a spec, no estimates or
+architecture decisions made in it.
+
+**Not done:** not committed (Commander cannot git-write per its own mode
+rule) — pending either human review/edits or a trivial Execute handoff
+just to commit.
+
 ## [2026-08-31] session-bc-074-075-build | Appointment + Consultation nodes built, live-verified, published; 1 cross-cutting bug found + fixed in already-shipped BC-073
 
 **Trigger:** Execute handoff from the BC-074/075 eng review (same day).

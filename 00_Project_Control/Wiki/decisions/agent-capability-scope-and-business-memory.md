@@ -1,5 +1,59 @@
 # Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
 
+## Scope broadened (2026-08-31, third pass — dashboard + spreadsheet sync)
+
+Human explicitly instructed: read `02_Agent_Runtime_System/
+Agent_Runtime_System_v1.md` first (the original pre-pivot spec — its
+Level-3 Business Memory concept originally pointed at a Business Config/
+KB source, corroborating this decision's direction), look for real
+open-source projects/patterns to reuse before planning custom builds, and
+broaden scope rather than shrink it. Two more decisions locked via a
+second `/plan-eng-review` pass (full detail + tradeoffs in the blueprint's
+Part 2/Part 6 and its second GSTACK REVIEW REPORT):
+
+- **Dashboard architecture (D3):** keep the existing custom React/Vite/TS
+  dashboard, explicitly reference Chatwoot's (MIT-licensed, open-source
+  Intercom/Zendesk alternative) UX/information-architecture when building
+  the channels/integrations/chats/business-info/metrics/settings screens
+  — no new runtime dependency. Adopting Chatwoot as real running
+  infrastructure (self-hosted, Agents wired in via its Agent Bot API) was
+  considered and named explicitly as the road not taken, not silently
+  dropped — a bigger, more ambitious bet worth revisiting later.
+- **Spreadsheet catalog sync (D4, extends D1):** native Google Sheets
+  sync (n8n's likely built-in node, flagged for live verification) for
+  clients with an existing sheet; an embedded open-source spreadsheet UI
+  — Baserow (MIT) or Grist (Apache-2.0) — as the actual "sheet-type page"
+  for clients with neither Shopify/WooCommerce nor an existing sheet.
+  NocoDB explicitly rejected — it switched off AGPL to a Sustainable Use
+  License, no longer safe to embed commercially.
+
+## Architecture locked (2026-08-31, second pass — module boundary + sync source)
+
+Follow-up to the resolution below: the human asked whether the light
+launch blueprint (`docs/designs/zenny-launch-blueprint.md`) actually
+resolved HOW business memory works, not just that it's deferred. It
+hadn't — ran a real gstack `/plan-eng-review` pass and locked two
+decisions (full detail + tradeoffs in the blueprint's Part 2 and its
+GSTACK REVIEW REPORT):
+
+- **Module boundary:** 4 parts per archetype Agent — Channel (delivery
+  param, already exists), Integrations (`client_connections`, already
+  exists), Business-Info/KB (persona `agent_prompts` + the new catalog/KB
+  layer below), Tool-calling core (the Agent workflow, gains one new
+  `Search Business KB` tool). Names a boundary that mostly already exists
+  in the built code rather than inventing a new one.
+- **Catalog/business-data sync mechanism:** phased — Shopify/WooCommerce
+  API pull (reusing already-built, already-credentialed connections) for
+  e-commerce clients with one connected; the existing Notion+Pinecone KB
+  pattern, generalized cross-archetype, for everyone else (hours,
+  policies, FAQ, non-catalog archetypes). Generic website scraping and
+  client-maintained feed uploads explicitly deferred — higher engineering
+  risk / burden than either reused path.
+
+**Still not decided — a future BC's job:** the KB tool's exact schema and
+per-archetype wiring; the sync workflow's cadence/diffing strategy. This
+pass locked the boundary and the source, not the implementation.
+
 ## Resolution (2026-08-31, BC-074/075 eng review)
 
 Resolved via AskUserQuestion during the BC-074/075 planning pass, not left
