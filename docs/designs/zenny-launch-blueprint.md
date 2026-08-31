@@ -287,6 +287,102 @@ decisions.
 
 Sources consulted for the D1 industry-practice check: [RAG for Customer Service 2026: Implementation Guide](https://heeya.fr/en/blog/rag-for-customer-service-2026), [Deploying an AI Shopping Assistant with RAG](https://www.blockchain-council.org/ai/deploying-ai-shopping-assistant-with-rag-product-catalog-reviews-policies/), [RAG Pipelines for Customer Support: Templates and Best Practices (2026)](https://techdailyshot.com/blog/rag-pipelines-customer-support-templates-2026). Sources for the D4 open-source spreadsheet check: [9 Best Open Source Airtable Alternatives in 2026](https://openalternative.co/alternatives/airtable), [NocoDB vs Baserow](https://blog.elest.io/nocodb-vs-baserow-which-open-source-airtable-alternative-should-you-pick/).
 
+### BC-076 build-ready spec (locked 2026-08-31, fifth pass — D9/D10, the actual implementation)
+
+Part 1/D6 made BC-076 launch-critical. D1/D2/D4 locked its boundary and
+sources. This section locks the actual build-ready spec — table shape,
+ingestion workflow design, tool wiring, and verification plan — so
+Commander can package a formal Build Card against it. Step 0 flagged the
+real complexity (5 ingestion legs + 1 new tool + wiring into 3 Agents) as
+one Build Card, not several — human confirmed: D6's "everything...
+verified" instruction was explicit enough that phasing any leg would be
+re-litigating a closed decision, not honoring it.
+
+**Schema (mechanical extension of the proven INT-011/012 pattern —
+`[[../platform-quirks/notion-pinecone-kb-pattern]]`, no new invention):**
+
+```
+control.client_kb_source                    (NEW — generalizes the
+  ├─ client_id            uuid                existing client_kb_source
+  ├─ source_type          enum('notion',       table beyond Email
+  │                              'shopify',     Manager-only)
+  │                              'woocommerce',
+  │                              'google_sheets',
+  │                              'baserow')
+  ├─ source_ref           text        -- notion_page_id / shopify
+  │                                      connection_id / sheet_id /
+  │                                      baserow_table_id, per source_type
+  ├─ last_synced_at       timestamptz
+  └─ sync_status          text        -- mirrors client_connections'
+                                          status convention
+
+Pinecone: NEW dedicated index `zenny-business-kb` (not the existing
+`zenny-email-kb` — different metadata shape, different tool surface;
+keeping them separate is "boring by default," not a new pattern).
+Same proven shape: serverless, AWS us-east-1, 1536-dim cosine
+(text-embedding-3-small via OpenRouter, zero new credential).
+Namespace = client_id (same structural per-client isolation as the
+email-KB pattern — one client can have MULTIPLE source rows feeding
+the SAME namespace, e.g. a Shopify catalog + a Notion FAQ together).
+```
+
+**New tool: `Search Business KB`** — wired into all 3 shipped archetype
+Agents (Commerce-Ecom, Appointment, Consultation), same shape as
+INT-011's retrieval leg generalized into a tool call: embed the query →
+Pinecone query (`namespace = client_id`, topK 4) → ground the Agent's
+answer in returned chunk text → fall back to `client_config.
+archetype_settings` on zero matches (identical fallback INT-011 already
+uses). One tool definition, reused verbatim across all 3 Agent workflows
+— not 3 separate tools.
+
+**Ingestion workflows — 5 legs, same chunk→embed→upsert shape as
+INT-012, same SCH-00x cron cadence convention:**
+
+| Leg | Source | Node | Chunk unit | Deterministic vector ID |
+|---|---|---|---|---|
+| Shopify | existing Client Credentials Grant connection (`[[../credentials/shopify]]`) | HTTP Request (products.json) | 1 product (title+description+price+variants) | `shopify_product_id` |
+| WooCommerce | existing manual-key connection (`[[../credentials/woocommerce]]`) | HTTP Request (`/wp-json/wc/v3/products`) | 1 product | `woocommerce_product_id` |
+| Notion (generalized) | existing INT-012 mechanism, unchanged, decoupled from Email-Manager-only scope | native Notion node | ~700-char paragraph-packed chunk | `notion_block_id + chunk_index` (unchanged) |
+| Google Sheets | client's existing sheet | **native `n8n-nodes-base.googleSheets` node, `sheet.read` op — confirmed live via n8n MCP `search_nodes`/`get_node_types` this session, not assumed** (closes D4's flagged verification) | 1 row | stable row-key column (client-designated) or row index |
+| Baserow (D10 winner) | embedded Baserow table (D8's self-serve screen) | **native `n8n-nodes-base.baserow` node, `row.getAll`/`batchCreate` — has real batch operations (200 rows/request), the concrete reason D10 picked Baserow over Grist (Grist's native node has no batch op)** | 1 row | Baserow row ID |
+
+**D10 — Baserow over Grist for the embedded sheet-type page (locked).**
+Verified live via n8n MCP, not assumed: `n8n-nodes-base.baserow` supports
+`batchCreate`/`batchUpdate`/`batchDelete` (200 rows/request) — matches a
+full-catalog sync's actual shape. `n8n-nodes-base.grist` exposes only
+single-row create/update/delete/getAll, no batch op — would need N
+individual calls per sync. Baserow's own Application Builder also fits
+embedding a client-facing catalog page more directly than Grist's
+spreadsheet-formula strength, which nothing here needs. Grist's larger
+community (11,371 vs 5,460 GitHub stars) doesn't offset the concrete
+technical gap. [Baserow vs Grist](https://www.getgrist.com/lookup/grist-vs-baserow/), [Baserow/Grist n8n integration](https://n8n.io/integrations/baserow/and/grist/).
+
+**D9 — verification plan (locked: per-archetype minimum, not bundled).**
+Matches D7 (independent rollout) + D6 (nothing ships unproven) at once —
+an archetype's launch only waits on the legs its own clients actually
+use, never on an unrelated archetype's leg:
+
+- **4 demo businesses for Commerce-Ecom** — one per catalog source
+  (Shopify-connected, WooCommerce-connected, Google-Sheets-connected,
+  neither/Baserow-embedded). Commerce-Ecom's own launch waits on all 4,
+  since a real client could arrive with any of the 4 catalog shapes.
+- **1 shared demo business for Appointment + Consultation** — a Notion
+  KB (FAQ/policies), synced once, then the `Search Business KB` tool
+  call verified live against BOTH archetype Agents using that same
+  synced content (one ingestion test, two tool-wiring tests — the
+  mechanism is identical, only the calling Agent differs).
+- **"Verified" means, per demo business:** the real ingestion workflow
+  executed live (not `test_workflow`-pinned) with a genuine Pinecone
+  upsert confirmed via Pinecone's own REST response (matching BC-049's
+  proof style), AND a real live Agent tool-call proving `Search Business
+  KB` returns grounded, correct answers from that demo business's actual
+  synced content (matching BC-073 AC1's proof style) — not a code-review
+  pass, an actual end-to-end execution.
+
+**Not decided here — Execute's job during the build:** exact chunk-size
+tuning per source type, exact Baserow table schema/column names for the
+embedded catalog page, the demo businesses' real synthetic data content.
+
 ### Part 3 — Capability-breadth verification
 Cheap, should ride alongside Part 1/2, not its own multi-day Build Card:
 for each archetype, a real live test proving the Agent answers FAQ-style
@@ -501,3 +597,28 @@ build.
 - The demo business(es) used for BC-076 verification (D6) — how many, what archetype(s), how realistic the test data needs to be — not scoped here, a future BC's call.
 - Part 1-EXT (the remaining 3 archetypes) — untouched by this pass beyond confirming it's now sequenced after, not parallel with, Part 1's gate.
 - Everything under "Not decided here" in Part 2 and Part 6 (first and second pass) — still open, unchanged by this pass.
+
+---
+
+## GSTACK REVIEW REPORT — BC-076 build-ready spec (2026-08-31, fifth pass)
+
+Scope: produce BC-076's actual implementation spec (schema, ingestion
+workflow design, tool wiring, verification plan) now that Part 1/D6 made
+it launch-critical. Not a review of the whole blueprint, not a build —
+this is the spec Commander packages into a formal Build Card next.
+
+| Section | Status | Findings |
+|---|---|---|
+| Step 0 (scope challenge) | Done, fired a real STOP | 5 new ingestion workflows + 1 new tool + wiring into 3 existing Agents crossed the 8-file/2-service complexity smell — stopped and asked whether to spec all 5 legs now or phase 2 into a fast-second card. Human confirmed all 5 now, citing D6's own explicit wording as the reason phasing would be re-litigation, not honoring the decision. Existing-code reuse mapped exhaustively: `client_kb_source` table shape, INT-011/012's chunk-embed-upsert mechanism, Shopify/WooCommerce credential connections, Pinecone namespace-per-client pattern — all reused, nothing rebuilt from scratch. |
+| 1. Architecture review | Done, 2 decisions locked (D9, D10) | D9 (verification plan: per-archetype minimum, 5 demo businesses, human accepted recommendation) and D10 (Baserow over Grist, human accepted recommendation) — both grounded in live evidence, not assumption: n8n MCP `search_nodes`/`get_node_types` confirmed Baserow's native batch operations vs. Grist's absence of them, and confirmed the native Google Sheets node exists (closing D4's flagged-not-assumed verification requirement from the second pass). A new dedicated Pinecone index (`zenny-business-kb`) was chosen over reusing Email Manager's `zenny-email-kb` — different metadata shape, different tool surface, "boring by default" separation rather than a new pattern. |
+| 2. Code quality review | No issues — no code changes in this pass, spec-only. | — |
+| 3. Test review | Locked as part of this spec, not deferred | D9's verification plan IS the test plan: real live ingestion execution + real Pinecone upsert proof + real Agent tool-call proof, per demo business, matching this project's own established live-verification bar (BC-049's proof style for ingestion, BC-073 AC1's proof style for tool-call grounding) rather than a new, weaker standard. |
+| 4. Performance review | Flagged for Execute during the build | Baserow's batch operations (200 rows/request) were the deciding factor precisely because of performance at sync time — a large catalog synced via Grist's single-row-only node would multiply API calls linearly. Embedding/upsert cost per sync run still scales with catalog size regardless of source (flagged in the first pass, unchanged) — Execute should watch this during the demo-business verification runs, not just prove correctness on small synthetic catalogs. |
+
+**VERDICT:** BC-076's build-ready spec is locked — schema, 5-leg ingestion design (Shopify/WooCommerce/Notion/Sheets/Baserow), the `Search Business KB` tool's wiring into all 3 shipped archetype Agents, and a concrete per-archetype demo-business verification plan. Ready for Commander to translate directly into a formal Build Card and hand to Execute — the next action, not a further planning pass.
+
+**UNRESOLVED DECISIONS:**
+- Exact chunk-size tuning per source type, exact Baserow table schema/column names for the embedded catalog page, and the demo businesses' real synthetic data content — explicitly left to Execute's own judgment during the build, not over-specified here.
+- Part 1-EXT (Emergency, Engagement, Commerce-Restaurant) — untouched, still sequenced after Part 1's gate substantially clears.
+- Part 3-7, 9 of the blueprint's own gate items (capability audits, channel-gateway parity, onboarding confirmation, dashboard's existing-screen verification, minimum alerting, final QA) — untouched by this pass, each still needs picking up per Part 1's sequencing.
+- Everything under "Not decided here" in Part 2 and Part 6 (first and second pass) — still open, unchanged.

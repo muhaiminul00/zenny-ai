@@ -86,7 +86,11 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
   alerting, two launch-critical dashboard pieces, QA pass), reverses
   BC-076 (business memory) from fast-follow to launch-critical per
   explicit human instruction, and locks independent per-archetype
-  rollout (no bundling across the 3). See
+  rollout (no bundling across the 3). **BC-076's build-ready spec is now
+  locked too (fifth pass)** — schema, 5-leg ingestion design (Shopify/
+  WooCommerce/Notion/Sheets/Baserow), the `Search Business KB` tool's
+  wiring into all 3 shipped Agents, and a per-archetype demo-business
+  verification plan. See
   [[../decisions/agent-capability-scope-and-business-memory]]. Every
   other part still gets its own `/plan-eng-review` pass when Commander
   schedules it — this doc is a map, not a full spec.

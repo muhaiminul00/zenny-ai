@@ -56,6 +56,41 @@ prepended). **Next, same session:** Commander resumes to plan BC-076's
 actual build-ready spec via gstack `/plan-eng-review` (D5-D8 already
 locked the boundary/timing, not the schema/workflow implementation).
 
+## [2026-08-31] session-bc076-spec-locked
+
+Fifth `/plan-eng-review` pass, same session, immediately following Part
+8's closure. Target named explicitly (scope gate skipped per exception
+2). Step 0 fired a real complexity-check STOP: BC-076's full spec touches
+5 new ingestion workflows + 1 new tool + wiring into 3 existing Agents —
+crossed the 8-file/2-service smell. Asked whether to spec all 5 legs now
+or phase 2 narrow ones into a fast-second card; human confirmed all 5
+now, citing D6's own explicit "everything... verified" wording as the
+reason phasing would re-litigate a closed decision.
+
+2 decisions locked (D9, D10):
+- **D9 (verification plan):** per-archetype minimum — 4 demo businesses
+  for Commerce-Ecom (one per catalog source: Shopify/WooCommerce/Sheets/
+  Baserow), 1 shared Notion-KB demo business for Appointment +
+  Consultation together. Matches D7 (independent rollout) and D6
+  (nothing ships unproven) at once. Human accepted the recommendation.
+- **D10 (Baserow over Grist):** resolved with live evidence, not
+  reputation — n8n MCP `search_nodes`/`get_node_types` confirmed
+  Baserow's native node has real batch row operations (200/request),
+  Grist's native node doesn't (single-row only). Also confirmed live
+  (closing D4's flagged-not-assumed item): n8n does have a native Google
+  Sheets node (`googleSheets` v4.7, `sheet.read` op). Human accepted the
+  recommendation.
+
+Full schema (`control.client_kb_source` generalized, new dedicated
+Pinecone index `zenny-business-kb`), the `Search Business KB` tool's
+wiring into all 3 shipped Agents, and the 5-leg ingestion workflow design
+(table with node/chunk-unit/deterministic-ID per leg) written into the
+blueprint's new "BC-076 build-ready spec" section, followed by a fifth
+`## GSTACK REVIEW REPORT`. `Wiki/decisions/agent-capability-scope-and-
+business-memory.md` and `Wiki/index.md` updated to match. Files edited
+directly by Commander (docs-only), not committed this entry — see the
+following entry for the formal Build Card packaging and handoff.
+
 ## [2026-08-31] session-zenny-launch-blueprint-production-gate
 
 Fourth pass on `docs/designs/zenny-launch-blueprint.md`. Human's explicit

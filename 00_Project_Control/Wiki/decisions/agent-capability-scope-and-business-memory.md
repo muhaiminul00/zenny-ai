@@ -1,5 +1,38 @@
 # Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
 
+## BC-076 build-ready spec locked (2026-08-31, fifth pass — schema, ingestion, verification plan)
+
+Now that Part 1/D6 made BC-076 launch-critical, this pass produced the
+actual implementation spec (full detail: blueprint's new "BC-076
+build-ready spec" section + its fifth GSTACK REVIEW REPORT):
+
+- **Schema:** `control.client_kb_source` generalized (source_type enum
+  covering notion/shopify/woocommerce/google_sheets/baserow, one row per
+  source, multiple sources can feed one client's namespace). New
+  dedicated Pinecone index `zenny-business-kb` (not reusing Email
+  Manager's `zenny-email-kb`), same proven 1536-dim/cosine/
+  namespace-per-client shape.
+- **New tool:** `Search Business KB`, one definition wired into all 3
+  shipped archetype Agents (Commerce-Ecom, Appointment, Consultation) —
+  same retrieval shape as INT-011, generalized into a tool call.
+- **5 ingestion legs**, all chunk→embed→upsert: Shopify, WooCommerce,
+  Notion (INT-012 unchanged, decoupled from Email-Manager-only scope),
+  Google Sheets (native n8n node, confirmed live — closes D4's flagged
+  verification), Baserow (D10, native n8n node has real batch ops,
+  Grist's doesn't — a live-verified, not assumed, tie-breaker).
+- **D9 (verification plan):** per-archetype minimum — 4 demo businesses
+  for Commerce-Ecom (one per catalog source) gate its own launch; 1
+  shared Notion-KB demo business gates Appointment + Consultation
+  together (same mechanism, two Agent-wiring checks). Matches D7
+  (independent rollout) and D6 (nothing ships unproven) simultaneously.
+- **D10 (Baserow over Grist):** locked with concrete evidence, not
+  reputation — Baserow's native n8n node supports batch row operations
+  (200/request), Grist's doesn't.
+
+Step 0 fired a real complexity-check STOP (5 new workflows + 1 tool + 3
+Agent wirings) — human confirmed building all 5 legs in one Build Card
+rather than phasing, consistent with D6's explicit wording.
+
 ## Production-readiness gate locked (2026-08-31, fourth pass — priority reversal + BC-076 launch-gate)
 
 Human explicit instruction: stop treating "finish the remaining 3
