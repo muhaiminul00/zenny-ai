@@ -1,5 +1,65 @@
 # Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
 
+## BC-076-Card2b SHIPPED — Credential Gate cleared, live-verified, 4 real bugs found and fixed (2026-09-01)
+
+Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s SCH-004 + Sheets
+Ingestion entries, `PROJECT_STATE.md`'s latest entry, `Wiki/log.md`
+session-bc076-card2b-shipped.
+
+Human supplied the credential-gate deliverables: a GCP service account, the
+n8n `googleApi` credential ("Google Service Account API"), and a real raw
+Shopify product-catalogue export as the test sheet.
+
+**Key-column trap caught live, not guessed:** the raw export has one row
+per product *variant*, and `Handle` (the natural-looking key) repeats
+across every variant of the same product — would have made D20's
+delete-then-reinsert silently clobber all but the last-synced variant
+under one shared row key. Confirmed `Variant SKU` (genuinely row-unique)
+with the human instead, backed by the sheet's actual live header row, not
+assumption.
+
+**Scope boundary held under pressure:** the human's whitelist answer also
+asked for real image-based product search (upload a photo, agent finds
+matches) and a recommendation carousel — correctly identified as new
+capability outside Card2b's approved spec (needs its own vision-embedding
+model and index-strategy design), and deferred as a future Build Card
+rather than improvised mid-build. Image URL/alt-text is ingested as plain
+searchable text for now, which is explicitly NOT the same thing.
+
+**4 real bugs found via live execution (none caught by `validate_workflow`,
+since none are structural — all surface only against real data):**
+inverted `Has Valid Rows?` branch logic (real rows would have skipped the
+whole embed/upsert pipeline and written a fake "success" with zero
+vectors); a strict-boolean-type crash on the same node from a leftover
+placeholder value; a Code-node per-item/all-items mode mismatch on `Chunk
+Content`; and the one that mattered most — after fixing the first three, a
+live run reported clean "success" while every single upsert had actually
+failed, because a 404 (expected, from deleting nothing on a first sync)
+wiped the row's content before the chunker read it, and `onError:
+continueRegularOutput` silently swallowed the resulting cascade of
+failures too. Fixed by sourcing row data from the last Code node instead
+of the fallible HTTP node's output.
+
+**Live-verified independently, not trusted from the workflow's own
+report:** 28 real vectors confirmed via Pinecone `describe-index-stats`;
+`SCH-004`'s generalized dispatcher correctly routed both legs (6 real
+`notion` clients + 1 `google_sheets` client) in the same live sweep, 3
+times over while debugging; `Search_business_kb`'s real webhook returned
+the exact seeded content for a live query.
+
+**Still open, needs human action:** the D20 re-key/absence proof and the
+403-vs-404 revoked-access proof both need the human to act on their own
+Google Sheet directly (a live 403 test already confirmed the service
+account's Viewer-only write boundary is real and correct, not a bug); no
+natural blank-key row existed in this test data to exercise D17's
+partial-failure path live.
+
+**This card wrote to live n8n/Supabase/Pinecone/Google Sheets state — per
+the live-infra safe-gate, Execute handed back to Commander for a human
+pulse-check rather than self-chaining into a new Build Card.**
+
+---
+
 ## BC-076-Card2b build-ready spec locked + build started, blocked on Credential Gate (2026-09-01, seventh pass)
 
 Full detail: `docs/designs/zenny-launch-blueprint.md`'s "BC-076-Card2b

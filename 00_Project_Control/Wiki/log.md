@@ -9,6 +9,116 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## session-bc076-card2b-shipped (2026-09-01)
+
+Human supplied BC-076-Card2b's Credential Gate deliverables: service account
+email `zenny-sheets-reader@zeromanual-production.iam.gserviceaccount.com`,
+n8n credential "Google Service Account API" (`googleApi` type, id
+`ERpU1vbQ14oSyPFD`), spreadsheet `1N63aUksP8ihKEZuQdvAsSFkHuEX4eXKTY5NQIL8KYec`
+tab `products_export_1` — a real raw Shopify product-catalogue export from
+the same demo store used elsewhere in this project ("Carmelli Bakery",
+`eb27a21f-209d-4b6d-8f6e-cb216411f6c4`).
+
+**Resumed via the Commander → Execute auto-handoff** (no new plan needed —
+this was resuming an already-approved, already-spec'd card, not a new
+architecture decision). `list_credentials` confirmed the credential's real
+type (`googleApi`) matches what `Read Sheet Rows` needs; attached via
+`setNodeCredential`; live-verified it actually authenticates by pulling the
+sheet's real header row through the node's own load-options method before
+building anything on that assumption.
+
+**Key-column/whitelist resolution, AskUserQuestion, not guessed:** the real
+header row exposed a genuine trap — this is a raw multi-variant Shopify
+export where `Handle` (the natural-looking key) repeats across every
+variant row of a product; picking it would have made D20's
+delete-then-reinsert silently clobber all but the last-synced variant
+under one shared key. Confirmed `Variant SKU` (genuinely row-unique)
+instead. Whitelist resolved to Core + Price + all Shopify metafield
+columns + Image Src/Alt Text (28 columns), with Image fields explicitly
+noted as plain searchable text, not visual search.
+
+**Scope boundary held:** the human's whitelist answer also asked for real
+image-based product search (upload a photo, agent finds matches) and a
+recommendation carousel. Recognized as new capability outside Card2b's
+approved spec — needs its own vision-embedding-model and index-strategy
+design — and deferred as a future Build Card via AskUserQuestion rather
+than improvised mid-build.
+
+**4 real bugs found via live execution (`execute_workflow`, not
+`test_workflow` — which auto-pins credentialed/HTTP nodes and would have
+simulated the very thing being verified). None were structural, so
+`validate_workflow` never caught any of them:**
+1. `Has Valid Rows?`'s condition tested `__no_valid_rows === true` but the
+   TRUE branch was wired to `Loop Rows` and FALSE to `Aggregate & Build
+   Status Payload` — backwards. Real valid rows would have skipped the
+   entire embed/upsert pipeline, writing a fake "success" status with zero
+   vectors ever created. Fixed by flipping the condition to `!== true`
+   rather than rewiring connections (matches the node's own name).
+2. Same node, a second real crash on the fixed condition:
+   `typeValidation:'strict'` + a leftover placeholder `rightValue:""`
+   threw `Wrong type: '' is a string but was expecting a boolean`. Fixed
+   per n8n's own suggested remedy: `typeValidation:'loose'` +
+   `rightValue: true` (a genuine boolean).
+3. `Chunk Content` used Code-node mode `runOnceForEachItem` but returned
+   an *array* of chunk objects — that mode requires exactly one `{json}`
+   object per input item; returning an array produced a malformed `json`
+   field (`"A 'json' property isn't an object"`). Fixed by switching to
+   `runOnceForAllItems`.
+4. The one that mattered most: after fixing 1-3, a full live run reported
+   `{"status":"success","synced_count":14,"failed_count":0}` in Supabase —
+   but every single `Upsert Chunk Vector` call had actually failed
+   (`"Vector dimension 0 does not match the dimension of the index
+   1536"`), silently swallowed by `onError:'continueRegularOutput'`. Root
+   cause: `Delete Existing Row Vectors` 404'd (expected and correct on a
+   first sync — nothing to delete yet), but n8n replaces a failed HTTP
+   node's item `json` with `{error:{...}}` on continue, wiping the row's
+   `content`/`row_key_safe` fields `Chunk Content` needed. Empty content →
+   empty `chunk_text` → OpenRouter rejected it → empty embedding →
+   Pinecone rejected the 0-dim vector → also swallowed → loop reported
+   clean success throughout. Fixed by sourcing row data from
+   `$('Compute Delete IDs').all()` (a Code node, always intact) instead of
+   the immediate input, which the preceding fallible HTTP call can wipe.
+   Re-verified: 28 real vectors confirmed via Pinecone
+   `describe-index-stats` (namespace `eb27a21f-...` → `recordCount: 28`),
+   matching 28 real `upsertedCount:1` responses.
+
+**Full live verification obtained, not assumed:**
+- Full pipeline against real data: 14/14 rows synced, 28 real chunks
+  embedded and upserted, independently confirmed via Pinecone (not just
+  trusted from the workflow's own status write — this is exactly the kind
+  of self-reported "success" that bug 4 proved can be false).
+- `SCH-004`'s generalized dispatcher (published this session) correctly
+  routed both the `notion` leg (6 real clients, idempotent re-syncs) and
+  the `google_sheets` leg in the same live sweep — run 3 times over while
+  debugging (executions 69332/69340/69348/69356), each a genuine
+  production-shaped run.
+- End-to-end retrieval: called `Search_business_kb`'s real webhook
+  directly with a live query — got back the exact seeded product content,
+  correctly scored and ranked, proving the full embed→Pinecone→format
+  chain surfaces sheets-ingested content for real.
+- Attempted a live D20 re-key test via a temporary throwaway workflow
+  (`UpOjx2Vb3r2N8Kta`, archived after) using the same credential in
+  `update` mode — got a clean `403 PERMISSION_DENIED`, confirming the
+  service account is correctly Viewer-only (the right security posture,
+  not a bug). This means the D20 re-key/absence proof and the
+  403-vs-404 revoked-access proof both genuinely need the human to act on
+  their own Google Sheet directly — not something Execute can complete
+  unilaterally without escalating the credential's scope, which it should
+  not do on its own judgment.
+- No natural blank-key row existed in the real test data (all 14 rows had
+  a populated `Variant SKU`), so D17's partial-failure path wasn't
+  exercised live this session — flagged, not silently skipped.
+
+Both `KR0kHvk3kJRThrX5` (Sheets Ingestion) and `ve6GVb5IvBtl4pvf` (SCH-004)
+published. Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`,
+`PROJECT_STATE.md`'s latest entry,
+`Wiki/decisions/agent-capability-scope-and-business-memory.md`. This card
+wrote to live n8n/Supabase/Pinecone/Google Sheets state — per the
+live-infra safe-gate, Execute is handing back to Commander for a human
+pulse-check rather than self-chaining into a new Build Card.
+
+---
+
 ## session-bc076-card2b-blocked (2026-09-01)
 
 Commander invoked gstack `/plan-eng-review` (seventh pass) for BC-076

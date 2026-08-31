@@ -122,7 +122,24 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
   A genuine live incident was found and fixed along the way: SCH-004's
   published version was still querying a column renamed away during the
   first slice, one scheduled run away from breaking the nightly Notion
-  sync for every client.** See
+  sync for every client.** **Card 2b then SHIPPED (2026-09-01): Credential
+  Gate cleared (real GCP service account + n8n credential + a real raw
+  Shopify export as test data), both workflows published and live-verified
+  end to end — 28 real vectors landed in Pinecone, confirmed independently,
+  and `Search_business_kb` proven to actually retrieve the seeded content
+  through a real query. 4 real bugs were found and fixed via live
+  execution alone (none were structural, so `validate_workflow` never
+  caught them) — most notably a false "success" status that had actually
+  written zero real vectors, caused by an HTTP-node failure silently
+  wiping downstream row data.** A live key-column trap was caught before
+  shipping: the raw export's `Handle` column isn't row-unique (repeats
+  across product variants) — `Variant SKU` used instead, confirmed against
+  the sheet's real header row, not guessed. The human's request for real
+  image-based product search + a recommendation carousel was correctly
+  scoped OUT as new capability needing its own design, not absorbed into
+  this card. **Still open, needs human action:** the D20 re-key/absence
+  proof and the 403-vs-404 revoked-access proof both need the human to act
+  on their own Google Sheet directly. See
   [[../decisions/agent-capability-scope-and-business-memory]]. Every
   other part still gets its own `/plan-eng-review` pass when Commander
   schedules it — this doc is a map, not a full spec.
