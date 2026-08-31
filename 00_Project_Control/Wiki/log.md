@@ -9,6 +9,86 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-31] session-bc076-followup-kb-client-id-bug
+
+Human's chosen next step, per the pulse-check at the prior session's
+handback: system-prompt wiring + Appointment/Consultation cold-path
+spot-check (not the remaining ingestion legs).
+
+**Done:** all 3 archetypes' `agent_prompts` (`tpl_commerce`/`tpl_appointment`/
+`tpl_consultation` + the 3 provisioned test-client schemas) updated —
+the old "if you do not have a confirmed answer... say so plainly"
+sentence replaced with an instruction to call `Search_business_kb`
+first. Live-verified on Commerce-Ecom: the LLM now correctly attempts
+the tool call for an hours question (previously refused outright).
+Appointment and Consultation's cold-path fix from the prior BC-076
+pass (`Memory Cold?` rightValue + `Has History?` gate) spot-checked
+with genuinely cold, zero-history conversations on both — both ran
+end to end cleanly, confirming the fix generalizes beyond
+Commerce-Ecom (the only one live-tested last time).
+
+**Found, not fixed — severe:** while proving the tool call actually
+reaches real content (seeded one real fact into `zenny-business-kb`
+for `client_test_002` via a throwaway upsert workflow, then asked the
+live Agent about it), discovered `Search_business_kb`'s `client_id`
+parameter resolves to `null` on every call, regardless of six
+different fix attempts:
+1. `$('Commerce-Ecom Node Trigger').item.json.client_id` (original)
+2. `$('Commerce-Ecom Node Trigger').first().json.client_id`
+3. bare `$json.client_id`
+4. legacy `$node["Commerce-Ecom Node Trigger"].json["client_id"]`
+5. `$fromAI('client_id', ...)` with the real value stamped into the
+   system prompt via a new `[[client_id]]` placeholder, for the LLM
+   to echo back verbatim
+6. same as 5, plus the tool's own `description` field made explicit
+   that `client_id` is a required argument
+
+All 6 confirmed null via the sub-workflow's own trigger data, not
+inferred from the final answer. Cross-checked that the *identical*
+`$('Commerce-Ecom Node Trigger').item.json.client_id` expression
+resolves correctly on an ordinary main-chain node (`Get Business
+Name`) in the same workflow — isolating the failure specifically to
+the `toolWorkflow`-as-`ai_tool` evaluation boundary, not a broken node
+name, a pairedItem lineage break, or IF-branch interference.
+
+**Consequence:** the tool always queries Pinecone under an empty/wrong
+namespace. Even after the remaining 4 ingestion legs are built and
+real content is indexed, `Search_business_kb` would still never
+retrieve it for any client. This is a harder blocker than the
+system-prompt gap fixed today — that gap made the tool *attempted but
+inert*; this one means it would stay *broken* even once attempted.
+
+**Not fixed this pass** (root cause needs deeper investigation than a
+small scoped pass allows): two real candidate fixes, neither tried:
+(a) `toolWorkflow`'s `source: 'parameter'` mode with a single raw-JSON
+expression body, which may use a different evaluation path than the
+per-field `defineBelow` resource-mapper mode that failed here; (b)
+restructure `Search_business_kb` as an inline `httpRequestTool`
+per workflow (matching `Check_availability`'s proven-working
+architecture) instead of one shared `toolWorkflow` sub-execution —
+trades the "one shared cross-archetype tool" design for 3 duplicated
+implementations, a real tradeoff for whoever picks this up.
+
+Commerce-Ecom's `Search_business_kb` node was left in the
+`$fromAI` + prompt-injection + explicit-description state from attempt
+6 (harmless, not worse than the original, documents the attempted
+mechanism for the next pass). Appointment/Consultation's copies were
+deliberately left untouched in their original state rather than
+propagate an unproven fix to 2 more workflows.
+
+**Cleanup:** all throwaway n8n workflows archived (`TEMP - BC-076 KB
+Verify Upsert`, `TEMP - BC-076 Commerce-Ecom KB+Cold-Path Verify`,
+`TEMP - BC-076 Cold-Path Verify (Appointment/Consultation)`); the one
+real Pinecone test vector deleted (`zenny-business-kb` back to 0
+records); all synthetic conversations/messages/sessions from this
+session's test external_ids removed from the 3 test-client schemas.
+
+Full detail: `06_Infrastructure/n8n/Workflow_Registry.md` (new "REAL
+BUG FOUND, NOT FIXED — SEVERE" section under the Search Business KB
+Tool entry, plus follow-up notes on all 3 Agent entries).
+
+---
+
 ## [2026-08-31] session-part8-credential-verify-and-bc076-planning
 
 Human reconnected `zenny-notification-sender` (expired Gmail OAuth,

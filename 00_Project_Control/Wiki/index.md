@@ -94,7 +94,15 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
   (schema + tool + wiring into all 3 Agents; 2 severe pre-existing
   cold-conversation bugs found+fixed along the way) — remaining
   ingestion legs and demo-business verification are a follow-up
-  session. See
+  session. **A same-day follow-up pass wired all 3 archetypes' system
+  prompts to actually use the tool and spot-checked the cold-path fix
+  on Appointment/Consultation (both hold) — but found a new, severe,
+  unfixed bug: the tool's `client_id` parameter resolves to `null` on
+  every call (a `toolWorkflow`-as-`ai_tool` n8n platform limitation,
+  confirmed 6 different ways), meaning it can never retrieve real
+  content for any client even once ingestion is built.** This is now
+  the actual blocker on BC-076, ahead of the remaining ingestion legs.
+  See
   [[../decisions/agent-capability-scope-and-business-memory]]. Every
   other part still gets its own `/plan-eng-review` pass when Commander
   schedules it — this doc is a map, not a full spec.

@@ -1,5 +1,23 @@
 # Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
 
+## BC-076 severe unfixed bug found (2026-08-31, follow-up pass) — the tool cannot retrieve real content for any client
+
+The same-day follow-up pass that wired all 3 archetypes' system prompts
+to use `Search_business_kb` also live-verified the tool with real
+seeded content, and found `client_id` resolves to `null` on every
+call — a genuine n8n platform limitation (a `toolWorkflow` node invoked
+as an AI Agent tool cannot reliably resolve `$()`/`$json`/`$node[]`
+references to sibling main-chain nodes), reproduced 6 independent ways.
+**Consequence: the tool always queries Pinecone under an empty/wrong
+namespace, so it will never return real client-scoped content even
+once the remaining 4 ingestion legs are built.** This is now the real
+blocker on BC-076's launch gate (D6/D9), ahead of the ingestion legs
+themselves — a wired-but-broken tool doesn't satisfy "verified," and
+building more ingestion into a tool that can't retrieve it changes
+nothing observable. Two untried candidate fixes and the full repro
+detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s Search Business
+KB Tool entry, `Wiki/log.md` session-bc076-followup-kb-client-id-bug.
+
 ## BC-076 build-ready spec locked (2026-08-31, fifth pass — schema, ingestion, verification plan)
 
 Now that Part 1/D6 made BC-076 launch-critical, this pass produced the
