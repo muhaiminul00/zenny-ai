@@ -120,6 +120,37 @@ recurring class of bug in this project):**
   `addConnection`/`removeConnection` operations, confirmed as genuinely
   separate operations in this tool.
 
+**5. Explicit `responseFormat: 'json'` can crash an HTTP node outright
+(found live, BC-074/075, 2026-08-31):** an HTTP Request node (plain or
+`httpRequestTool`) calling one of this project's own n8n-hosted webhook
+workflows (WF-002/WF-003/WF-010, confirmed on all three) with
+`options.response.response.responseFormat: 'json'` explicitly set can
+throw `TypeError: Cannot read properties of undefined (reading 'data')`
+(`HttpRequestV3.node.ts:1158`) — not a graceful error, a hard node crash.
+Same crash class as the already-documented `FIXED BC-029 #6` (WF-001's
+`Route To Human Handoff` node), but this confirms it is NOT
+tool-node-specific — it hit a plain `httpRequest` node too. **This had
+been live and unnoticed in BC-073's shipped `Check_availability` tool
+since 2026-08-29** — its own live verification never happened to force a
+real successful response through that exact node, so the bug shipped
+silently. **Fix: omit `responseFormat` entirely** (let it default) on any
+HTTP node calling one of these webhooks — this is the third
+response-format-related crash class on this project's list (see #1
+above), reinforcing that this project's own webhook responses need
+active option-tuning per node, not a copy-pasted default.
+
+**6. Renaming a node via `renameNode` does not give the renamed-into node
+any of the original node's connections (found live, BC-074/075):** the
+established live-test pattern (swap a real trigger node's name aside,
+rename a temporary Set node into its place so `$("<TriggerName>")`
+expressions resolve against test data) correctly carries the OLD node's
+existing connections to its new name, but the node being renamed IN
+starts with zero connections of its own — a fresh `addConnection` is
+required from it to whatever the old trigger fed, or the harness silently
+dead-ends at that node with no error beyond "workflow completed" at the
+wrong place. Always add the explicit connection in the same operation
+batch as the rename.
+
 ## Why (if a non-obvious decision)
 
 These are documented as a single reference page (rather than left

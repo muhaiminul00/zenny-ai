@@ -10,7 +10,45 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-31 (latest) — by /execute — **BC-2026-08-31-concurrency-hardening
+2026-08-31 (latest) — by /execute — **BC-074/075 shipped: Appointment +
+Consultation archetype nodes built, live-verified, published, both
+inheriting BC-2026-08-31's memory-rehydration pattern from day one.**
+Eng review (gstack `/plan-eng-review`) found: no new confirmation gate
+needed for either archetype (the locked commerce guardrail is scoped to
+money-shaped actions, neither `WF-003` nor `WF-010` touches client
+money/stores); `insert_client_lead`'s FK requires a lead before either
+Tool can be called, so 2 new lead-mint sub-workflows were built (same
+shape as BC-073's cart one, minus the verification-queue step); no real
+lead-scoring mechanism exists anywhere in Zenny's own runtime, so
+BC-075 ships an explicitly-flagged provisional inline LLM-derived score
+as a stand-in, not a finished scorer. Human's cross-archetype capability/
+business-memory question resolved via AskUserQuestion: scoped OUT of
+these cards, deferred to a future BC (recommended shape: generalize the
+existing Notion+Pinecone KB pattern into a cross-archetype tool). **1
+cross-cutting bug found live, affecting already-shipped BC-073:**
+`Check_availability`'s explicit `responseFormat:'json'` crashes on any
+real tool call (`Cannot read properties of undefined reading 'data'`) —
+had been silently broken in production since BC-073 shipped 2026-08-29;
+fixed in all 3 workflows, republished. **Real, disclosed external
+blocker (pre-existing, not a defect here):** both new test clients have
+zero calendar connections, and `WF-002`/`WF-003`/`WF-010`'s shared
+credential-resolution step now hard-crashes in that case because its own
+notification fallback hits the already-expired `zenny-notification-
+sender` Gmail credential (Active Blocker since BC-053) — blocked a fully
+clean success-path test for the calendar-touching tools; everything up
+to that known point verified live and correct instead. **Fully clean,
+un-blocked proof obtained:** WF-010's real hard Score Gate correctly
+rejecting a low score with a genuine 400, live end to end. 2 new n8n
+platform quirks logged (`Wiki/platform-quirks/n8n-node-behaviors.md`
+items 5-6). All synthetic test data cleaned up. Full detail:
+`06_Infrastructure/n8n/Workflow_Registry.md`, `Wiki/log.md`
+session-bc-074-075-build. **Next:** the disclosed calendar-credential
+blocker needs human OAuth reconnection before a fully clean success-path
+test is possible for any calendar-touching archetype tool; otherwise
+awaiting human go-ahead for further work (BC-076+ business-memory tool,
+or channel-gateway track).
+
+2026-08-31 (prior) — by /execute — **BC-2026-08-31-concurrency-hardening
 shipped: 4 real multi-tenant/multi-concurrent-user gaps in BC-072/073
 found + fixed, human-flagged before any more archetype nodes get built
 on the same foundation.** gstack `/investigate` found 3 SQL-level race

@@ -1238,6 +1238,95 @@ Architecture: `05_Platform_Builds/Zenny_SaaS/Zenny_MultiNode_Runtime_Architectur
 
 Synthetic rows cleaned up after every test.
 
+**FIXED, cross-cutting (found live while building BC-074/075, 2026-08-31):** `Check_availability`'s HTTP Request Tool node had an explicit `options.response.response.responseFormat: 'json'` set — this crashes with `Cannot read properties of undefined (reading 'data')` (`HttpRequestV3.node.ts:1158`) on any real tool call, the same crash class as WF-001's documented `FIXED BC-029 #6`, never previously hit on this specific node because BC-073's own live verification never got a real successful tool-call response through it (the roster's stock state always returned `available:false` early, via a different code path). **This means any real customer asking about availability since BC-073 shipped (2026-08-29) would have silently gotten a generic "having trouble checking" apology instead of a real answer — undetected until this session.** Fixed by removing the explicit `responseFormat`, matching the already-proven working pattern elsewhere in this repo. Republished same day.
+
+---
+
+### Zenny Runtime - Appointment Node (BC-074)
+**n8n ID:** `VcaqfwExxxiknOrO` · **published**, active (sub-workflow, no production trigger)
+
+**PURPOSE:** BC-074's appointment archetype node — same Agent-based pattern as BC-073's Commerce-Ecom Node, including BC-2026-08-31's memory-rehydration chain from day one (not retrofit). Handles FAQ/availability Q&A (auto), booking (auto), cancellation (gated via WF-013's own existing tier logic), and status lookup (auto).
+
+**TRIGGER:** Execute Workflow Trigger (Define Below): `client_id`, `channel`, `external_id`, `message_text`.
+
+**FLOW:** identical shape to the Commerce-Ecom Node (BC-072 session resolution → memory-cold check/rehydration → business name + `appointment_agent_system` prompt → Agent run → persist) with 4 tools instead of 2: `Check_availability` (HTTP Request Tool → WF-002, `check_type: calendar`, no gate), `Create_appointment` (`toolWorkflow` → new **Zenny Runtime - Book Appointment (Direct)** sub-workflow, no gate — see Architecture Review finding below), `Cancel_appointment` (HTTP Request Tool → WF-013's real webhook directly — its own existing BC-053 tier branch + BC-2026-08-31 race-safe claim flow already handle confirmation, no new gate needed), `Get_booking_status` (HTTP Request Tool → WF-015, read-only, no gate).
+
+**REAL FINDING — no new confirmation gate needed (Architecture Review, `/plan-eng-review`):** the locked commerce-tool guardrail (BC-073's CEO review) is scoped to money-shaped actions. `WF-003` (CreateAppointment) writes only to Zenny's own DB/calendar, never a client store or client money — checked directly, not assumed from the name. Unlike BC-073 (which had to build a gate for `CreateCart`), BC-074 adds zero new gate logic.
+
+**REAL FINDING — `insert_client_lead`'s FK requires a real lead before any conversion tool can be called (caught live during build, not anticipated in planning):** `WF-003` requires `lead_id` in its payload, and nothing upstream of this Agent creates one (BC-072's session resolution only resolves `customer_id`, per BC-073's own precedent). **Zenny Runtime - Book Appointment (Direct)** (new sub-workflow, n8n ID `YR4m0hWUHtkCBbvj`) mints a lead (`insert_client_lead`, `archetype: appointment`, `intent: create_appointment`) then calls `WF-003`'s real webhook directly with the minted `lead_id` — same shape as BC-073's `Zenny Runtime - Queue Commerce Cart Verification`, minus the verification-queue step (not needed here per the finding above).
+
+**FIXED, found live during this build (same crash class as the Commerce-Ecom fix above, confirmed NOT tool-node-specific — a plain `httpRequest` node hit it too):** `Check_availability`, `Cancel_appointment`, `Get_booking_status` (all `httpRequestTool`), and `Create Appointment (WF-003)` inside the lead-mint sub-workflow (a plain `httpRequest`) all had the same explicit `responseFormat: 'json'` — all 4 fixed by removing it, before first publish this time (no live-broken window).
+
+**REAL, DISCLOSED EXTERNAL BLOCKER (pre-existing, not a BC-074 defect):** the appointment-archetype test client (`client_test_003_acme_appointment_test`) has zero `client_connections` rows for `calendar` (same "first real zero-connection caller" scenario BC-031 already documented for WF-003). `WF-002`/`WF-003`'s own `Resolve Calendar Credential (UTIL-006)` step now hard-crashes in that scenario — not a graceful `our_db_fallback` degrade as documented — because its own internal ops-notification fallback uses the `zenny-notification-sender` Gmail credential, which has been expired since BC-053 (2026-08-14, already logged as an Active Blocker, `Wiki/infra/verification-approval-queue.md`). **This blocks a fully clean success-path live test for `Check_availability`/`Create_appointment` against this specific test client** — every other part of the chain (lead-mint, correct webhook payload shape, WF-003's own input validation/schema-resolution/customer-check) was confirmed live and correct up to that exact point. Not fixed here (Credential Gate — needs human OAuth reconnection); the only roster client with a real connected Google Calendar (`client_test_002_acme_commerce_test`) is commerce-ecom, not appointment/consultation, so swapping test clients wasn't a viable workaround either.
+
+**REAL DEPENDENCIES:** `hA0PJmeEzEeLssNC` (BC-072), `YR4m0hWUHtkCBbvj` (this card, new), WF-002/WF-013/WF-015 (called by URL, not modified), `get_client_agent_prompt`/`append_message`/`get_recent_messages` RPCs, `openrouter-zm` + `zenny-vault-suparbase` credentials. New prompt: `appointment_agent_system`, seeded in `tpl_appointment` + `client_test_003_acme_appointment_test`.
+
+**LAST VERIFIED:** BC-074, 2026-08-31 — live, real external calls:
+- FAQ/availability path (AC1): real message → real customer/conversation created → `Check_availability` called correctly (real webhook, no crash post-fix) → graceful LLM response.
+- Cold-buffer memory rehydration (AC5): a genuinely cold conversation (`is_new:false`, `messagesCount:0` from a fresh n8n process) correctly triggered `Get Recent History (RPC)` → `Rehydrate Memory`, confirmed via a second turn correctly finding `messagesCount:2` already warm from the live in-process buffer (same mechanism as BC-073, proven working, not re-derived).
+- Booking chain wiring (AC2, partial — see disclosed blocker above): `Create_appointment` correctly minted a real lead and called WF-003's real webhook with the correct payload; WF-003 itself correctly validated input and resolved schema/customer before hitting the disclosed external blocker.
+- Status lookup (AC4): `Get_booking_status` called with a synthetic reference, correctly got WF-015's real `NOT_FOUND` response, surfaced gracefully to the customer — full round trip, no DB fixture needed.
+- Tenant isolation (AC6): inherited via BC-072's shared sub-workflow, same as BC-073 — not re-proven.
+- **Not live-verified this session:** `Cancel_appointment`'s tool-call wiring specifically (same `httpRequestTool` pattern as the 3 proven tools, same fix already applied, calling WF-013 which is independently proven live since BC-026/053/BC-2026-08-31) — a live spot-check is recommended before the next session touching this workflow, not blocking.
+
+All synthetic rows (conversations/messages/sessions/leads) cleaned up after testing.
+
+---
+
+### Zenny Runtime - Book Appointment (Direct)
+**n8n ID:** `YR4m0hWUHtkCBbvj` · **published**, active (sub-workflow, `toolWorkflow` target for BC-074's Appointment Node)
+
+**PURPOSE:** Mints a lead (`insert_client_lead`, required by `insert_client_appointment_conversion`'s FK — the shared session resolver only resolves `customer_id`, not `lead_id`) then calls WF-003 CreateAppointment's real webhook directly. No confirmation gate — see BC-074's Architecture Review finding above.
+
+**TRIGGER:** Execute Workflow Trigger (Define Below): `client_id`, `client_schema_name`, `customer_id`, `channel`, `service`, `preferred_date`, `preferred_time`, `conversation_summary`.
+
+**FLOW:** `Insert Lead (RPC)` (`p_archetype: appointment`, `p_intent: create_appointment`, same `channel === 'web_chat' ? 'web-chat' : channel` source-channel mapping as BC-073's cart sub-workflow) → `Create Appointment (WF-003)` (real webhook call, `lead_id` from the mint step) → `Return` (echoes WF-003's real result).
+
+**REAL DEPENDENCIES:** `insert_client_lead` RPC, WF-003 (called by URL, not modified).
+
+**LAST VERIFIED:** BC-074, 2026-08-31 — direct test harness (bypassing the Agent's own tool-call judgment): real lead minted with correct archetype/intent/channel mapping, real webhook call reached WF-003, which correctly validated input and resolved schema/customer before hitting the disclosed external calendar-credential blocker documented above. Synthetic lead rows cleaned up after.
+
+---
+
+### Zenny Runtime - Consultation Node (BC-075)
+**n8n ID:** `pTtw04cyetGDPKGd` · **published**, active (sub-workflow, no production trigger)
+
+**PURPOSE:** BC-075's consultation archetype node — same Agent-based pattern as BC-074, with a provisional score-collection stand-in for WF-010's hard Score Gate (see Architecture Review finding 3 below — flagged explicitly, not presented as a finished scoring system).
+
+**TRIGGER:** Execute Workflow Trigger (Define Below): `client_id`, `channel`, `external_id`, `message_text`.
+
+**FLOW:** identical shape to BC-074 with 3 tools: `Check_availability` (HTTP Request Tool → WF-002, `archetype: consultation`, `check_type: calendar`, no gate), `Create_scored_booking` (`toolWorkflow` → new **Zenny Runtime - Book Scored Consultation (Direct)** sub-workflow, no new gate — WF-010's own hard Score Gate is the real enforcement), `Get_booking_status` (HTTP Request Tool → WF-015, read-only, no gate).
+
+**REAL FINDING — no lead-scoring mechanism exists anywhere in Zenny's own runtime (Architecture Review, flagged not silently patched):** `WF-010`'s hard Score Gate (`lead_score < 50` → 400) is the caller's responsibility to satisfy, but nothing in the current pipeline computes a real score (Convocore's funnel is fully stopped per this doc's own CORRECTION section; WF-001 never computed one either, per its own spec: "no lead-scoring logic here"). **Provisional stand-in, explicitly flagged as such, not a finished feature:** the consultation Agent's system prompt instructs it to ask 1-2 qualifying questions and derive an honest `lead_score` inline from the answers before calling `Create_scored_booking`. `WF-010`'s own hard gate still enforces the real floor regardless of how the score was derived. **A real scoring mechanism is a genuine future Build Card, not in scope here.**
+
+**FIXED, proactively (same crash class as BC-074, applied before first publish):** `Check_availability`, `Get_booking_status` (`httpRequestTool`) and `Create Scored Booking (WF-010)` inside the lead-mint sub-workflow (plain `httpRequest`) all had the explicit `responseFormat: 'json'` removed.
+
+**REAL DEPENDENCIES:** `hA0PJmeEzEeLssNC` (BC-072), `9n3qbyRfScHQXT3z` (this card, new), WF-002/WF-015 (called by URL, not modified), `get_client_agent_prompt`/`append_message`/`get_recent_messages` RPCs, `openrouter-zm` + `zenny-vault-suparbase` credentials. New prompt: `consultation_agent_system`, seeded in `tpl_consultation` + `client_test_004_acme_consultation_test`.
+
+**LAST VERIFIED:** BC-075, 2026-08-31 — live, real external calls:
+- FAQ path (AC1): real message → correct genericized prompt loaded → LLM answered directly, correctly asked a qualifying follow-up per its own system prompt (no tool call needed, matching BC-073's AC1 precedent).
+- **Score Gate rejection (AC3) — fully clean, real, un-blocked success proof:** direct sub-workflow test with `lead_score: 20` → real lead minted → WF-010's real webhook returned a genuine `400 VALIDATION_ERROR` naming the Score Gate threshold explicitly. Exactly the documented hard-gate behavior, live-proven end to end.
+- Score Gate pass-through (AC2, partial): `lead_score: 72` correctly passed the gate (no 400) and proceeded to the same disclosed external calendar-credential blocker documented under BC-074 — same root cause, not a new issue, not fixed here.
+- Tenant isolation: inherited via BC-072, not re-proven.
+- **Not live-verified this session:** `Get_booking_status`'s tool-call wiring specifically (same proven pattern as BC-074's identical tool) and the full qualifying-question → scored-booking conversational flow through the Agent itself (verified via the direct sub-workflow test instead, which proves the backend chain but not the Agent's own multi-turn qualifying behavior) — recommended spot-checks before the next session touching this workflow, not blocking.
+
+All synthetic rows cleaned up after testing.
+
+---
+
+### Zenny Runtime - Book Scored Consultation (Direct)
+**n8n ID:** `9n3qbyRfScHQXT3z` · **published**, active (sub-workflow, `toolWorkflow` target for BC-075's Consultation Node)
+
+**PURPOSE:** Mints a lead (`insert_client_lead`) then calls WF-010 CreateScoredBooking's real webhook directly, passing along the Agent's own derived `lead_score`. No confirmation gate — WF-010's own hard Score Gate is the real enforcement mechanism.
+
+**TRIGGER:** Execute Workflow Trigger (Define Below): `client_id`, `client_schema_name`, `customer_id`, `channel`, `lead_score`, `service_type`, `preferred_date`, `preferred_time`, `conversation_summary`.
+
+**FLOW:** `Insert Lead (RPC)` (`p_archetype: consultation`, `p_intent: create_scored_booking`) → `Create Scored Booking (WF-010)` (real webhook call, `lead_id` from the mint step, `lead_score` passed through unmodified) → `Return`.
+
+**REAL DEPENDENCIES:** `insert_client_lead` RPC, WF-010 (called by URL, not modified).
+
+**LAST VERIFIED:** BC-075, 2026-08-31 — direct test harness: `lead_score: 20` correctly rejected by WF-010's real Score Gate (`400 VALIDATION_ERROR`); `lead_score: 72` correctly passed the gate and proceeded to the disclosed external calendar-credential blocker (same as BC-074's, not new). Synthetic lead rows cleaned up after.
+
 ---
 
 ## Referenced In Docs But Not Found As A Real Built Workflow

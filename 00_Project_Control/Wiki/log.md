@@ -9,6 +9,73 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-31] session-bc-074-075-build | Appointment + Consultation nodes built, live-verified, published; 1 cross-cutting bug found + fixed in already-shipped BC-073
+
+**Trigger:** Execute handoff from the BC-074/075 eng review (same day).
+
+**Built:** two new Agent-based archetype nodes (`Zenny Runtime - Appointment
+Node`, `Zenny Runtime - Consultation Node`) mirroring BC-073's structure
+exactly, plus two new lead-minting sub-workflows (`Zenny Runtime - Book
+Appointment (Direct)`, `Zenny Runtime - Book Scored Consultation (Direct)`)
+after a real gap was caught mid-build: `insert_client_lead`'s FK requires a
+lead before `WF-003`/`WF-010` can be called, and nothing upstream creates
+one — same pattern as BC-073's cart sub-workflow, minus the verification-
+queue step (not needed, per the eng review's no-new-gate finding). Both new
+prompt keys (`appointment_agent_system`, `consultation_agent_system`)
+seeded into their templates and real test client schemas.
+
+**1 cross-cutting bug found and fixed, affecting already-shipped BC-073:**
+`Check_availability`'s HTTP Request Tool had an explicit
+`responseFormat: 'json'` that crashes with `Cannot read properties of
+undefined (reading 'data')` on any real tool call — the same crash class
+as WF-001's documented `FIXED BC-029 #6`, but never previously hit on a
+tool-subnode HTTP call. **This had been live in BC-073's shipped Commerce-
+Ecom Node since 2026-08-29** — any real customer asking about availability
+would have silently gotten a generic apology instead of a real answer,
+undetected because BC-073's own live verification never forced a real
+successful response through that exact node. Found live while building
+BC-074, fixed in all 3 workflows (BC-073's live one + both new ones),
+republished same day.
+
+**Real, disclosed external blocker (pre-existing, not a defect in this
+card):** both new archetype test clients have zero calendar connections,
+and `WF-002`/`WF-003`/`WF-010`'s shared `Resolve Calendar Credential
+(UTIL-006)` step now hard-crashes in that scenario (not a graceful
+degrade) because its own internal notification fallback uses the already-
+expired `zenny-notification-sender` Gmail credential (logged as an Active
+Blocker since BC-053, 2026-08-14). Blocked a fully clean success-path test
+for the calendar-touching tools on both cards — everything up to that
+exact point was confirmed live and correct instead (lead-mint, real
+webhook calls, WF-003/WF-010's own input validation). Not fixed (Credential
+Gate — needs human OAuth reconnection).
+
+**Fully clean, un-blocked live proofs obtained:** BC-074's FAQ path,
+cold-buffer memory rehydration, and status-lookup tool (real `NOT_FOUND`
+round trip); BC-075's FAQ path and — the strongest result this session —
+WF-010's real hard Score Gate correctly rejecting a `lead_score: 20` call
+with a genuine `400`, live-proven end to end with zero external blockers
+in the way.
+
+**2 new n8n platform quirks discovered and logged**
+(`Wiki/platform-quirks/n8n-node-behaviors.md`, items 5-6): the
+`responseFormat` crash above is confirmed NOT tool-node-specific (hit a
+plain `httpRequest` node too); renaming a node into a trigger's old name
+for live-testing doesn't carry the old node's connections to the new one,
+needs an explicit `addConnection` added in the same batch.
+
+**Not live-verified this session (flagged, not blocking):**
+`Cancel_appointment`'s specific tool-call wiring (same proven pattern,
+same already-independently-proven backend) and the full multi-turn
+qualifying-question flow through the Consultation Agent itself.
+Recommended spot-checks for the next session touching these workflows.
+
+**Output:** all 4 workflows published (2 new archetype Agent nodes, 2 new
+lead-mint sub-workflows), 1 already-shipped workflow (BC-073's Commerce-
+Ecom Node) republished with the crash fix, `Workflow_Registry.md` updated
+with full entries for all 5, Wiki updated (this entry +
+`n8n-node-behaviors.md` items 5-6 + `index.md`), `PROJECT_STATE.md`
+updated. All synthetic test data cleaned up.
+
 ## [2026-08-31] session-bc-074-075-eng-review | gstack /plan-eng-review for appointment + consultation nodes, business-memory question resolved (scoped out)
 
 **Trigger:** Commander→gstack planning bridge for BC-074/075, human's explicit
