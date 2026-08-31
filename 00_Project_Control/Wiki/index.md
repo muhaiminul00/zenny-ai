@@ -78,8 +78,18 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
   settings) is locked, referencing open-source Chatwoot's UX patterns
   without adopting it as infra; Part 2's catalog sync gained Google
   Sheets + embedded Baserow/Grist legs for non-Shopify/WooCommerce
-  clients. Every other part still gets its own `/plan-eng-review` pass
-  when Commander schedules it — this doc is a map, not a full spec.
+  clients. **Part 1 re-sequenced (third pass, fourth `/plan-eng-review`):**
+  priority reversed — production-hardening the 3 shipped archetypes
+  (Commerce-Ecom/Appointment/Consultation) now comes BEFORE the remaining
+  3 (moved to Part 1-EXT, deferred). Locks a launch-critical gate scope
+  (credential fix, capability/channel/onboarding audits, minimum
+  alerting, two launch-critical dashboard pieces, QA pass), reverses
+  BC-076 (business memory) from fast-follow to launch-critical per
+  explicit human instruction, and locks independent per-archetype
+  rollout (no bundling across the 3). See
+  [[../decisions/agent-capability-scope-and-business-memory]]. Every
+  other part still gets its own `/plan-eng-review` pass when Commander
+  schedules it — this doc is a map, not a full spec.
 
 ## Open Decisions
 

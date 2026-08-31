@@ -10,7 +10,35 @@ file points to but doesn't explain.
 ---
 
 ## Last Updated
-2026-08-31 (latest) — by /execute — **BC-074/075 shipped: Appointment +
+2026-08-31 (latest) — by /execute — **Part 1's production-readiness gate
+begins: Part 8 (disclosed `zenny-notification-sender` credential blocker,
+Active Blocker since BC-053) CLOSED, live-verified, not just trusted on
+the human's word.** Human reconnected the Gmail OAuth credential and
+asked for verification before moving to BC-076. **Found live, not
+assumed:** the most recent real exercise of this credential (an hourly
+"Tool Execution Fallback" chain, `UTcdzMvOb7gCQM5J` → UTIL-004) had
+failed at 09:01 UTC with "needs to be reconnected" — the reconnect's
+effect hadn't been exercised by anything since. Built a throwaway 2-node
+test workflow (Manual Trigger → Gmail send, bound to the same credential
+ID `dUDWiqDs4C95gnLG` the production nodes use), executed it live:
+real success, real Gmail message ID `1a05730046f5a2e9`, `SENT` label —
+genuine proof, not a credential-exists check. Temp workflow archived
+immediately after. **Real, separate gap found and flagged, not fixed
+(out of Part 8's scope):** that same hourly fallback chain has 609 error
+executions on record, all for an unrelated root cause — a client's
+inbox-sync is missing a `client_connections` row for its email category,
+which has been silently failing hourly. Worth folding into Part 7
+(ops/monitoring) or the channel-gateway audit (Part 4) when picked up —
+not touched here. Full detail: `Wiki/log.md`
+session-part8-credential-verify-and-bc076-planning. **Next:** BC-076
+(business-memory/KB tool) — per Part 1's D6, launch-critical, backend
+must be verified against 1-2 internally-built demo businesses before any
+real client goes live. Needs its own gstack `/plan-eng-review` pass for
+the actual build-ready spec (schema, ingestion workflow, per-archetype
+wiring) before a formal Build Card is issued — not yet done as of this
+entry.
+
+2026-08-31 (prior) — by /execute — **BC-074/075 shipped: Appointment +
 Consultation archetype nodes built, live-verified, published, both
 inheriting BC-2026-08-31's memory-rehydration pattern from day one.**
 Eng review (gstack `/plan-eng-review`) found: no new confirmation gate

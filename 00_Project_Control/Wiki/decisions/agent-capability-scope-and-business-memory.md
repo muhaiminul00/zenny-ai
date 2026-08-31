@@ -1,5 +1,41 @@
 # Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
 
+## Production-readiness gate locked (2026-08-31, fourth pass — priority reversal + BC-076 launch-gate)
+
+Human explicit instruction: stop treating "finish the remaining 3
+archetypes" as next-up — fully production-harden the 3 already-shipped
+archetypes (Commerce-Ecom/BC-073, Appointment/BC-074, Consultation/BC-075)
+first, so the pattern replicates to the rest. Locked via gstack
+`/plan-eng-review` (full detail: blueprint's Part 1 + its third GSTACK
+REVIEW REPORT):
+
+- **Gate scope (D5):** launch-critical only — credential reconnect,
+  capability-breadth spot-check, channel-gateway audit, onboarding-
+  pipeline confirmation, minimum execution-failure alerting, two
+  launch-critical dashboard pieces (existing-screen verification + the
+  new KB/catalog self-serve screen), and a final QA pass, all per
+  archetype. Full dashboard rebuild and full ops/monitoring stack stay
+  fast-follow.
+- **BC-076 timing (D6) — REVERSED from this page's own earlier framing:**
+  the business-memory/KB tool is now launch-critical, not fast-follow.
+  Human's explicit call: "everything should be built, verified before any
+  client gets live... test it if required with demo business made by
+  ourselves." The backend must be built and verified against 1-2
+  internally-built demo businesses before any real client launches on any
+  of the 3 archetypes.
+- **Rollout mode (D7):** independent per-archetype — each of the 3
+  archetypes goes live as soon as its own gate items clear, not bundled.
+- **KB/catalog UI scope (D8):** hybrid — the self-serve dashboard screen
+  for a client to manage their own KB/catalog is ALSO launch-critical
+  (reopening D3's dashboard-fast-follow call for this one screen only);
+  the internal demo businesses used to verify BC-076 itself can be
+  populated manually, no UI needed for those.
+
+**Net effect on this page's own prior status ("not decided, not built"):**
+still not built, but no longer open-ended — this is now the explicit,
+ordered gate a future BC-076 Build Card must satisfy before any of these
+3 archetypes can onboard a real paying client.
+
 ## Scope broadened (2026-08-31, third pass — dashboard + spreadsheet sync)
 
 Human explicitly instructed: read `02_Agent_Runtime_System/

@@ -9,6 +9,109 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-31] session-part8-credential-verify-and-bc076-planning
+
+Human reconnected `zenny-notification-sender` (expired Gmail OAuth,
+Active Blocker since BC-053) and asked for live verification before
+moving to BC-076 Build Card work. Handed to Execute per CLAUDE.md's
+"not even a read" rule for live infra — Commander never touched n8n MCP
+directly.
+
+Invoked `n8n-credentials-and-security-official` skill first (non-
+negotiable before any n8n action). `list_credentials` confirmed the
+credential object exists (`dUDWiqDs4C95gnLG`, type `gmailOAuth2`) but
+that alone isn't proof — per "Claimed Limitations Need Evidence,"
+existence isn't authentication. Checked `search_executions` for the
+credential's real production consumers first: found the hourly "Tool
+Execution Fallback" chain (`LzP5m25iMmhROVsD` schedule → `UTcdzMvOb7gCQM5J`
+→ UTIL-004 `fcilrbwldjnn92Yn`) had 609 error executions on record, most
+recent at 09:01 UTC — 36 minutes before this check — still failing with
+"The credential 'zenny-notification-sender' needs to be reconnected."
+That proved the reconnect's effect hadn't yet been exercised by anything,
+not that it had failed.
+
+Built a throwaway 2-node test workflow (Manual Trigger → Gmail send,
+bound to the same credential ID the production nodes use) via
+`create_workflow_from_code` (SDK reference + node types read first, per
+protocol), executed it manually: real success, Gmail message ID
+`1a05730046f5a2e9`, `SENT` label. Archived the temp workflow immediately
+after — **Part 8 is genuinely closed, live-verified, not taken on the
+human's word alone.**
+
+**Found and flagged, not fixed — out of Part 8's scope:** the 609 hourly
+failures weren't all this credential's fault going forward — the
+underlying trigger was "SyncInbox failed for client
+7e2dffbf-97a2-46d8-b60f-6782379f02b6 (email). Reason: no
+client_connections row for this client/category." That's a separate,
+still-open gap (a client's email-sync integration was never actually
+connected) that will keep firing the fallback chain hourly regardless of
+the Gmail credential's health, just without hitting this specific
+symptom anymore. Recommended home: Part 7 (ops/monitoring, since this
+is exactly the "broken dependency failing quietly" case Part 7 already
+names) or Part 4's channel-gateway audit. Not investigated further or
+touched this session — flagged for whoever picks up Part 4/7.
+
+PROJECT_STATE.md's Last Updated section rewritten (Part 8 closure entry
+prepended). **Next, same session:** Commander resumes to plan BC-076's
+actual build-ready spec via gstack `/plan-eng-review` (D5-D8 already
+locked the boundary/timing, not the schema/workflow implementation).
+
+## [2026-08-31] session-zenny-launch-blueprint-production-gate
+
+Fourth pass on `docs/designs/zenny-launch-blueprint.md`. Human's explicit
+instruction: stop treating "finish the remaining 3 archetypes" as
+next-up — fully production-harden the 3 already-shipped archetypes
+(Commerce-Ecom/BC-073, Appointment/BC-074, Consultation/BC-075) first, so
+the pattern replicates to the rest. Ran gstack `/plan-eng-review` (target
+explicitly named, scope gate skipped per its own exception 2). Step 0:
+no 8+ file / 2+ service smell, pure scope/sequencing lock, no code
+changes; WebSearch skipped (project-specific prioritization, not an
+unfamiliar technical pattern).
+
+4 decisions locked via AskUserQuestion (D5-D8, continuing the blueprint's
+own running decision letters):
+- **D5 (gate scope):** launch-critical only — credential reconnect
+  (Part 8), capability-breadth spot-check (Part 3), channel-gateway audit
+  (Part 4), onboarding-pipeline confirmation (Part 5), minimum
+  execution-failure alerting (narrowed Part 7), two launch-critical
+  dashboard pieces (narrowed Part 6), final QA pass (Part 9) — all per
+  archetype. Full dashboard rebuild + full ops stack fast-follow. Human
+  accepted the recommended option.
+- **D6 (BC-076 timing) — human explicitly REJECTED the recommended
+  fast-follow option.** Verbatim: "Everything should be built, verified
+  before any client gets live. we have to test it if required with demo
+  business made by ourselves." Business-memory/KB tool is now
+  launch-critical, backend verified against 1-2 internally-built demo
+  businesses before any real client launches — reverses this doc's own
+  earlier working assumption (established in the second/third
+  `/plan-eng-review` passes) that it could fast-follow.
+- **D7 (rollout mode):** independent per-archetype gate, not bundled —
+  each of the 3 archetypes goes live as soon as its own D5 gate items
+  clear. Human accepted the recommended option.
+- **D8 (KB/catalog UI scope) — a follow-up question fired to resolve a
+  real tension D6 created against D5/D1's dashboard-fast-follow call.**
+  Human's verbatim answer: "Full self-serve ui before launch but we can
+  manually populate for first 1-2 demo business." Locked as hybrid: the
+  self-serve KB/catalog dashboard screen is launch-critical (reopening
+  the dashboard-fast-follow call for this one screen only, rest of Part
+  6 stays fast-follow); the internal demo businesses used to verify
+  BC-076 itself can be populated manually, no UI needed for those.
+
+Blueprint's Part 1 rewritten (new production-readiness gate content, old
+"finish the archetype set" content moved to Part 1-EXT and marked
+deferred/blocked by Part 1, not parallel), "Known open items" list item 1
+updated, Sequencing notes section rewritten with the new 7-step priority
+order, a third `## GSTACK REVIEW REPORT` section appended (self-contained,
+does not replace the first two). `Wiki/decisions/agent-capability-scope-
+and-business-memory.md` gained a new top section documenting D5-D8;
+`Wiki/index.md`'s Roadmap paragraph extended to note the re-sequencing.
+Files touched, not committed this session (Commander mode — docs-only,
+single-file-at-a-time edits, no git-write; per CLAUDE.md hands off to
+Execute for the actual commit when the human asks). **Next:** awaiting
+human direction — either hand this pass's doc changes to Execute for a
+trivial housekeeping commit, or continue planning by picking up Part 8
+(credential reconnect) or the BC-076 Build Card itself.
+
 ## [2026-08-31] session-zenny-launch-blueprint-broaden | Dashboard architecture (D3) + spreadsheet catalog sync (D4) locked, scope broadened per explicit human instruction
 
 **Trigger:** human asked to re-run the architecture pass, this time

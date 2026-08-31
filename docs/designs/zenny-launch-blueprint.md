@@ -33,6 +33,8 @@ Commerce-Restaurant.**
 **Known open items, already flagged, not yet scheduled:**
 1. Business memory (this session's trigger) — no durable per-client KB
    beyond the static `agent_prompts` string; needed across all archetypes.
+   **Locked as launch-critical (D6, third pass, Part 1) — not fast-follow,
+   reversing the earlier working assumption.**
 2. Capability breadth (FAQ, sales-style recommendation) — resolved as
    *probably* a prompt-content question not a missing tool (BC-073's own
    AC1 proves FAQ-style answers happen with no tool call today), but never
@@ -53,15 +55,124 @@ Commerce-Restaurant.**
 Order reflects dependency, not importance — a part can move up if it
 blocks something else once actually planned.
 
-### Part 1 — Finish the archetype set (Emergency, Engagement, Commerce-Restaurant)
+### Part 1 — Production-readiness gate for the 3 shipped archetypes (locked 2026-08-31, third pass — supersedes the sequencing below)
+
+**Human's explicit instruction this pass: stop treating "finish the
+archetype set" as next-up. Fully complete/production-harden Commerce-Ecom
+(BC-073), Appointment (BC-074), and Consultation (BC-075) FIRST — the
+pattern that emerges here is what gets replicated for Emergency,
+Engagement, and Commerce-Restaurant, not built in parallel with them.**
+Locked via gstack `/plan-eng-review` (D5-D8 below); the old Part 1
+("finish the archetype set") moves to **Part 1-EXT** further down and is
+now explicitly deferred, not parallel.
+
+**D5 — gate scope (locked: launch-critical only, not full platform
+readiness).** What must be true before any of these 3 archetypes is
+called production-ready, vs. what fast-follows after the first real
+clients:
+
+**In the gate:**
+- Part 8 — credential reconnect (`zenny-notification-sender` Gmail,
+  Active Blocker since BC-053). Cheap, do first — unblocks a clean
+  calendar-tool test for appointment/consultation.
+- Part 3 — capability-breadth spot-check, live, per archetype (FAQ,
+  sales-style recommendation where relevant) — cheap, rides alongside
+  everything else.
+- Part 4 — channel-gateway parity audit (WhatsApp/Instagram/web chat) on
+  the new own-runtime — real, disclosed unknown, never re-verified since
+  the Convocore→own-runtime pivot.
+- Part 5 — onboarding pipeline confirmed working end-to-end for these 3
+  archetypes against the new runtime (not just checked in isolation per
+  archetype card).
+- Part 6, narrowed to two launch-critical pieces (see D8 below): (a)
+  verify existing dashboard screens — lead-approval, connection-
+  management, client-config — against the new runtime's real data shapes
+  (this is the same gap PROJECT_STATE.md already discloses: BC-073's
+  cart-verification approval Edge Function has never been tested with a
+  real dashboard JWT — that's a real launch blocker for commerce-ecom,
+  not fast-follow); (b) the BC-076 self-serve KB/catalog screen (D8).
+- Part 7, narrowed to a minimum: execution-failure alerting on the core
+  runtime chain + each archetype's Agent, and a credential-expiry check
+  — the two things Part 7's own text already names as the pre-launch
+  floor. Full monitoring/ops stack is fast-follow.
+- **BC-076 (business-memory/KB tool) — locked as launch-critical, not
+  fast-follow (D6 below, reversing this doc's own working assumption).**
+- Part 9 — final QA pass, applied per-archetype (D7 below), once that
+  archetype's own gate items above clear.
+
+**Fast-follows after the first real clients (not gating):**
+- The rest of Part 6 — chats/inbox view, metrics, settings polish, the
+  full Chatwoot-IA-informed screen redesign.
+- The rest of Part 7 — anything beyond execution-failure alerting +
+  credential-expiry checking (dashboards, on-call rotation, etc.).
+
+Rejected: full platform-readiness gate (everything above plus the
+complete dashboard rebuild and full ops stack) — real weeks of work for
+value not yet proven needed pre-launch, the same reasoning the
+concurrency-hardening card already applied against a custom Postgres
+memory system. Rejected: bare-minimum technical gate (just credential
+fix + QA pass, skipping the capability/channel/onboarding audits) —
+leaves real disclosed unknowns (channel parity, onboarding-pipeline
+staleness) untested going into a real client's first experience.
+
+**D6 — BC-076 timing (locked: hard gate, reversing the earlier
+fast-follow framing in "Where things actually stand" above).** Human's
+explicit call: "Everything should be built, verified before any client
+gets live. We have to test it if required with demo business made by
+ourselves." BC-076's backend (the `Search Business KB` tool, ingestion
+workflows, Shopify/WooCommerce/Notion/Sheets sync per D1/D4 above) must
+be fully built and verified against 1-2 internally-built demo
+businesses — not a real client — before any real, paying client goes
+live on any of these 3 archetypes. This reverses this doc's own working
+assumption (Part 3's finding that FAQ-style answers work fine via prompt
+content alone) as a launch-gate call, not a technical correction to that
+finding — the finding still stands for what a bare prompt *can* do, the
+human's call is that a real client shouldn't launch without the fuller
+capability regardless.
+
+**D7 — rollout mode (locked: independent per-archetype gate, not
+bundled).** Each of the 3 archetypes goes live as soon as its own D5
+gate items clear — a client can go live on Commerce-Ecom the moment its
+gate items are done, without waiting on Appointment or Consultation's
+own QA to finish. "These 3 archetypes are production-ready" becomes a
+rolling milestone, not one bundled checkpoint. Matches the concurrency-
+hardening precedent (ship the smallest correct thing) over waiting for a
+tidy simultaneous release.
+
+**D8 — KB/catalog UI scope (locked: hybrid).** Human's explicit call:
+"Full self-serve UI before launch but we can manually populate for first
+1-2 demo business." The BC-076 self-serve KB/catalog dashboard screen
+(where a real client edits their own catalog/FAQ/policies) is
+launch-critical — it must exist before any REAL client goes live, not
+fast-follow — reopening D1's original "rest of Part 6 is fast-follow"
+call for this one screen specifically (the rest of Part 6 stays
+fast-follow, unchanged). The 1-2 internal demo businesses used to verify
+BC-076's backend (D6) can be populated directly/manually, no UI needed
+for those — they're test fixtures, not real clients.
+
+**Sequencing for this gate, per archetype:** Part 8 (credential
+reconnect, once) → Part 3 + Part 4 audits (cheap, parallel) → BC-076
+backend build + demo-business verification (D6) → Part 6's two
+launch-critical pieces (existing-screen verification + KB/catalog
+self-serve screen, D8) → Part 5 onboarding-pipeline confirmation → Part
+7 minimum alerting → Part 9 QA pass for that archetype → that archetype
+goes live independently (D7).
+
+**Blocks:** Part 1-EXT (the remaining 3 archetypes) — deferred until
+this gate is substantially through for the first archetype, so the
+pattern that emerges here (which parts of Part 5/6/7's minimum bar
+actually took real work, what BC-076 verification surfaced) is what gets
+replicated, per the human's explicit instruction this pass.
+
+### Part 1-EXT — Finish the remaining archetype set (Emergency, Engagement, Commerce-Restaurant) — now deferred, not parallel
 Same pattern as BC-073/074/075: Agent workflow + memory-rehydration chain +
 lead-mint sub-workflow + tool wiring, gstack-planned per archetype, built
 against the now-hardened concurrency baseline from day one. Biggest known
 unknown per archetype: which existing Convocore-era Tools (WF-0xx) are
 reusable vs. need a same-shape lead-mint gate like appointment/consultation
-got. **Blocks:** nothing else — can run in parallel with Parts 2-3 once
-scoped, but is probably the highest-value block since 3 archetypes with
-zero coverage is the single biggest live-client gap.
+got. **Blocked by Part 1 above, per this pass's explicit instruction** —
+no longer "runs in parallel," starts once Part 1's gate is substantially
+proven on at least one of the 3 shipped archetypes.
 
 ### Part 2 — Business info architecture: channels, integrations, business-info/KB, tool-calling core
 **Resolved via gstack `/plan-eng-review`, 2026-08-31 (D1, D2 below) — no
@@ -255,12 +366,17 @@ alerting on the core runtime workflows (BC-072 chain + each archetype
 Agent), and a credential-expiry check that doesn't rely on someone noticing
 by accident.
 
-### Part 8 — Clear the disclosed credential blocker
-Human action, not a Build Card: reconnect `zenny-notification-sender`
-(expired Gmail OAuth). Unblocks a fully clean calendar-tool test for
-appointment/consultation, and likely blocks other archetypes' calendar
-paths too (Part 1). Cheap, should happen early — it's a pure dependency
-unlock, not scoped work.
+### Part 8 — Clear the disclosed credential blocker — CLOSED, live-verified (2026-08-31)
+Human reconnected `zenny-notification-sender` (expired Gmail OAuth).
+Execute live-verified via a throwaway test workflow bound to the same
+credential ID the production nodes use — real send succeeded (Gmail
+message ID `1a05730046f5a2e9`), not just checked for existence. **New
+gap found in the same check, flagged not fixed:** the hourly Tool
+Execution Fallback chain (`UTcdzMvOb7gCQM5J`) has 609 error executions
+from an unrelated cause — a client's email-sync integration is missing
+its `client_connections` row — still open, recommended for Part 4 or 7
+when picked up. Full detail: `Wiki/log.md`
+session-part8-credential-verify-and-bc076-planning.
 
 ### Part 9 — Pre-launch QA pass
 Once Parts 1-7 are done: one real end-to-end pass per archetype, per
@@ -274,18 +390,28 @@ new-RPC grant-exposure gaps introduced by Parts 1-2.
 
 ## Sequencing notes (light, not a Gantt chart)
 
-- Part 8 (credential reconnect) is a 5-minute human action — do it whenever
-  convenient, it's a pure unblock.
-- Part 1 (remaining archetypes) is probably the critical path — 3 of 6
-  archetypes with zero build is the largest gap between "here" and "any
-  paying client in one of those verticals."
-- Part 4 (channel parity) deserves an early cheap live-check even before
-  full build — if BC-072's foundation already handles it, this part shrinks
-  a lot; if not, it's a real blocker worth knowing about early.
-- Parts 2, 3, 5, 6, 7 don't strictly block each other or Part 1 — Commander
-  sequences them by whatever's cheapest/highest-value at the time each is
-  actually picked up, not fixed here.
-- Part 9 is last by definition — it's the gate, not a build step.
+**Superseded, third pass (2026-08-31):** the critical path is no longer
+"finish the remaining archetypes." Per Part 1's new production-readiness
+gate, the priority order is now:
+
+1. Part 8 (credential reconnect) — 5-minute human action, do it whenever
+   convenient, pure unblock.
+2. Part 3 + Part 4 audits (capability-breadth, channel-gateway parity) —
+   cheap, run in parallel, for the 3 shipped archetypes only.
+3. BC-076 backend build + demo-business verification (D6) — now
+   launch-critical, the single biggest remaining build in the gate.
+4. Part 6's two launch-critical pieces (existing dashboard screens
+   verified against new schema; BC-076's self-serve KB/catalog screen,
+   D8) — the rest of Part 6 stays fast-follow.
+5. Part 5 (onboarding pipeline confirmation) + Part 7's minimum alerting.
+6. Part 9 (QA pass), per archetype independently (D7) — that archetype
+   goes live the moment its own chain above clears.
+7. Part 1-EXT (Emergency, Engagement, Commerce-Restaurant) — starts once
+   Part 1's gate is substantially proven on at least one shipped
+   archetype, not in parallel with it.
+
+Parts 2's remaining "not decided here" items (KB tool schema/cadence,
+Baserow-vs-Grist) get resolved as part of step 3-4 above, not separately.
 
 ## Explicitly not decided here
 
@@ -342,9 +468,36 @@ rather than contradicting it.
 
 **VERDICT:** Part 2 (business info) and Part 6 (dashboard) both broadened per instruction — architecture locked for both without shrinking scope: real open-source options were surveyed and two adopted as design/implementation inputs (Chatwoot's UX pattern, Baserow/Grist as real embedded infra), one explicitly rejected mid-check (NocoDB, license change) rather than recommended from stale assumption.
 
-**UNRESOLVED DECISIONS:**
+**UNRESOLVED DECISIONS (second pass):**
 - Chatwoot-as-real-infra (D3 option B) — named as the road not taken, not closed forever; worth revisiting if the custom dashboard build proves too slow once fully scoped.
 - Baserow vs. Grist — both viable, not decided; future BC's call.
 - n8n's native Google Sheets node — flagged for live MCP verification by Execute, not assumed.
 - Everything under "Not decided here" in Part 2 and Part 6 above (schema, ingestion workflow, screen-by-screen dashboard design) — future BC's job.
 - The rest of the 9-part blueprint (archetypes 1/3/4/5, channel-gateway parity, onboarding, ops, credential blocker, QA) — untouched by either pass, each gets its own review when scheduled.
+
+---
+
+## GSTACK REVIEW REPORT — Part 1 production-readiness gate for the 3 shipped archetypes (2026-08-31, third pass)
+
+Scope: re-sequence the blueprint's priority (production-harden the 3
+shipped archetypes before starting the remaining 3) and lock 4 scope/
+sequencing decisions (D5-D8: gate scope, BC-076 timing, rollout mode,
+KB/catalog UI scope). Not a review of the full 9-part blueprint, not a
+build.
+
+| Section | Status | Findings |
+|---|---|---|
+| Step 0 (scope challenge) | Done | No 8+ file / 2+ new service smell — pure scope/sequencing lock on an existing doc, no code changes. Existing-code/doc reuse mapped: reused the blueprint's own Parts 3-9 rather than inventing new categories, reused PROJECT_STATE.md's already-disclosed gaps (credential blocker, provisional lead-scorer, untested approval-Edge-Function JWT) rather than re-deriving them. WebSearch skipped — this is a project-specific prioritization call, not an unfamiliar technical pattern needing external validation. |
+| 1. Architecture review | Done, 4 decisions locked | D5 (gate scope: launch-critical only, not full platform readiness — human accepted recommendation), D6 (BC-076 timing: hard gate, human explicitly rejected the fast-follow recommendation and required demo-business verification before any real client), D7 (rollout mode: independent per-archetype, human accepted recommendation), D8 (KB/catalog UI scope: hybrid — self-serve UI gates real-client launch, demo businesses can be manually populated, human's own explicit framing). D6 is the one place this pass's human decision overrode the AI recommendation — logged plainly, not smoothed over. |
+| 2. Code quality review | No issues — no code changes in this pass, scope/sequencing lock only. | — |
+| 3. Test review | Deferred to the future BC(s) | BC-076's own future Build Card must cover demo-business verification as a real acceptance criterion (D6), not just unit-level tool tests — the human's explicit bar is "verified... with demo business made by ourselves," which is an end-to-end test requirement, not a code-review checklist item. The channel-gateway audit (Part 4) and onboarding-pipeline confirmation (Part 5) each need their own live test pass when picked up — not fabricated here for unscoped work. |
+| 4. Performance review | Not applicable this pass | No performance-sensitive architecture introduced — this locks priority order and gate membership, not implementation. |
+
+**VERDICT:** Part 1 re-sequenced and locked: production-hardening the 3 shipped archetypes (Commerce-Ecom, Appointment, Consultation) is now the explicit priority over starting the remaining 3 (moved to Part 1-EXT, deferred). Gate scope (D5), BC-076's launch-critical status (D6), independent per-archetype rollout (D7), and the KB/catalog UI's hybrid scope (D8) are all locked with real tradeoffs recorded. Ready for Commander to translate the sequencing above into scoped Build Cards (starting with Part 8's trivial credential unblock and the BC-076 backend build) as each is picked up.
+
+**UNRESOLVED DECISIONS:**
+- BC-076's exact table/schema shape, ingestion workflow, and per-archetype tool wiring — still a future BC's job, unchanged from the first pass; D6 only changed the launch-gate timing, not the implementation spec.
+- Which specific existing dashboard screens (lead-approval, connection-management, client-config) actually need fixing vs. already work against the new schema — genuinely unknown until Execute reads the current dashboard code against current schema, per Part 6's own "still verify" framing.
+- The demo business(es) used for BC-076 verification (D6) — how many, what archetype(s), how realistic the test data needs to be — not scoped here, a future BC's call.
+- Part 1-EXT (the remaining 3 archetypes) — untouched by this pass beyond confirming it's now sequenced after, not parallel with, Part 1's gate.
+- Everything under "Not decided here" in Part 2 and Part 6 (first and second pass) — still open, unchanged by this pass.
