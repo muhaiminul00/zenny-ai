@@ -9552,3 +9552,76 @@ surface) → squash-merged → branch deleted → `v1.4.0` tag +
 Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
 
 **Next:** none blocking.
+
+## [2026-08-31] gstack-pilot BC-2026-08-31-preflight-allow-dirty shipped (v1.5.0)
+
+Human reported a real live-hit deadlock from `zm-brain` usage: a Build
+Card whose entire job was committing a pre-existing dirty tree hit
+`pre-flight-sync.js` Step 1's unconditional halt (deliberately never
+auto-stashes). Since the `PreToolUse` hook then blocks every Write/Edit
+until a valid marker exists, and the marker only gets written on a
+Step-1 pass, there was no way through the front door — the agent
+worked around it by routing mutations through Bash instead of
+Edit/Write, silently stepping outside the gate's enforcement rather
+than satisfying it.
+
+Chained through `/plan-eng-review` (1 decision, human-confirmed): a new
+`--allow-dirty` boolean flag on `pre-flight-sync.js`, passed by Execute
+only when a Build Card's Objective explicitly states its deliverable IS
+committing the current working tree — all-or-nothing bypass of Step 1
+only, default to NOT passing it when in doubt. Rejected auto-detecting
+"commit-shaped" cards by text-matching the Objective, against this
+plugin's own deterministic-script-over-prose-interpretation philosophy.
+
+4 files changed: `scripts/pre-flight-sync.js` (new flag), `commands/
+execute.md` (narrow criterion for passing it), `.claude-plugin/
+plugin.json` (`1.4.0` → `1.5.0`, minor). `hooks/pre-tool-use.js`
+completely untouched — the marker's shape never encoded tree-
+cleanliness, only branch + freshness.
+
+Live-verified, not assumed: regression case (no flag — dirty tree still
+halts exactly as before) and the new path (flag passed — Step 1
+skipped, marker written) both run directly against the real script in
+a scratch branch; separately confirmed the `PreToolUse` hook allows a
+real `Edit` call once the marker exists (simulated hook invocation,
+exit 0, no deny).
+
+Wrap-up: feature branch → PR #7 → `/review` (Scope Check: CLEAN, 0
+findings — tiny two-file diff, adversarial pass disclosed-skipped) →
+`qa` inapplicable (no web surface) → squash-merged → branch deleted →
+`v1.5.0` tag + `gh release create` cut in the same sitting, confirmed
+live via `gh release list`.
+
+Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
+
+**Next:** none blocking.
+
+## [2026-08-31] gstack-pilot BC-2026-08-31-install-message-delegation shipped (v1.5.1)
+
+Human flagged directly: README's Install section still showed the
+gstack global-install step as a raw copy-paste shell block, while
+`TEAM_SETUP.md` step 1 already has a proven "paste this as a message,
+let Claude diagnose and retry" pattern for the exact same step. Two
+related gaps also raised: no CLI-equivalent documented for
+gstack-pilot's own `/plugin` install, and `/gstack-pilot:init`'s
+must-do status wasn't landing loudly enough (a common real mistake —
+plugin shows installed, does nothing until that step runs).
+
+No design doc — pure content/instructions fix, same category as the
+prior README-only cards this session. 3 targets, all in README's
+Install section: (1) gstack global-install step reworded to
+message-delegation framing, reusing `TEAM_SETUP.md` step 1's actual
+wording; (2) `claude plugin marketplace add ...` CLI-equivalent added
+alongside the existing `/plugin` method for gstack-pilot's own install;
+(3) `/gstack-pilot:init`'s must-do status made louder right at the
+three-liner itself. `.claude-plugin/plugin.json` (`1.5.0` → `1.5.1`,
+patch). Confirmed by diff: only `README.md` and `plugin.json` changed.
+
+Wrap-up: feature branch → PR #8 → `/review` (Scope Check: CLEAN, 0
+findings — pure markdown diff) → `qa` inapplicable (no web surface) →
+squash-merged → branch deleted → `v1.5.1` tag + `gh release create`
+cut in the same sitting, confirmed live via `gh release list`.
+
+Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
+
+**Next:** none blocking.
