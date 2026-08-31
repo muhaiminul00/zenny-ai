@@ -9445,3 +9445,43 @@ surface) → squash-merged → branch deleted → `v1.3.1` tag +
 Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
 
 **Next:** none blocking.
+
+## [2026-08-31] gstack-pilot BC-2026-08-31-execute-midrun-planning-chain shipped (v1.4.0)
+
+Human's gap: Execute chained into gstack skills at exactly two fixed
+points (pre-flight gate, wrap-up chain) — a mid-run block that's
+genuinely research-answerable (architecture mismatch, unclear bug root
+cause, security question) had no path but the existing decision-needed
+STOP, ending the turn every time even when Execute could plausibly
+resolve it itself. Chained through `/plan-eng-review` (real architecture
+decision, not prose) — 5 decisions locked via AskUserQuestion:
+
+- Fork the existing decision-needed STOP rather than add a new STOP
+  category.
+- Skill selection: a 4-case table (`investigate`/`plan-eng-review`/
+  `cso`/`office-hours`) plus an open fallback, not a closed list.
+- Hard cap of one mid-run invocation per task, escalating to the
+  existing STOP on a second stuck moment — tracked in-run, no new
+  persistent state file.
+- No new session-kind logic — inherits gstack's existing interactive/
+  spawned/headless AskUserQuestion branching.
+- Resolution logged via `gstack-decision-log`; a resolution implying
+  scope change still trips the existing design-change STOP, never
+  silently absorbed.
+
+4 files: `commands/execute.md` (new paragraph forked inside the
+existing STOP-condition paragraph — pre-flight/wrap-up paragraphs
+confirmed byte-identical, untouched), `TODOS.md` (new deferred entry:
+smarter skill-selection beyond the 4-case table), `README.md` (one
+sentence in "Gates and stop conditions"), `.claude-plugin/plugin.json`
+(`1.3.1` → `1.4.0`, minor).
+
+Wrap-up: feature branch → PR #6 → `/review` (Scope Check: CLEAN, 0
+findings — pure prose/markdown diff) → `qa` inapplicable (no web
+surface) → squash-merged → branch deleted → `v1.4.0` tag +
+`gh release create` cut in the same sitting, confirmed live via
+`gh release list`.
+
+Full detail: `Wiki/reference/gstack-pilot-plugin.md`.
+
+**Next:** none blocking.

@@ -392,6 +392,49 @@ proven live on Company Brain (Phase 3, not yet started, not designed).
     surface) → squash-merged → branch deleted.
   - **`v1.3.1` tag/release cut in the same sitting as the merge.**
     Confirmed live: `gh release list` shows `v1.3.1` as latest.
+- **Build Card BC-2026-08-31-execute-midrun-planning-chain shipped,
+  2026-08-31 — v1.4.0, Execute's mid-run planning/investigation chain.**
+  Human's gap: Execute previously chained into gstack skills at exactly
+  two fixed points (pre-flight gate, wrap-up chain) — stuck mid-run on
+  something genuinely research-answerable (architecture mismatch,
+  unclear bug root cause, security question) had no path but the
+  existing decision-needed STOP, ending the turn every time even when
+  Execute could plausibly resolve it itself.
+  - **Chained through `/plan-eng-review`** (not packaged directly —
+    genuine architecture decision, control-flow + safety-bound design,
+    not prose). 5 decisions locked via AskUserQuestion: (1) fork the
+    existing decision-needed STOP rather than add a new STOP category;
+    (2) a 4-case skill table (`investigate`/`plan-eng-review`/`cso`/
+    `office-hours`) plus an open fallback, not a closed list; (3) a hard
+    cap of one mid-run invocation per task, escalating to the existing
+    STOP on a second stuck moment — no persistent state file needed,
+    tracked in-run; (4) no new session-kind logic — inherits gstack's
+    existing interactive/spawned/headless AskUserQuestion branching for
+    free; (5) resolution logged via `gstack-decision-log`, with an
+    explicit carve-out that a resolution implying scope change still
+    trips the existing design-change STOP, never silently absorbed.
+  - **Design doc + Build Card** (`docs/designs/execute-midrun-planning-
+    chain.md`, `docs/build-cards/BC-2026-08-31-execute-midrun-planning-
+    chain.md`) — repo-local only, not tracked in git, per v1.3.0's
+    repo-hygiene change (kept on disk for `plan-eng-review`'s local
+    design-doc search, gitignored).
+  - **4 files changed:** `commands/execute.md` (new paragraph inserted
+    as a fork inside the existing "Do not self-invoke `commander`..."
+    STOP-condition paragraph — pre-flight-gate and wrap-up-chain
+    paragraphs confirmed byte-identical, untouched), `TODOS.md` (new
+    deferred entry: smarter mid-run skill-selection beyond the 4-case
+    table, explicitly not built now — unmeasured problem), `README.md`
+    (one sentence added to "Gates and stop conditions", right after the
+    existing decision-needed-flag sentence), `.claude-plugin/plugin.json`
+    (`1.3.1` → `1.4.0`, minor — new capability, not a patch).
+  - **Wrap-up chain:** feature branch
+    (`feat/execute-midrun-planning-chain`) → PR #6 → gstack `/review`
+    (Scope Check: CLEAN, 0 findings — pure prose/markdown diff, no
+    critical-category surface) → `qa` inapplicable (no web/UI surface,
+    same disclosed substitution as every prior card) → squash-merged →
+    branch deleted.
+  - **`v1.4.0` tag/release cut in the same sitting as the merge.**
+    Confirmed live: `gh release list` shows `v1.4.0` as latest.
 - **What it is:** the same Advisor/Commander/Execute mode system as
   `role-modes`, with two real behavior differences: Commander's
   planning phase chains into gstack's `office-hours` (new-idea framing)
