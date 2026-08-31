@@ -9,6 +9,38 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-31] session-bc-074-075-eng-review | gstack /plan-eng-review for appointment + consultation nodes, business-memory question resolved (scoped out)
+
+**Trigger:** Commander→gstack planning bridge for BC-074/075, human's explicit
+capability-breadth + business-memory question folded in as a planning input
+(see the entry above).
+
+**Findings (3):** (1) both new Agent workflows must inherit BC-2026-08-31's
+memory-rehydration pattern from day one, not retrofit; (2) real finding —
+neither `WF-003` (CreateAppointment) nor `WF-010` (CreateScoredBooking)
+needs a new confirmation gate (the locked commerce guardrail is scoped to
+money-shaped actions; neither tool touches client money or a client store)
+— BC-074/075 add zero new gate logic, unlike BC-073; (3) real gap flagged,
+not silently patched — nothing in Zenny's own runtime computes a
+`lead_score` for consultation's Score Gate (Convocore's funnel is stopped,
+WF-001 never computed one either) — BC-075 ships a provisional inline
+LLM-derived score-collection stand-in, explicitly marked as such, with a
+future BC flagged for a real scoring mechanism.
+
+**Business-memory/capability-breadth question — resolved via
+AskUserQuestion, not left open:** deferred to a separate future Build Card.
+FAQ/recommendation quality is a prompt-content problem (BC-073's own AC1
+already proves FAQ is LLM-direct, no tool needed) — the real gap is a
+durable business-memory store, and the recommended shape (generalize the
+existing Notion+Pinecone KB pattern into a `Search Business KB` tool for
+every archetype) is pointed to, not designed. See
+[[decisions/agent-capability-scope-and-business-memory]].
+
+**Output:** BC-074 (Appointment Node) and BC-075 (Consultation Node)
+Build-Ready Specs written into `docs/designs/zenny-saas-runtime-pivot.md`,
+CEO+ENG cleared, ready for Execute. Both cards write to live n8n — the
+live-infra handoff safe-gate applies once either lands.
+
 ## [2026-08-31] agent-capability-scope-and-business-memory-flagged | human raises capability-breadth + business-memory gap, routed to gstack planning ahead of BC-074/075
 
 Immediately after BC-2026-08-31-concurrency-hardening's handback, human

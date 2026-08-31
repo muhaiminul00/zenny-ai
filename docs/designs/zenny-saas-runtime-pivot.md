@@ -988,6 +988,251 @@ platform-level items (OpenBSP health, Meta App Review lead time, Convocore
 subscription status) — those belong to the Channel Adapter track, unaffected
 by this node-level card.
 
+## BC-074/075 Eng Review — appointment + consultation nodes (gstack /plan-eng-review, 2026-08-31)
+
+**Trigger:** Commander→gstack→Execute planning bridge, on top of BC-2026-08-31's
+concurrency-hardening pass. Human explicitly widened scope before approving:
+raised a cross-archetype architecture question (agent capability breadth +
+a durable "business memory" distinct from chat memory — see
+`Wiki/decisions/agent-capability-scope-and-business-memory.md`) to be weighed
+here, not resolved standalone.
+
+**Design Doc Check:** this document (already CEO+ENG cleared for the overall
+runtime pivot; BC-072/BC-073 already complete on it). BC-074/075 are the
+final two node types named in the original Archetype item resolution above
+— a scoped follow-on inside the already-approved architecture, not a new
+strategic bet. No new office-hours pass needed.
+
+**Step 0 Scope Challenge:**
+1. *What already solves each sub-problem:* real, live, published Tools exist
+   for both archetypes from the Convocore-era build. Appointment:
+   `WF-002` (CheckAvailability, calendar check_type), `WF-003`
+   (CreateAppointment, real parallel calendar+DB write), `WF-013`
+   (CancelAppointment, BC-053 verification-tier + BC-2026-08-31's race fix),
+   `WF-015` (GetBookingStatus). Consultation: `WF-002` (shared),
+   `WF-010` (CreateScoredBooking, hard Score Gate ≥50), `WF-015` (shared,
+   `booking_reference` covers a scored booking the same as a direct
+   appointment — same `appointments` tracking row shape). `WF-016`
+   (UpdateCustomer) is shared across every archetype already, same as
+   BC-073. None of these need rebuilding — BC-074/075's job is wiring two
+   more Agents to call them, same pattern as BC-073's commerce-ecom node.
+2. *Minimum set:* two new n8n Agent workflows (one per archetype). No new
+   confirmation-gate extension needed this time (see Architecture Review
+   finding 2 below) and no new tables — everything BC-074/075 needs already
+   exists from BC-053/BC-072/BC-073/BC-2026-08-31.
+3. *Complexity check:* 2 new Agent workflows + 4 wired tools (appointment) /
+   3 wired tools (consultation, `WF-010` replacing `WF-003`) — under the
+   8-file/2-new-service smell threshold per card, and the two cards stay
+   independent (no shared new component between them beyond what's already
+   built). No stop triggered.
+4. *Search check:* same as BC-073 — `@n8n/n8n-nodes-langchain.agent` with
+   tool sub-nodes remains current best practice for this project's n8n
+   version; no new pattern needed.
+5. *TODOS cross-reference:* N/A, same as BC-073 (no `TODOS.md` in this repo).
+
+**Architecture Review — 3 findings:**
+
+1. **Both nodes inherit BC-2026-08-31's memory-rehydration pattern from day
+   one, not as a retrofit.** Per `Wiki/platform-quirks/
+   n8n-concurrency-race-patterns.md`'s explicit standing expectation, the
+   4-node chain (`Load Current Memory` → `Memory Cold?` → `Get Recent
+   History (RPC)` → `Rehydrate Memory`) is copied into both new Agent
+   workflows before first publish, using the already-proven
+   `groupMessages:true`/`alwaysOutputData:true` settings and the
+   `messagesCount === 0` cold-check signal — not rediscovered via the same
+   2 n8n bugs BC-073/2026-08-31 already paid for once. This is why the
+   pattern lives in its own Wiki page rather than folded into a single
+   card's writeup.
+2. **No new confirmation-gate work needed — real finding, not an
+   oversight.** The locked commerce-tool guardrail ("any tool that
+   creates/modifies an order, refund, or payment requires human
+   confirmation before executing") is scoped to money-shaped actions.
+   Checked each tool's actual behavior, not assumed from name: `WF-003`
+   (CreateAppointment) and `WF-010` (CreateScoredBooking) both write
+   directly to Zenny's own DB (or fall back to it) — no client money moves,
+   no client store is touched — so neither needs BC-073's
+   `pending_verifications` gate in front of it. `WF-013` (CancelAppointment)
+   already has its own opt-in verification-tier branch (BC-053) plus this
+   session's own double-fulfillment fix (BC-2026-08-31 Finding 2) — reused
+   as-is, not rebuilt. **Net: BC-074/075 add zero new gate logic**, unlike
+   BC-073 which had to build one for CreateCart.
+3. **Consultation's Score Gate is the Agent's caller responsibility, not the
+   Tool's.** `WF-010` itself already rejects `lead_score < 50` with a 400
+   (hard gate, per its own spec) — the consultation Agent must have a real
+   `lead_score` in context before calling `CreateScoredBooking`, sourced
+   from wherever this archetype's scoring actually happens today (outside
+   this card's scope — Growth Agent's WF-001 doesn't compute a score
+   either, per its own entry: "no lead-scoring logic here ... scoring
+   defers to Convocore's funnel"). **Real gap, flagged not silently
+   patched:** with Convocore fully stopped (per this doc's own CORRECTION
+   section), nothing in the current pipeline computes `lead_score` for
+   Zenny's own runtime. Building a real scoring mechanism is out of
+   BC-074/075's scope (a new capability, not wiring an existing one) —
+   the consultation Agent ships with a placeholder score-collection step
+   (asks the customer 1-2 qualifying questions inline, LLM-derives a score
+   from the answers) as the smallest correct stand-in, explicitly flagged
+   in the Build-Ready Spec below as provisional, not a finished scoring
+   system.
+
+**Business memory / capability-breadth question — resolved via
+AskUserQuestion (human, 2026-08-31): deferred to a separate future Build
+Card, not folded into BC-074/075.** Both archetypes' FAQ and
+recommendation-style behavior are prompt-driven (per BC-073's own AC1 — the
+LLM answers FAQ/availability directly, no tool call, no confirmation gate),
+so capability breadth is a prompt-content question, not a missing
+tool-calling capability. The real gap is a durable, cross-archetype
+business-memory store (product/service details, policies, FAQ content)
+beyond the single static per-client `agent_prompts` string. Closest existing
+precedent, checked per the Document Resolution Authority's "search broadly
+first" rule: the Notion+Pinecone KB pattern already live for Email Manager
+(INT-011/012, `Wiki/platform-quirks/notion-pinecone-kb-pattern.md`).
+**Recommendation for a future BC (not this one): a new read-only `Search
+Business KB` HTTP Request Tool, generalizing that same Notion+Pinecone
+pattern so every archetype's Agent — not just Email Manager — can query it.**
+Not designed further here; this is a pointer for whoever scopes that card,
+not a spec.
+
+**Code Quality / Test / Performance:** no implementation exists yet to audit
+directly, same as BC-073. Test coverage for both cards' Acceptance Criteria
+below covers the new surface (tool-call routing, memory rehydration,
+consultation's score-collection stand-in); BC-072's tenant-isolation/
+LLM-degradation tests and BC-2026-08-31's concurrency fixes aren't re-run
+here — inherited by construction (every turn still enters through BC-072's
+shared sub-workflow, and the underlying RPCs/indexes are already
+schema-wide, not per-archetype).
+
+**Outside Voice:** not run this pass — same reasoning as BC-073 (a scoped
+follow-on inside an architecture Codex already reviewed at the CEO/Eng
+review stage, not a new strategic bet).
+
+### BC-074 Build-Ready Spec — Appointment Node
+
+**Build Card ID:** BC-074
+**Target:** New n8n Agent-based workflow (appointment archetype node type)
+**Runtime Module:** Zenny Own Runtime (Phase 14), built on BC-072's
+foundation + BC-2026-08-31's concurrency/memory-durability fixes.
+
+**Objective:**
+- **Purpose:** handle an appointment-archetype client's conversation turns —
+  FAQ/availability Q&A (auto), booking (auto, real parallel calendar+DB
+  write), cancellation (gated per BC-053's opt-in tier), and status lookup
+  (auto) — through Zenny's own runtime instead of Convocore.
+- **Inputs:** the loaded `conversation_sessions` row + latest inbound
+  message from BC-072's shared entry sub-workflow; the client's
+  `agent_prompts`/`client_config` rows.
+- **Outputs:** an LLM response persisted via `append_message`; for a booking
+  request, `WF-003`'s real outcome (`client_calendar` success /
+  `our_db_fallback` / Pattern D handoff) echoed back conversationally; for a
+  cancel request, a real `pending_verifications` row + "pending
+  confirmation" response (tier on) or a real escalation (tier off, today's
+  default for every existing client).
+
+**Node design:**
+- `@n8n/n8n-nodes-langchain.agent`, `promptType: 'define'`, system prompt
+  from `get_client_agent_prompt` — same pattern as BC-073, not hardcoded.
+- Model sub-node: `OpenRouter Chat Model`, same credential/timeout pattern
+  as BC-072/BC-073.
+- Memory chain: BC-2026-08-31's full 4-node rehydration pattern
+  (`Load Current Memory`/`Memory Cold?`/`Get Recent History (RPC)`/
+  `Rehydrate Memory`), copied exactly — not rediscovered.
+- Tools:
+  1. `Check availability` — HTTP Request Tool → `WF-002`
+     (`check_type: calendar`), read-only, no gate.
+  2. `Create appointment` — HTTP Request Tool → `WF-003` directly (no new
+     gate — Architecture Review finding 2).
+  3. `Cancel appointment` — HTTP Request Tool → `WF-013` directly (its own
+     existing tier/race-safe gate handles confirmation, not a new one).
+  4. `Get booking status` — HTTP Request Tool → `WF-015`, read-only, no
+     gate.
+
+**Dependencies / Required utilities:** BC-072's shared sub-workflow +
+`append_message`/`find_or_create_conversation` RPCs; BC-2026-08-31's
+`get_recent_messages` RPC; `WF-002`, `WF-003`, `WF-013`, `WF-015` (built,
+live, published, called by URL, not modified).
+
+**Acceptance Criteria:**
+1. A FAQ/availability question gets a correct, auto-answered response with
+   no confirmation gate — live-verified.
+2. A booking request produces `WF-003`'s real outcome (calendar success, or
+   `our_db_fallback` given the roster's known no-live-calendar limitation)
+   with no gate in front of it.
+3. A cancel request against a tier-off client (today's default) produces a
+   real escalation via `WF-013`'s existing path; against a tier-on client,
+   a real `pending_verifications` row using BC-2026-08-31's race-safe claim
+   flow — no double-fulfillment possible, inherited not re-proven.
+4. A status lookup returns `WF-015`'s real derived status.
+5. Cold-buffer conversation (existing history, unseen `conversation_id` this
+   process run) gets history loaded before the Agent responds — same test
+   shape as BC-2026-08-31's AC4, run fresh against this new workflow.
+6. Tenant isolation is inherited, not re-proven: a spot-check confirms the
+   Agent's calls still flow through BC-072's shared sub-workflow.
+
+**Definition of Done:** all 6 Acceptance Criteria live-verified via n8n +
+Supabase MCP; `Workflow_Registry.md` updated (new Agent workflow entry);
+Wiki updated if this surfaces a new durable fact.
+
+**Open Verification Items resolved by this card:** none of the still-open
+platform-level items (OpenBSP health, Meta App Review lead time, Convocore
+subscription status).
+
+### BC-075 Build-Ready Spec — Consultation Node
+
+**Build Card ID:** BC-075
+**Target:** New n8n Agent-based workflow (consultation archetype node type)
+**Runtime Module:** Zenny Own Runtime (Phase 14), built on BC-072's
+foundation + BC-2026-08-31's concurrency/memory-durability fixes.
+
+**Objective:**
+- **Purpose:** handle a consultation-archetype client's conversation turns —
+  FAQ/availability Q&A (auto), qualification + scored booking (auto, hard
+  Score Gate ≥50), and status lookup (auto) — through Zenny's own runtime
+  instead of Convocore.
+- **Inputs/Outputs:** same shape as BC-074, substituting `WF-010`
+  (CreateScoredBooking) for `WF-003`.
+
+**Node design:** same base pattern as BC-074 (Agent node, OpenRouter model
+sub-node, BC-2026-08-31's memory rehydration chain). Tools:
+1. `Check availability` — HTTP Request Tool → `WF-002`, read-only, no gate.
+2. `Create scored booking` — HTTP Request Tool → `WF-010` directly. **Score
+   collection (provisional, flagged per Architecture Review finding 3):**
+   before calling this tool, the Agent asks the customer 1-2 qualifying
+   questions (system-prompt-driven, sourced from `agent_prompts`) and
+   LLM-derives a `lead_score` from the answers. This is an explicit
+   stand-in for a real scoring mechanism that does not exist anywhere in
+   the current pipeline (Convocore's funnel is stopped, WF-001 never
+   computed one) — not a finished feature. `WF-010`'s own hard gate
+   (`lead_score < 50` → 400) still enforces the real floor regardless of
+   how the score was derived.
+3. `Get booking status` — HTTP Request Tool → `WF-015`, read-only, no gate.
+
+**Dependencies / Required utilities:** same as BC-074, substituting `WF-010`
+for `WF-003`.
+
+**Acceptance Criteria:**
+1. A FAQ/availability question gets a correct, auto-answered response with
+   no confirmation gate — live-verified.
+2. A qualifying exchange followed by a booking request that scores ≥50
+   produces `WF-010`'s real success outcome.
+3. The same exchange scoring <50 gets `WF-010`'s real 400 rejection,
+   surfaced to the customer as a graceful decline/handoff, not a raw error.
+4. A status lookup returns `WF-015`'s real derived status.
+5. Cold-buffer conversation gets history loaded before the Agent responds —
+   same test shape as BC-074's AC5.
+6. Tenant isolation is inherited, not re-proven — same spot-check as BC-074's
+   AC6.
+
+**Definition of Done:** all 6 Acceptance Criteria live-verified via n8n +
+Supabase MCP; `Workflow_Registry.md` updated (new Agent workflow entry,
+noting the provisional score-collection stand-in clearly as such); Wiki
+updated if this surfaces a new durable fact.
+
+**Open Verification Items resolved by this card:** none of the still-open
+platform-level items. **New open item this card creates:** a real
+lead-scoring mechanism for Zenny's own runtime does not exist yet
+(Architecture Review finding 3) — not blocking BC-075, but should become its
+own future Build Card once a real client needs scoring accuracy beyond the
+inline LLM-derived stand-in.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
@@ -998,10 +1243,12 @@ by this node-level card.
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | not run — no UI scope in this Build Card track (onboarding UX explicitly deferred) |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | not run — not applicable, no external SDK/CLI surface |
 | Eng Review (BC-073) | `/plan-eng-review` | Commerce-ecom node architecture | 1 | CLEAR | 2 findings self-resolved (Agent node not chainLlm; HTTP Request Tool not toolWorkflow); 1 real gap found+closed (WF-005 confirmation-gate placement); lead-capture scope resolved via AskUserQuestion |
+| Concurrency Audit | `/investigate` + `/plan-eng-review` | Multi-tenant/multi-user hardening on BC-072/073 | 1 | CLEAR (BC-2026-08-31) | 4 real race/durability findings fixed + live-verified; see `Wiki/platform-quirks/n8n-concurrency-race-patterns.md` |
+| Eng Review (BC-074/075) | `/plan-eng-review` | Appointment + consultation node architecture | 1 | CLEAR | 3 findings (memory-rehydration inherited by design; no new gate needed; consultation scoring gap flagged, not silently patched); business-memory/capability-breadth question resolved via AskUserQuestion — deferred to a future BC, not this one |
 
-- **CODEX:** Outside-voice pass (gpt-5.5, read-only) ran against the fully CEO-reviewed plan — 20 findings, all resolved or explicitly accepted-as-tracked-risk (see the table under "Eng Review" above).
+- **CODEX:** Outside-voice pass (gpt-5.5, read-only) ran against the fully CEO-reviewed plan — 20 findings, all resolved or explicitly accepted-as-tracked-risk (see the table under "Eng Review" above). Not re-run for BC-074/075 (same reasoning as BC-073 — scoped follow-on, not a new strategic bet).
 - **CROSS-MODEL:** One load-bearing tension surfaced — Codex's repeated argument (items 14/19/20) that validating archetype-reuse should precede the runtime build. Presented explicitly to the founder; Approach B (runtime-first) was reaffirmed, not silently overridden. Recorded as an accepted, eyes-open risk, not a resolved disagreement.
-- **VERDICT:** CEO + ENG CLEARED — ready to proceed toward a Build Card. Two accepted-risk items remain tracked, not blocking: n8n's fitness as a full conversation runtime (latency/streaming/concurrency) is unproven until a real spike; tenant isolation's shared entry sub-workflow is necessary but not sufficient without the RLS tests named in the Test Plan artifact.
+- **VERDICT:** CEO + ENG CLEARED — ready to proceed toward Build Cards BC-074 and BC-075. Two accepted-risk items remain tracked from earlier passes, not blocking: n8n's fitness as a full conversation runtime (latency/streaming/concurrency) is unproven until a real spike; tenant isolation's shared entry sub-workflow is necessary but not sufficient without the RLS tests named in the Test Plan artifact. New from this pass: consultation's lead-scoring mechanism is a real, disclosed gap (provisional LLM-derived stand-in, not a finished scoring system) and business memory is explicitly out of BC-074/075's scope, deferred to a future BC.
 
 **UNRESOLVED DECISIONS:**
 - OpenBSP's live project health (commit activity, community size) — must be re-verified before the channel gateway build starts, not assumed stable from the Channel Adapter doc alone.
@@ -1009,3 +1256,5 @@ by this node-level card.
 - Whether the Convocore subscription is actually cancelled or just unused (Budget section) — confirm before treating it as a real $0.
 - n8n's real fitness as a conversation runtime (latency, streaming, concurrent sessions, retry idempotency) — accepted as risk, not spiked or proven yet.
 - The 1-1.5 month timeline target against the now-larger scope (2-3 node types + 3-channel gateway) — founder's instruction was "try, extend if required," not a locked number; re-forecast after the first real build milestone.
+- Consultation's real lead-scoring mechanism (BC-075 ships an inline LLM-derived stand-in, not a finished scorer) — future BC once a real client needs scoring accuracy.
+- Business memory / cross-archetype capability breadth (`Wiki/decisions/agent-capability-scope-and-business-memory.md`) — deferred to a future BC (recommended shape: generalize the existing Notion+Pinecone KB pattern into a `Search Business KB` tool for every archetype's Agent); not designed yet, only pointed to.

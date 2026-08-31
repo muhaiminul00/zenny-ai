@@ -1,4 +1,21 @@
-# Agent Capability Scope & Business Memory — FLAGGED, not built (2026-08-31)
+# Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
+
+## Resolution (2026-08-31, BC-074/075 eng review)
+
+Resolved via AskUserQuestion during the BC-074/075 planning pass, not left
+open: **deferred to a separate future Build Card, not folded into
+BC-074/075.** Capability breadth (FAQ, sales-style recommendation) turned
+out to be a prompt-content question, not a missing tool-calling capability
+— BC-073's own AC1 already proves the LLM answers FAQ/availability directly
+with no tool call. The real gap is business memory itself: a durable,
+structured, cross-archetype store beyond the single static per-client
+`agent_prompts` string. Recommendation for whoever scopes that future card:
+generalize the already-live Notion+Pinecone KB pattern (Email Manager,
+INT-011/012 — [[../platform-quirks/notion-pinecone-kb-pattern]]) into a new
+read-only `Search Business KB` tool available to every archetype's Agent,
+not just Email Manager. Not designed further — this is a pointer, not a
+spec. Full reasoning: `docs/designs/zenny-saas-runtime-pivot.md`'s "BC-074/075
+Eng Review" section.
 
 ## What was raised
 
