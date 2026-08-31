@@ -9,6 +9,56 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-08-31] session-bc076-card1-shipped
+
+Executed the Build Card the sixth planning pass produced. n8n MCP was
+disconnected at the start of this pass; independently confirmed the VPS
+itself was reachable (DNS + HTTPS 200 via direct probe) before reporting
+the stop plainly per the Permission Denials standing rule; human
+reconnected the MCP server (`/mcp` reconnect) and work resumed from
+exactly where it stopped.
+
+**Root cause confirmed once more via live data, not re-guessed:** pulled
+WF-002's real trigger config (`n8n-nodes-base.webhook`, `POST`, `path:
+check-availability`, `responseMode: responseNode`, no auth) to mirror
+exactly rather than inventing a shape. Rebuilt `uZdHEI8tQ1qeeHzt`'s
+trigger the same way (`Search Business KB Webhook` + a new `Normalize
+Contract` code node + a terminal `Respond to Webhook`), then rewired all
+3 Agents from `toolWorkflow` to `httpRequestTool`, `client_id` as a
+static main-chain reference per D13 (never `$fromAI`).
+
+**Live-verified with real content, not a code-review pass:** seeded 2
+real facts into 2 different clients' Pinecone namespaces via a throwaway
+upsert workflow, then ran 4 real conversations:
+1. Commerce-Ecom + its own client asking about hours → exact-match
+   grounded answer, tool-call trace confirmed non-null `client_id`.
+2. The SAME Commerce-Ecom client asking a question whose fact only
+   exists under a DIFFERENT client's namespace → correctly did NOT
+   retrieve it, fell back gracefully. Real cross-tenant isolation proof.
+3. Appointment + its own client asking about cancellation policy →
+   exact-match grounded answer, proving the fix generalizes across
+   archetypes, not just Commerce-Ecom.
+4. Consultation + a client with no seeded content → tool call succeeds,
+   graceful fallback (minimum spot-check bar per the Build Card).
+
+All temp n8n workflows archived, both test Pinecone vectors deleted
+(confirmed `zenny-business-kb` back to 0 records), synthetic
+conversations purged from all 3 test-client schemas.
+
+**Mandatory wrap-up:** `Workflow_Registry.md` updated for all 4 touched
+workflows from live `get_workflow_details` reads (Search Business KB
+Tool entry rewritten to FIXED status; all 3 Agent entries updated).
+PROJECT_STATE.md + this Wiki page updated. Routed through the Branch/PR
+Workflow standing rule (genuine architecture fix across multiple live
+n8n workflows) — see the PR/merge record in this same log entry's
+git history.
+
+Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`. **Next:**
+Cards 2a/2b/3/4 from the sixth-pass sequencing, each needing its own
+`/plan-eng-review` before a Build Card.
+
+---
+
 ## [2026-08-31] session-bc076-unblock-sequence-planned
 
 Human's explicit instruction: stop cycling ad-hoc "what's next" answers,

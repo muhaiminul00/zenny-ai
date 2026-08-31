@@ -110,7 +110,10 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
   3rd sensitive scope onto an already-unverified Gmail/Calendar OAuth
   app) → Card 3 (remaining ingestion legs) → Card 4 (scheduled canary/
   smoke-test, this session's own undetected-bug history being the
-  reason manual-only verification isn't enough).** See
+  reason manual-only verification isn't enough).** **Card 1 then
+  shipped the same session — the client_id bug is FIXED and
+  live-verified (real seeded content, correct-tenant retrieval AND
+  cross-tenant non-leakage both proven across 2 archetypes).** See
   [[../decisions/agent-capability-scope-and-business-memory]]. Every
   other part still gets its own `/plan-eng-review` pass when Commander
   schedules it — this doc is a map, not a full spec.

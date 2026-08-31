@@ -1,5 +1,16 @@
 # Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
 
+## BC-076-Card1 SHIPPED (2026-08-31) — the severe client_id bug is fixed, live-verified
+
+Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s Search Business
+KB Tool entry, `Wiki/log.md` session-bc076-card1-shipped. Summary: the
+tool's sub-workflow now has a real Webhook trigger (matching WF-002/013/
+015), all 3 Agents call it via `httpRequestTool` (matching
+`Check_availability`) with `client_id` static per D13. Live-verified with
+2 real seeded facts across 2 clients: correct-tenant retrieval AND
+cross-tenant non-leakage both proven, not assumed. Cards 2a/2b/3/4 remain
+the next planned work, each needing its own `/plan-eng-review` pass.
+
 ## BC-076 unblock sequence locked (2026-08-31, sixth pass — gstack `/plan-eng-review`)
 
 Human explicitly asked for a proper step-by-step plan before any more
