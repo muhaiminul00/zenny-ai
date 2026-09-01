@@ -54,3 +54,5 @@ including the deferred counter)
 **Priority:** P3
 **Depends on:** Whatever alerting infrastructure this project has (or
 builds) for `sync_status`.
+
+## Completed
