@@ -567,6 +567,10 @@ a same-leg resync-hygiene problem. Both corrected below (D19, D20).
   sheet entirely) stays deferred to Card 3's future shared mechanism**,
   reused here rather than rebuilt bespoke. Narrowed by D20 below: this
   defers ONLY the cross-leg case, not same-leg resync hygiene.
+  **Superseded 2026-09-01 (BC-076-Card2c)** — D20's rename-safety fix
+  can't distinguish a renamed row from a deleted one (both leave the old
+  key missing from the current sheet), so it closes this case too. See
+  D20's note below.
 - **D17 — partial-row-failure handling:** continue past a bad row, don't
   abort the whole sync; `sync_status` records partial state + which
   row-keys failed (capped list, not raw cell content — see verification
@@ -586,11 +590,20 @@ a same-leg resync-hygiene problem. Both corrected below (D19, D20).
   which the bare-key-as-ID version could not support.
 - **D20 — delete-then-reinsert per row key, every sync (outside-voice
   catch):** before writing a row's current chunks, delete any existing
-  vectors for that `(source_ref, row_key)` pair first. Closes both the
-  shrinking-chunk-count bug and the edited-key-value bug with one
-  mechanism — an edited key is just delete-old-key + insert-new-key.
-  Stays scoped to this leg's own rows; does not touch Card 3's cross-leg
-  scope (D16).
+  vectors for that `(source_ref, row_key)` pair first. Closes the
+  shrinking-chunk-count bug. **Superseded 2026-09-01 (BC-076-Card2c) on
+  the edited-key-value bug specifically:** the belief stated here — "an
+  edited key is just delete-old-key + insert-new-key" — was wrong.
+  Deleting by a row's *current* key can never find vectors stored under a
+  key that no longer exists, so a rename orphaned the old vectors
+  permanently in production (live-proven, not theorized). The actual fix
+  (D24-D32, `06_Infrastructure/n8n/Workflow_Registry.md`'s Sheets
+  Ingestion entry) diffs Pinecone's own listed vectors against the
+  current sheet's keys, and — since that diff can't distinguish "renamed"
+  from "deleted entirely" — also formally supersedes D16 below, closing
+  Card 3's cross-leg-deletion case for this leg too. Left here, not
+  deleted, so a future reader sees the original (wrong) reasoning and its
+  correction side by side, not just the correction alone.
 - **D21 — client-designated column whitelist (outside-voice catch):**
   only columns the client names (stored in D18's `source_config`) get
   chunked — not every column in the row. Consistent with D15's own
