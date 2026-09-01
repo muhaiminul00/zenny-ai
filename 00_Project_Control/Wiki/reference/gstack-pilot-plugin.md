@@ -623,6 +623,57 @@ project. The locked chain mapping matches that documented order.
   live-proof point), or done sooner if the human wants `--team`
   actually run now, accepting its global side effect.
 
+## BC-077 T5/T7 closed, 2026-09-02 — one real gap found in the PR-exemption, not just a formality check
+
+**T5 (blank fields):** `.claude/CLAUDE.md`'s "Fill in the specifics"
+section is filled in — State Doc (`PROJECT_STATE.md` + `Wiki/log.md`),
+live-infra list (n8n, Supabase `zenny-vault`, Pinecone
+`zenny-business-kb`, Convocore, Hostinger), Build Card format (Zenny's
+own, root `CLAUDE.md`), env convention (venv-only). Pure reconciliation
+of already-established facts, no new decisions.
+
+**T7.2 (trivial-housekeeping PR-exemption) — a real miss found, not
+just confirmed working:** checking BC-078's actual git history (commit
+`00d5851`, PR #8) before assuming the exemption held: BC-078 touched
+only `.claude/CLAUDE.md`, root `CLAUDE.md`, `PROJECT_STATE.md`, and
+`Wiki/log.md` — doc/config only, zero code or n8n/Supabase workflow
+changes, exactly the shape root `CLAUDE.md`'s exemption describes — yet
+it went through a full PR anyway, not direct-to-main. **The exemption
+was declared correctly on paper (BC-077's own D1) but wasn't actually
+applied the one real time it had a chance to be**, one day after
+shipping. No root cause investigation beyond that (not this task's
+scope) — flagged plainly rather than assumed fixed. **This session's
+own wrap-up (T5 + this page + `PROJECT_STATE.md` + `.gitignore`, same
+doc/config-only shape) is the corrective live example:** committed
+direct-to-`main`, no PR, citing the exemption explicitly — see
+`Wiki/log.md`'s BC-077-T5-T7 entry for the actual commit. If a future
+trivial-housekeeping task goes PR-first again without a stated reason,
+that's the pattern repeating, not a one-off.
+
+**T7.1 (Commander self-chain into `office-hours`/`plan-eng-review`) —
+mechanism confirmed present, live trigger not yet observed.**
+`commander.md`'s dispatch instructions unambiguously specify autonomous
+chaining before drafting any Build Card (read directly, not assumed —
+same text surfaced when `/gstack-pilot:commander` was invoked this
+session), including the disambiguator fix from the pre-1.0 routing bug
+(prior-scoped-next-step wins over tentative phrasing). But no Commander
+task since gstack-pilot went live (2026-09-02, same day as BC-077/078)
+has actually been a genuinely-fresh idea or an unambiguous prior-named
+next step that would exercise the fire — every Commander turn today
+either confirmed a mode switch, answered a summary request, or received
+an already-fully-specified follow-up (this T5/T7 task itself).
+**Deliberately not manufacturing a synthetic test** — a fake "is X worth
+building" prompt would spawn a real `office-hours`/`plan-eng-review`
+session with real gstack telemetry/decision-log/checkpoint artifacts for
+a throwaway idea, disproportionate cost for confirming a dispatch
+`if`-branch, and risks polluting this project's actual planning history.
+**Closes naturally, not artificially:** the next real Commander task
+that's either genuinely new (BC-076 Card 2a's dashboard OAuth
+investigation is plausibly this) or already-named-but-unscoped (BC-076
+Card 3's remaining ingestion legs, already sitting in `PROJECT_STATE.md`
+as a "Next") will be the live proof — note in that session's own log
+whether the chain actually fired.
+
 ## Open items, not blocking, disclosed to the human
 
 - Repo not yet pushed to GitHub (Phase 2).
@@ -630,6 +681,10 @@ project. The locked chain mapping matches that documented order.
 - ~~Zenny's own unmerged "## Skill routing" vs. `using-gstack/SKILL.md`
   duplication~~ — **closed 2026-09-02, BC-077 T4:** merged into Zenny's
   root `CLAUDE.md` Tool Routing Table, same PR as this migration.
+- ~~BC-077 T5 (blank `.claude/CLAUDE.md` fields)~~ — **closed
+  2026-09-02**, see above.
+- **T7.1 still open** (not blocking) — closes on the next real Commander
+  task that's genuinely new or prior-scoped-but-unbuilt; see above.
 
 See [[reference/gstack-skill-playbook.md]] for gstack's general
 Zenny-side decision map, [[reference/role-modes-plugin]] for the

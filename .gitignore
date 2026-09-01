@@ -19,3 +19,8 @@ Thumbs.db
 
 # Throwaway browser-automation session artifacts
 .playwright-mcp/
+
+# gstack-pilot's Execute pre-flight marker - ephemeral, per-branch, 8h TTL,
+# rewritten every task; never meant to be committed (found recurring as
+# untracked cruft during BC-077 T5/T7, 2026-09-02)
+.claude/hooks/state/preflight-ok

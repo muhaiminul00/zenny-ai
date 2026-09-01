@@ -9,6 +9,63 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## session-bc077-t5-t7-closed (2026-09-02, same day as BC-077/078)
+
+Human asked Commander for a status summary, picked BC-077's two
+remaining tasks (T5, T7) as next. Neither needed a gstack planning
+chain — both already scoped in `docs/designs/zenny-gstack-pilot-
+migration.md`, mechanical/verification work, not new architecture.
+
+**T5 — done.** `.claude/CLAUDE.md`'s blank "Fill in the specifics"
+fields filled from facts already on record elsewhere: State Doc
+(`PROJECT_STATE.md` + `Wiki/log.md`), live-infra list (n8n, Supabase
+`zenny-vault`, Pinecone `zenny-business-kb`, Convocore, Hostinger),
+Build Card format (Zenny's own root `CLAUDE.md` section, not the
+plugin's generic fallback), env convention (venv-only). No new
+decisions made.
+
+**Pre-flight gate hit a real snag first:** `scripts/pre-flight-sync.js`
+isn't in this repo — it lives only in the plugin cache
+(`~/.claude/plugins/cache/gstack-pilot/gstack-pilot/<version>/scripts/`)
+and `execute.md`'s prose names it as a bare relative path with no
+resolution instruction. Located the installed version (1.6.0) via
+`find` and invoked it by absolute path. Then hit a dirty-tree STOP
+caused by `.claude/hooks/state/preflight-ok` itself — the pre-flight
+marker file, untracked and never gitignored, left over from BC-078's
+session. Removed it (not part of this task, not committed as
+`--allow-dirty` "this task's own deliverable" - it's stray tool
+exhaust) and added `.claude/hooks/state/preflight-ok` to `.gitignore`
+so it stops recurring as untracked noise every session.
+
+**T7.2 (trivial-housekeeping PR-exemption) — real gap found, not a
+clean pass.** Checked BC-078's actual history before assuming the
+exemption held: commit `00d5851` (PR #8) touched only doc/config files
+(`.claude/CLAUDE.md`, root `CLAUDE.md`, `PROJECT_STATE.md`,
+`Wiki/log.md`) — zero code/workflow, exactly what the exemption
+describes — yet went through a full PR instead of direct-to-`main`.
+The exemption existed on paper (BC-077's own D1) but wasn't applied the
+one real time it had a chance to be. This session's own wrap-up (same
+doc/config-only shape: `.claude/CLAUDE.md`, `.gitignore`,
+`PROJECT_STATE.md`, this file, `Wiki/index.md`, `Wiki/reference/
+gstack-pilot-plugin.md`) is the corrective example — committed direct
+to `main`, no PR, citing the exemption explicitly.
+
+**T7.1 (Commander self-chain into `office-hours`/`plan-eng-review`) —
+confirmed present in source, not yet live-triggered.** `commander.md`'s
+dispatch text unambiguously specifies autonomous chaining before
+drafting a Build Card. No Commander task since gstack-pilot went live
+today has been a genuinely-fresh idea or an unambiguous prior-scoped
+next step, so the fire has never actually happened yet to observe.
+Deliberately did not manufacture a synthetic "fake idea" test — it
+would spawn a real `office-hours`/`plan-eng-review` session with real
+gstack telemetry for throwaway content, disproportionate to confirming
+one dispatch branch. Left open, closes naturally on the next real
+Commander task (BC-076 Card 2a or Card 3 are the likely candidates).
+
+Full detail: `Wiki/reference/gstack-pilot-plugin.md`'s new "BC-077
+T5/T7 closed" section. **Next:** whatever Commander picks next; T7.1
+stays open until then, not blocking.
+
 ## session-claude-md-modes-section-removed (2026-09-02, same-day follow-up to BC-078)
 
 Human directly edited root `CLAUDE.md` themselves, deleting the entire

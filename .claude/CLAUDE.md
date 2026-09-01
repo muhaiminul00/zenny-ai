@@ -55,14 +55,30 @@ of 5 - matches root `CLAUDE.md`'s own pre-existing standing number, reconciled
 execute.md actually read the override from.) Change the number by telling
 Claude a new one in Commander mode; it updates this line.
 
-Fill in the specifics that make this useful for THIS project:
-- State Doc: (name this project's state-tracking doc / decision log, if any -
-  Commander's pre-session briefing hook reads this path automatically once set).
-- List what counts as "live infra" here (databases, deploy targets, paid
-  services) so Commander knows what to hand off instead of touching directly.
-- Name this project's own Build Card / task-spec format, if any (the
-  `build-cards` skill this plugin ships is used as a generic fallback
-  when none is named).
-- Env/tooling convention (if any) - e.g. venv-only installs + a tracked
-  requirements file so teammates share a synced environment via GitHub, or none.
+Filled in 2026-09-02 (BC-077 T5), from facts already established elsewhere
+in this project - no new decisions made here, pure reconciliation:
+
+- **State Doc:** `PROJECT_STATE.md` (current-truth dashboard, overwritten
+  each session - read this first, every session) + `Wiki/log.md`
+  (append-only chronological decision/change log, cold storage). Durable
+  facts/decisions in between live in `Wiki/*/*.md`, cataloged via
+  `Wiki/index.md`. Full model: root `CLAUDE.md`'s "Standing Rule - The
+  Wiki" section.
+- **Live infra** (never touched directly by Commander, always handed to
+  Execute - not even a read): n8n (workflow execution layer), Supabase
+  project `zenny-vault` (control + per-client schemas), Pinecone index
+  `zenny-business-kb` (vector search), Convocore (conversation layer,
+  though largely superseded by Zenny's own n8n runtime per the 2026-08-29
+  SaaS pivot), Hostinger (VPS/DNS/domains/hosting), and any paid
+  third-party credential a workflow calls (OpenRouter, Google Workspace
+  APIs, etc.).
+- **Build Card format:** Zenny's own, defined in root `CLAUDE.md`'s
+  "Build Card System" section (Build Card ID, Target, Runtime Module/
+  Architectural constraints, Objective, Dependencies/Shared Utilities,
+  Acceptance Criteria, Test Cases, Definition of Done, Open Verification
+  Items) - not this plugin's generic `build-cards` skill fallback.
+- **Env/tooling convention:** Python packages install into the project
+  venv (`.zenny-py-venv`) only, per root `CLAUDE.md`'s "Standing Rule -
+  Python Installs" - never global/system Python, with a disclosed,
+  logged exception path if a package genuinely can't work in-venv.
 <!-- gstack-pilot-plugin:v1 -->
