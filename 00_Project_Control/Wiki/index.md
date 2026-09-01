@@ -144,10 +144,18 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
   published, re-verified via a direct Supabase read. D20's re-key proof
   FAILED: renaming a row's key orphans its old vectors in Pinecone
   permanently, since the delete-then-reinsert mechanism only ever knows
-  a row's *current* key. This is a genuine design gap, not a bug — the
-  human chose the fix (track previously-synced keys, diff-delete
-  orphans), but it's new architecture needing its own `/plan-eng-review`
-  pass, so it's tracked as a follow-up Build Card, not built yet. See
+  a row's *current* key. **Closed same day via BC-076-Card2c:** routed
+  through `/plan-eng-review` (per the human's chosen approach — track
+  previously-synced keys, diff-delete orphans), including a default-on
+  outside-voice pass that caught a real gap (no guard against an
+  incomplete Sheets read mass-deleting real content) the interactive
+  review missed. Built, published, and live-verified same session — the
+  exact `DPB`/`TMB02` orphan vectors left as evidence are now gone,
+  independently re-confirmed via a fresh Pinecone list call, zero false
+  positives against the 14 valid keys. Formally supersedes D16 (cross-leg
+  row deletion) too, since the two cases are indistinguishable from key
+  data alone. Two small follow-ups tracked in `TODOS.md`, not built this
+  pass (a dormant-source audit, wiring failures to real alerting). See
   [[../decisions/agent-capability-scope-and-business-memory]]. Every
   other part still gets its own `/plan-eng-review` pass when Commander
   schedules it — this doc is a map, not a full spec.

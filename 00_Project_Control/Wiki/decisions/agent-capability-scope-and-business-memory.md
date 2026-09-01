@@ -1,5 +1,64 @@
 # Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
 
+## BC-076-Card2c — D20 rename-safety fix shipped, D16 formally superseded (2026-09-01, same-day follow-up to Card2b)
+
+Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s Sheets
+Ingestion entry (D24-D32 subsection), `PROJECT_STATE.md`'s latest entry,
+`TODOS.md` (2 follow-ups). Full plan/review artifact (not repo-committed):
+`C:\Users\muhai\.claude\plans\starry-snuggling-patterson.md`.
+
+**The D20 gap logged below is CLOSED.** Routed through gstack
+`/plan-eng-review` per the Commander→gstack→Execute bridge (not
+freehanded), including a default-on outside-voice (Codex) pass that
+caught a real gap the interactive review missed. Built and live-verified
+same session:
+
+- **D24:** orphan-key source of truth is Pinecone's own `GET /vectors/list`
+  (paginated, prefix-scoped), diffed against every row-key physically
+  present in the current sheet read — not a new Supabase tracking column.
+  Chosen specifically because it can't drift from Pinecone's actual
+  contents and auto-discovers historical orphans with zero backfill step.
+- **D25 — formally supersedes D16** (cross-leg row deletion, previously
+  deferred to a future Card 3 mechanism). A key missing from the current
+  sheet is indistinguishable between "renamed" and "deleted entirely"
+  given D14's key-only row identity — no second signal exists to tell them
+  apart, so one mechanism now correctly closes both. D16 is retired.
+- **D26-D32:** malformed-ID handling, graceful list/delete-failure
+  degradation (matching D17's existing posture), a shared `id_prefix`
+  builder (DRY fix), a read-completeness guard before any deletion runs
+  (D29 — see below), bounded pagination/delete-batching, and duplicate-key
+  exclusion. Full rationale for each: Workflow_Registry.md.
+
+**The one finding worth naming here, not just in the workflow doc:** the
+outside-voice pass caught that the first draft had no guard against an
+*incomplete* Sheets read — without one, a truncated/permission-limited/
+API-hiccup read that doesn't hard-error would make every unread row look
+orphaned and delete real, current KB content. Implementing that guard
+(D29) surfaced a second, *pre-existing* latent gap: without
+`alwaysOutputData` on the Sheets read node, n8n's own zero-item-safety
+default meant a "successful" 200-OK-but-zero-rows read would have
+silently skipped the entire rest of the workflow — no error, no status
+write. Both closed together. This is the kind of gap that survives a
+solo review and needs a second, differently-biased pass to catch — logged
+here as a reason this project keeps outside-voice on by default, not
+optional.
+
+**Live proof, not simulated:** the exact `DPB`/`TMB02` orphan vectors left
+in Pinecone since the original D20 proof (below) were correctly identified
+and deleted by the new mechanism on the first real production sweep after
+shipping, independently re-verified via a fresh direct Pinecone list call
+(32 vectors → 28, the right 4 gone, zero false positives against the other
+14 valid keys).
+
+**Scope trim, disclosed, not silent:** the plan's `consecutive_orphan_step_
+failures` cross-run counter was not built this pass (would need a new
+Supabase read of prior `sync_status` for marginal value over what already
+shipped) — folded into a `TODOS.md` follow-up instead. Also not built: a
+periodic cross-source orphan audit for dormant sources that stop syncing
+entirely (same `TODOS.md`).
+
+---
+
 ## BC-076-Card2b — D20 re-key gap found, D17 status bug fixed (2026-09-01, same-day follow-up)
 
 Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s Sheets Ingestion

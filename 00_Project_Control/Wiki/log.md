@@ -9,6 +9,67 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## session-bc076-card2c-d20-rename-safety-fix-shipped (2026-09-01, same-day follow-up to Card2b)
+
+Commander received the D20-gap handback and, per the Commander→gstack→
+Execute planning bridge, sent it straight to gstack `/plan-eng-review`
+rather than drafting the fix itself.
+
+**Plan-eng-review pass:** Step 0 scope challenge passed (below the
+8-file/2-class complexity trigger). Interactive review raised and
+resolved 6 architecture/code-quality decisions with the human — orphan-key
+source of truth (Pinecone `/vectors/list` vs a new Supabase column, chose
+the Pinecone-list approach), formal D16 supersession, malformed-ID
+handling, list/delete-failure posture, shared ID-builder DRY fix. Default-
+on outside-voice (Codex) pass then found 16 additional findings; 2 were
+genuine cross-model tensions surfaced back to the human (a missing
+read-completeness guard against mass-deletion on an incomplete Sheets
+read, and an implicit stale-content-vs-strict-deletion choice for rows
+that fail validation but stay present) — both resolved, the rest folded
+in directly as unambiguous corrections (exact-ID delete instead of
+rebuilt candidates, prefix/parser consistency, duplicate-key exclusion
+tightened from "reported" to "excluded", pagination/batch bounds, a
+missing status field). Full plan artifact (not repo-committed):
+`C:\Users\muhai\.claude\plans\starry-snuggling-patterson.md`.
+
+**Build (Execute):** Live-verified `GET /vectors/list` (raw REST + n8n's
+built-in HTTP pagination feature) against the real `zenny-business-kb`
+index before building anything on it — confirmed prefix filtering,
+pagination round-tripping, and Pinecone's documented 1000-ID delete-batch
+limit. Added 4 new nodes to `KR0kHvk3kJRThrX5` (Verify Read Completeness,
+List Previously-Synced Vector IDs, Compute Orphaned Row Keys, Delete
+Orphaned Vectors) plus a shared `id_prefix` field threaded through
+existing nodes, `alwaysOutputData` on the Sheets read (closing a
+pre-existing latent zero-item-safety gap found while implementing D29),
+and duplicate-key exclusion in `Validate Rows & Build Batch`. Published
+(`activeVersionId 50aa506d-eb55-43e9-9eef-1ae5f44d1726`).
+
+**Live proof:** full real SCH-004 sweep (execution 70124 → sub-execution
+70131) correctly identified `DPB__0/1` and `TMB02__0/1` as the only
+orphans among 32 listed vectors (zero false positives against the other
+14 valid keys) and deleted them. Independently re-verified via a fresh,
+separate Pinecone list call afterward: 32 → 28 vectors, the right 4 gone.
+This is the exact evidence deliberately left in Pinecone since the
+original D20 proof — now closed.
+
+**Disclosed, not hidden:** the plan's `consecutive_orphan_step_failures`
+cross-run counter was trimmed during build (needs a new Supabase read for
+marginal value); folded into a `TODOS.md` follow-up instead, alongside a
+periodic dormant-source orphan audit. The D32/D26/D27 edge-case branches
+are implemented and reviewed but not each individually live-fired (would
+require deliberately corrupting a live sheet or Pinecone call).
+
+**Docs updated same pass:** `Workflow_Registry.md` (new D24-D32
+subsection), Wiki decisions page (D16 formally superseded), `Wiki/
+index.md`, `TODOS.md` (created, 2 entries), and `docs/designs/
+zenny-launch-blueprint.md`'s original D16/D20 bullets — corrected in
+place (not deleted) with superseded-by notes, since the original belief
+that current-key delete alone would close the edited-key-value case was
+wrong and a future reader should see that reasoning and its correction
+side by side.
+
+---
+
 ## session-bc076-card2b-d20-gap-d17-fixed (2026-09-01, same-day follow-up)
 
 Human completed the 3 remaining DoD proofs from the SHIPPED entry below.
