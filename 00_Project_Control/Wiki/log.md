@@ -61,11 +61,12 @@ require deliberately corrupting a live sheet or Pinecone call).
 
 **Docs updated same pass:** `Workflow_Registry.md` (new D24-D32
 subsection), Wiki decisions page (D16 formally superseded), `Wiki/
-index.md`, `TODOS.md` (created, 2 entries). `docs/designs/
-zenny-launch-blueprint.md`'s original D20 bullet also needs a
-superseded-by note — the belief that current-key delete alone would
-close the edited-key-value case was wrong, worth flagging plainly so a
-future reader doesn't inherit it.
+index.md`, `TODOS.md` (created, 2 entries), and `docs/designs/
+zenny-launch-blueprint.md`'s original D16/D20 bullets — corrected in
+place (not deleted) with superseded-by notes, since the original belief
+that current-key delete alone would close the edited-key-value case was
+wrong and a future reader should see that reasoning and its correction
+side by side.
 
 ---
 
