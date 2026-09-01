@@ -48,9 +48,12 @@ installed, or asks which memory system to use otherwise, then records the answer
 here so it is never re-asked.
 
 Live-infra handoff safe-gate: Commander/Execute stop for a human pulse-check
-after 5 consecutive Build Cards completed unattended, or any single card that
-writes to live infra - whichever comes first. Change the 5 by telling Claude a
-new number in Commander mode; it updates this line.
+after 3 consecutive Build Cards completed unattended, or any single card that
+writes to live infra - whichever comes first. (3, not the plugin's own default
+of 5 - matches root `CLAUDE.md`'s own pre-existing standing number, reconciled
+2026-09-02, BC-078, since this is the file gstack-pilot's own commander.md/
+execute.md actually read the override from.) Change the number by telling
+Claude a new one in Commander mode; it updates this line.
 
 Fill in the specifics that make this useful for THIS project:
 - State Doc: (name this project's state-tracking doc / decision log, if any -
