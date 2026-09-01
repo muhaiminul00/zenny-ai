@@ -9,6 +9,56 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## session-claude-md-modes-section-removed (2026-09-02, same-day follow-up to BC-078)
+
+Human directly edited root `CLAUDE.md` themselves, deleting the entire
+"## Modes — /commander, /execute, /advisor" section (135 lines,
+lines 47-183ish pre-deletion) in one pass, on the judgment that it's
+now fully redundant with the `gstack-pilot` plugin's own mode
+documentation (its seeded block in `.claude/CLAUDE.md`, its
+`commander.md`/`execute.md`/`advisor.md` command files). Asked Execute
+to commit and push it directly to `main`, with a specific commit
+message, explicitly bypassing the PR-first chain — honored as a direct
+human instruction on landing their own already-made edit, not a
+judgment call left to Execute.
+
+**One dangling reference caught and fixed while landing it, disclosed
+before committing:** the surviving Branch/PR Workflow section's
+"routing pure bookkeeping through a PR would be exactly the
+over-engineering this document already tells both modes to avoid" no
+longer had a referent — "Neither mode over-engineers" was inside the
+just-deleted block. Reworded to stand on its own ("...would be
+over-engineering for zero safety gain on content with no code/workflow
+risk") rather than silently leaving a broken forward-reference.
+
+**Flagged, not reversed — real content lost with no surviving
+duplicate anywhere else in the document:**
+- The 2026-08-12 incident note (Commander ran live read-only Supabase
+  queries while `mode.json` still read `"commander"`) that motivated
+  the mode-state-write-before-infra-touch discipline.
+- The explicit "live infra = n8n/Supabase/VPS/DNS" domain list, tied
+  to the safe-gate's "any single card that wrote to live infra" clause.
+- The `/clear`-vs-`/compact` self-invocation reasoning and its pointer
+  to `Wiki/platform-quirks/mode-self-invocation-limits.md`.
+- "Neither mode over-engineers" — the project's own stated build
+  philosophy (smallest correct thing, search-broadly-first before
+  stopping on a blocker).
+
+**Confirmed still safe, not lost:** Mandatory MCP Verification
+survives as its own separate standing-rule section elsewhere in
+`CLAUDE.md`. The safe-gate's actual number (3, reconciled in BC-078)
+survives in `.claude/CLAUDE.md` — the file gstack-pilot's own commands
+actually read for the override, so the enforcement mechanism itself is
+unaffected even though root `CLAUDE.md`'s copy of the full paragraph
+is gone.
+
+Committed direct-to-`main` (`d1ce202`), no PR, per explicit human
+instruction — CLAUDE.md edits had gone through the full PR chain for
+every prior card this session (BC-077, BC-078), so this is a real,
+disclosed deviation from that pattern, not a new default.
+
+---
+
 ## session-bc078-safe-gate-reconcile-shipped (2026-09-02, same-day follow-up to BC-077)
 
 Human's very next message after BC-077's handback flagged two things:
