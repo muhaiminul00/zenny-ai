@@ -113,7 +113,41 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
   reason manual-only verification isn't enough).** **Card 1 then
   shipped the same session — the client_id bug is FIXED and
   live-verified (real seeded content, correct-tenant retrieval AND
-  cross-tenant non-leakage both proven across 2 archetypes).** See
+  cross-tenant non-leakage both proven across 2 archetypes).** **Card 2b's
+  build-ready spec locked (seventh pass, 10 decisions D14-D23, 6 of them
+  outside-voice-forced corrections to a real ID-collision bug) and its
+  build started — the Sheets ingestion workflow + SCH-004's generalized
+  dispatcher are both built and structurally validated, but blocked on a
+  real Credential Gate (no Google service-account credential exists yet).
+  A genuine live incident was found and fixed along the way: SCH-004's
+  published version was still querying a column renamed away during the
+  first slice, one scheduled run away from breaking the nightly Notion
+  sync for every client.** **Card 2b then SHIPPED (2026-09-01): Credential
+  Gate cleared (real GCP service account + n8n credential + a real raw
+  Shopify export as test data), both workflows published and live-verified
+  end to end — 28 real vectors landed in Pinecone, confirmed independently,
+  and `Search_business_kb` proven to actually retrieve the seeded content
+  through a real query. 4 real bugs were found and fixed via live
+  execution alone (none were structural, so `validate_workflow` never
+  caught them) — most notably a false "success" status that had actually
+  written zero real vectors, caused by an HTTP-node failure silently
+  wiping downstream row data.** A live key-column trap was caught before
+  shipping: the raw export's `Handle` column isn't row-unique (repeats
+  across product variants) — `Variant SKU` used instead, confirmed against
+  the sheet's real header row, not guessed. The human's request for real
+  image-based product search + a recommendation carousel was correctly
+  scoped OUT as new capability needing its own design, not absorbed into
+  this card. **Same-day follow-up (2026-09-01): the 403 revoked-access
+  proof closed clean, and the final D20/D17 proofs found real issues,
+  not papered over.** D17's blank-key status report had a stale-snapshot
+  bug (`"success"/failed_count:0` while naming a failed row) — fixed,
+  published, re-verified via a direct Supabase read. D20's re-key proof
+  FAILED: renaming a row's key orphans its old vectors in Pinecone
+  permanently, since the delete-then-reinsert mechanism only ever knows
+  a row's *current* key. This is a genuine design gap, not a bug — the
+  human chose the fix (track previously-synced keys, diff-delete
+  orphans), but it's new architecture needing its own `/plan-eng-review`
+  pass, so it's tracked as a follow-up Build Card, not built yet. See
   [[../decisions/agent-capability-scope-and-business-memory]]. Every
   other part still gets its own `/plan-eng-review` pass when Commander
   schedules it — this doc is a map, not a full spec.

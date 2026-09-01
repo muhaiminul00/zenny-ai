@@ -522,6 +522,209 @@ must design this, not just the upsert path.
 **Sequencing:** Card 1 → Card 2a/2b (parallel, independent) → Card 3.
 Card 4 can build in parallel with Card 3 once Card 1 is done.
 
+### BC-076-Card2b build-ready spec (locked 2026-08-31/2026-09-01, seventh
+pass — Google Sheets ingestion leg, hardened by outside-voice review)
+
+Card 1 shipped (severe `client_id` bug fixed, live-verified). This pass
+locks Card 2b — independent of Card 2a, which stays blocked on the human's
+dashboard OAuth error details (not yet provided). Real update landed this
+pass, noted but non-blocking: Google OAuth consent-screen branding
+verification is already approved (shows "Zenny"); only the demo/explanation
+video remains before submitting for restricted+sensitive scope verification.
+D11 already chose the service-account path specifically so Card 2b never
+depends on that timeline — this doesn't change 2b's design, just Part 1's
+launch-gate tracking (see PROJECT_STATE.md).
+
+**Reused, not rebuilt:** `control.client_kb_source`'s generalized schema
+(`source_type` enum incl. `google_sheets`, `source_ref`,
+`upsert_client_kb_source` RPC) and `zenny-business-kb`'s Pinecone
+index/embeddings, both already live from BC-076's first slice. SCH-004's
+cron-polling pattern exists but its current filter query is unverified
+against the generalized schema — Execute's first live-check, not assumed
+either way.
+
+**Outside-voice catch, real and substantive (not stylistic):** the first
+draft of this spec had `vector ID = key-column value` — a genuine collision
+bug once a row can produce more than one chunk, or once a second sheet
+source shares the same Pinecone namespace. Codex also caught that deferring
+staleness entirely to Card 3 (per D16) silently permits a *narrower* bug
+D16 never intended to allow: a row's OWN chunk count shrinking on resync
+(edited content needs fewer chunks) or its key value being edited leaves
+stale orphaned chunks answerable forever — not a cross-leg deletion problem,
+a same-leg resync-hygiene problem. Both corrected below (D19, D20).
+
+**Decisions locked this pass (D14-D23, continuing the doc's D-numbering):**
+
+- **D14 — row identity = client-designated stable key column, not row
+  index.** Robust to reordering/insertion; row index breaks silently the
+  moment a row is inserted above another (the "looks fine, quietly wrong"
+  bug class D12 exists to catch, but Card 4's canary isn't built yet).
+- **D15 — one designated tab per sheet**, not auto-ingest-every-tab.
+  `source_ref = {spreadsheetId}:{sheetName}`. A client with a genuine
+  multi-tab catalog gets a second source row — explicit, not automatic —
+  avoiding silent ingestion of unrelated/private tabs.
+- **D16 — cross-leg deletion/staleness (a client removing a row from the
+  sheet entirely) stays deferred to Card 3's future shared mechanism**,
+  reused here rather than rebuilt bespoke. Narrowed by D20 below: this
+  defers ONLY the cross-leg case, not same-leg resync hygiene.
+- **D17 — partial-row-failure handling:** continue past a bad row, don't
+  abort the whole sync; `sync_status` records partial state + which
+  row-keys failed (capped list, not raw cell content — see verification
+  plan).
+- **D18 — new `source_config jsonb` column on `client_kb_source`**, not
+  more delimited segments crammed into `source_ref`. Holds the key-column
+  name and (per D21) the column whitelist. Generalizes to whatever Card
+  3's other 4 legs need later (e.g. a Baserow view_id) instead of a
+  text-parsing scheme that gets more fragile every time a new field is
+  added. Real additive migration, Execute's job to write + live-verify.
+- **D19 — composite vector ID + full metadata contract (outside-voice
+  catch, corrects the first draft):** `vector_id =
+  {source_type}_{source_ref_hash}_{row_key}_{chunk_index}`. Every vector
+  carries metadata: `source_type`, `source_ref`, `row_key`,
+  `row_number_at_sync`, `updated_at`, `content_hash`. Closes the
+  collision bug, and makes deterministic cleanup/debugging possible —
+  which the bare-key-as-ID version could not support.
+- **D20 — delete-then-reinsert per row key, every sync (outside-voice
+  catch):** before writing a row's current chunks, delete any existing
+  vectors for that `(source_ref, row_key)` pair first. Closes both the
+  shrinking-chunk-count bug and the edited-key-value bug with one
+  mechanism — an edited key is just delete-old-key + insert-new-key.
+  Stays scoped to this leg's own rows; does not touch Card 3's cross-leg
+  scope (D16).
+- **D21 — client-designated column whitelist (outside-voice catch):**
+  only columns the client names (stored in D18's `source_config`) get
+  chunked — not every column in the row. Consistent with D15's own
+  tab-scoping logic; avoids a real content-leak risk (a notes/cost/margin
+  column sitting in the same sheet becoming something the Agent can quote
+  to a customer).
+- **D22 — one global service account for now, not one per client**
+  (outside-voice flagged the blast-radius tradeoff explicitly). Matches
+  this project's actual current stage (2-3 test clients); a leaked key
+  would expose every connected client's Sheet at once — a real,
+  documented risk, not a hypothetical, revisit if/when client count or
+  risk tolerance changes.
+- **D23 — proceed with Card 2b as now revised, not a separate "source-
+  identity hardening" pre-card.** D18-D21's fixes are themselves the
+  general hardening the outside-voice review asked for — `source_config`,
+  composite vector IDs, and per-row cleanup are not Sheets-specific
+  patches, so Card 3's other 4 legs inherit the same contract rather than
+  needing their own foundational card first.
+
+**Build scope:**
+1. Human-side credential gate: create one GCP service account; client
+   shares their Sheet with its email (Viewer). **Blocking first
+   verification step, non-negotiable, before any other Card 2b work
+   starts:** confirm live via `get_node_types`/`explore_node_resources`
+   that n8n's native Google Sheets node actually supports service-account
+   auth (only the *read operation's existence* was live-verified in the
+   fifth pass — the *auth mode* never was, an unverified claim wearing
+   "confirmed live" clothing). **Documented fallback, correctly sized this
+   time (outside-voice corrected the first draft's "minor fallback"
+   framing):** if unsupported, a raw HTTP Request node + JWT signed with
+   the service-account key is itself a real sub-build — private-key
+   handling, token caching/renewal, correct Sheets API scopes — matching
+   this codebase's existing raw-HTTP convention but not a one-liner. If
+   this fallback is needed, re-scope Card 2b's estimate before proceeding
+   past this step, don't silently absorb it.
+2. Migration: add `source_config jsonb` (nullable) to
+   `control.client_kb_source` (D18).
+3. New n8n ingestion workflow: read the designated tab → validate the
+   header row contains the designated key column AND every whitelisted
+   column (D21) → for each row, delete existing vectors for
+   `(source_ref, row_key)` (D20) → chunk only the whitelisted columns'
+   content → embed → upsert with the composite ID + metadata (D19) →
+   continue past a row that fails validation, aggregating a capped
+   (e.g. first 20) list of failed row-keys, never raw cell content → write
+   `sync_status`/`last_synced_at` via `upsert_client_kb_source`.
+4. SCH-004: Execute live-verifies its current filter query first (does it
+   already read the generalized schema, or still the old
+   `notion_page_id`-only shape). Generalize to poll all due `source_type`
+   rows generically if not already, rather than adding another
+   per-source special case.
+5. Provisioning for v1 stays manual/RPC-driven — no dashboard UI exists
+   yet (Card 2a's UI is unbuilt). Execute writes a short runbook/checklist
+   (spreadsheetId reachable, sheetName exists, key column present, service
+   account has access) an operator runs before inserting a source row —
+   not a UI, matching "smallest correct thing."
+
+**NOT in scope, explicitly deferred:**
+- Cross-leg deletion (a row removed from the sheet entirely, vs. edited) —
+  Card 3's future shared mechanism (D16, narrowed by D20).
+- Dashboard self-serve UI for entering a Sheet ID/tab/key column/whitelist
+  — Part 6 dashboard rebuild territory; Card 2a doesn't build this either.
+- Multi-tab-per-sheet auto-ingestion (D15) — a second source row per extra
+  tab, explicit, not automatic.
+- Excel (`.xlsx`) upload leg — D4 noted it rides a similar shape, but it's
+  a distinct connector/trigger, separate scope from 2b.
+- Per-client service accounts (D22) — revisit if client count grows past
+  the current 2-3-test-client phase.
+- A domain-level pre-check for clients whose Google Workspace blocks
+  external/service-account sharing (flagged by outside-voice as a real
+  onboarding-blocker risk, not just an edge case) — no precedent in this
+  codebase for detecting this ahead of time; if hit, it becomes a real
+  onboarding support case, not silently absorbed into 2b's scope.
+
+**Verification plan (live MCP verification — this project's actual test
+doctrine for n8n workflows, not unit tests):**
+1. Live-verify Sheets node service-account auth mode (blocking, first
+   step, see Build scope #1).
+2. Live-verify SCH-004's current query shape before touching it.
+3. Live-verify Google API prerequisites: Sheets API enabled on the
+   service-account project, correct scopes granted, and confirm actual
+   403 (no access) vs 404 (bad sheet/tab id) response shapes — needed for
+   real vs. cosmetic error status in step 6 below.
+4. Migrate `source_config` column, confirm via `list_tables`.
+5. Seed one real test-client Google Sheet with a designated key column
+   and a designated whitelist column, share with the service account, run
+   the ingestion workflow live, confirm real chunks land in Pinecone
+   (correct namespace, composite IDs, full metadata per D19), confirm
+   `client_kb_source.sync_status`/`last_synced_at` actually updated.
+6. Leave one whitelisted-column cell blank on one row, re-run, confirm the
+   other rows still ingest and that specific row-key appears in the
+   partial-failure list per D17 (not a silent skip).
+7. Edit an already-synced row's key value, re-run, confirm the OLD vector
+   ID is gone and a new one exists under the new key (D20) — proves
+   absence of the stale vector, not just presence of the new one (the
+   exact gap outside-voice flagged in the first draft's verification
+   plan).
+8. Revoke the service account's share access, re-run, confirm a real
+   error status is written using the 403/404 semantics from step 3, not a
+   crash or silent no-op.
+9. Confirm via a live Agent conversation (Commerce-Ecom) that content
+   from the seeded Sheet is retrievable through `Search_business_kb` —
+   reuses Card 1's already-proven retrieval path end-to-end.
+10. Clean up all test data after (temp n8n workflows, test Pinecone
+    vectors, the test `client_kb_source` row) — standing practice this
+    session.
+
+**Failure modes:**
+- Sheet share revoked mid-cycle → real error status per step 8, not a
+  silent success.
+- Malformed/blank whitelisted-column value on a row → reported per D17
+  (step 6), doesn't corrupt other rows.
+- Edited/re-keyed row → old vector removed, not orphaned (D20, step 7).
+- Sheets node auth mode unsupported → documented HTTP+JWT fallback with a
+  re-scope trigger, not a silent scope absorption (Build scope #1).
+- Client's Workspace domain blocks external/SA sharing → real onboarding
+  blocker, flagged NOT-in-scope, not silently absorbed.
+
+**Implementation Tasks (synthesized from this pass's findings):**
+- [ ] **T1 (P1)** — n8n — live-verify Google Sheets node service-account
+      auth mode; re-scope if the HTTP+JWT fallback is needed
+      (Build scope #1)
+- [ ] **T2 (P1)** — Supabase — migrate `source_config jsonb` onto
+      `control.client_kb_source` (D18)
+- [ ] **T3 (P1)** — n8n — build the ingestion workflow: tab read → header
+      validation (key + whitelist) → delete-then-reinsert per row key →
+      composite-ID upsert with full metadata (D19, D20, D21)
+- [ ] **T4 (P1)** — n8n — live-verify SCH-004's current filter query;
+      generalize to poll all due `source_type` rows if not already
+- [ ] **T5 (P2)** — docs — write the manual-provisioning runbook/checklist
+      for inserting a `client_kb_source` row (Build scope #5)
+- [ ] **T6 (P1)** — verification — run the full 10-step live verification
+      plan above, including the re-key/absence proof (step 7) and the
+      403-vs-404 error-status proof (step 3/8)
+
 ### Part 3 — Capability-breadth verification
 Cheap, should ride alongside Part 1/2, not its own multi-day Build Card:
 for each archetype, a real live test proving the Agent answers FAQ-style
@@ -814,3 +1017,44 @@ instruction, not a single narrow bug-fix card.
 - Root cause of the human's real dashboard OAuth reconnect error — not yet investigated, Card 2a's other first task.
 - A dedicated security pass on tool-webhook auth (Check_availability/Cancel_appointment/Get_booking_status and the new Search_business_kb webhook all appear to carry no auth beyond the URL itself) — flagged, not scheduled.
 - Everything already listed as unresolved in the fifth pass above — still open, unchanged.
+
+---
+
+## GSTACK REVIEW REPORT — BC-076-Card2b build-ready spec (2026-09-01, seventh pass)
+
+Scope: lock Card 2b (Google Sheets ingestion leg, service account per D11)
+into a build-ready spec, independent of Card 2a which stays blocked on the
+human's dashboard OAuth error details. Real update landed this pass:
+Google OAuth branding verification already approved ("Zenny" on the
+consent screen), only the demo/explanation video remains before restricted+
+sensitive scope submission — noted in Part 1's launch-gate tracking, does
+not change Card 2b's design (D11 was chosen specifically to be independent
+of that timeline).
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | Not run — infra/architecture planning, not a product-scope question. |
+| Codex Review | `/codex review` | Independent 2nd opinion | 1 | issues_found, all resolved | See CODEX/CROSS-MODEL below. |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | clean (post-resolution) | See table below. |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | Not run — no UI in this pass's scope. |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | Not run — not applicable to this infra plan. |
+
+| Section | Status | Findings |
+|---|---|---|
+| Step 0 (scope challenge) | Done, no STOP fired | ~2 files/1 migration, well under the 8-file/2-service smell. Existing-code reuse mapped: `client_kb_source`'s generalized schema, `zenny-business-kb`'s Pinecone index/embeddings, and the chunk→embed→upsert shape all reused unchanged from BC-076's first slice; only SCH-004's current filter query is unverified against the generalized schema, flagged for Execute rather than assumed. |
+| 1. Architecture review | Done, 10 decisions locked (D14-D23) | D14 (client-designated key column, not row index), D15 (single designated tab per sheet), D16 (cross-leg deletion deferred to Card 3, narrowed by D20), D17 (continue-past-bad-row partial failure), D18 (new `source_config jsonb` column, not more delimited `source_ref` segments), D19 (composite vector ID + full metadata contract — outside-voice catch, corrects a real collision bug in the first draft), D20 (delete-then-reinsert per row key every sync — outside-voice catch, closes both the shrinking-chunk-count and edited-key bugs), D21 (client-designated column whitelist, not ingest-all — outside-voice catch, closes a real content-leak risk), D22 (one global service account for now, blast-radius tradeoff documented explicitly), D23 (proceed with Card 2b as revised rather than a separate hardening pre-card — the fixes above ARE the general hardening). All human-confirmed, all recommended options accepted. |
+| 2. Code quality review | No issues | No app code yet — n8n workflow/schema design. Ingestion shape mirrors Shopify/WooCommerce/Notion's existing deterministic-ID convention; delete-then-reinsert is a small, explicit addition, not a new abstraction layer. |
+| 3. Test review | Locked as part of this spec | 10-step live verification plan written directly into the spec (test plan artifact also written to `~/.gstack/projects/.../*-eng-review-test-plan-*.md`), including 2 steps outside-voice specifically forced in: proving absence of a stale vector after a re-key (not just presence of the new one), and distinguishing real 403-vs-404 error semantics before trusting an error status. |
+| 4. Performance review | No issues at expected scale | Small-business catalog sizes (dozens-hundreds of rows) place no real load on Sheets API or Pinecone; flagged only as an awareness note if a real client's sheet exceeds ~2000 rows, not a blocker. |
+
+**CODEX:** Ran (gpt-5.5, high reasoning, `codex exec -s read-only`). 18 findings on the first-draft plan — 6 promoted to human decisions (D18-D23 above, all accepted as recommended), the rest folded directly into the spec as scope corrections: Google API prerequisite verification added to the test plan (403/404 semantics, scopes, quota), the HTTP+JWT fallback's effort reframed from "minor" to a real re-scope trigger, a domain-sharing-restriction risk flagged under NOT-in-scope rather than silently absorbed, and a manual-provisioning runbook added to Build scope rather than assuming an operator "just knows" the inputs to validate.
+
+**CROSS-MODEL:** No disagreement on architecture — Codex's promoted findings (D18-D21, most severely D19/D20's collision and staleness bugs) were genuine gaps in the first draft, not a competing stance; all corrected via AskUserQuestion and accepted as recommended. One genuine strategic tension raised (D23: build Card 2b now with the fixes folded in, vs. pause for a separate general "source-identity hardening" pre-card) — presented neutrally, human chose to proceed now, reasoning that D18-D21's fixes already generalize past Sheets specifically.
+
+**VERDICT:** Card 2b (Google Sheets ingestion leg, service account per D11, hardened by 6 outside-voice-forced corrections) is build-ready — packaged into a formal Build Card and handed to Execute next. CEO + ENG CLEARED for Card 2b — eng review still required for Card 2a/3/4 individually when picked up. Card 2b's actual build is now larger than the fifth pass assumed (a real migration plus a vector-ID/metadata redesign, not just a Sheets connector) — disclosed plainly in the spec, not smoothed over.
+
+**UNRESOLVED DECISIONS:**
+- n8n Google Sheets node's actual service-account auth support — genuinely unverified, Execute's blocking first step, not assumed either way.
+- Whether SCH-004's current filter query already matches the generalized schema or still targets the old `notion_page_id`-only shape — Execute's second live-check.
+- Whether a client's Google Workspace domain might block external/service-account sharing — a real onboarding-blocker risk with no precedent in this codebase to check ahead of time; flagged, not resolved.
++ 4 unresolved from prior reviews (`Provider_App_Setup_Guide_v1.md` submission status, dashboard test-client-login support, the human's real OAuth error root cause, and the tool-webhook auth security pass — all carried from the sixth pass, still open, unchanged by this one).

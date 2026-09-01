@@ -1,5 +1,152 @@
 # Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
 
+## BC-076-Card2b — D20 re-key gap found, D17 status bug fixed (2026-09-01, same-day follow-up)
+
+Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s Sheets Ingestion
+entry (D20/D17 sections), `PROJECT_STATE.md`'s latest entry.
+
+**D20 (delete-then-reinsert per row key) has a real design gap: it cannot
+detect a key rename.** Live-proven by renaming two real rows' `Variant SKU`
+values, resyncing, then fetching exact vector IDs directly from Pinecone
+(the Pinecone MCP's `search-records` only works on integrated-inference
+indexes, not this raw one — a disposable diagnostic workflow was built to
+hit `/vectors/fetch` directly instead). Both the old and new keys' vectors
+existed simultaneously — the old content is permanently orphaned, since
+nothing in any future sync ever again computes an ID containing the old
+key. Not a bug to patch; D20's mechanism only ever knew a row's *current*
+key.
+
+**Decision:** track previously-synced row keys per `source_ref` and
+diff-delete anything missing from the current sync (covers rename, delete,
+and reorder). This is new architecture (persistence + diff logic + real
+edge cases — multiple renames in one sync, backfilling rows synced before
+this existed, cleaning up the orphans this proof already created) — per
+the Commander→gstack→Execute planning bridge it needs its own
+`/plan-eng-review` pass before a Build Card. **Not built.** Tracked as a
+follow-up card; the `DPB`/`TMB02` orphan vectors are left in Pinecone
+deliberately as evidence until it lands.
+
+**D17 (blank-key partial-failure) structurally held — no corruption of the
+other rows — but its status report was wrong:** `sync_status` said
+`"success"/failed_count:0` while naming a failed row in the same payload.
+Root cause: `Aggregate & Build Status Payload` read `failedCount` off the
+first valid row's own stale snapshot (a primitive copied by value before
+the loop counted the later failure) instead of deriving it. **Fixed**
+(`failed_count = total_rows - synced_count`, exact regardless of row
+order), published, and re-verified independently via a direct
+`control.client_kb_source` read: `{"status":"partial","failed_count":1,...}`
+— correct. This one IS closed.
+
+## BC-076-Card2b SHIPPED — Credential Gate cleared, live-verified, 4 real bugs found and fixed (2026-09-01)
+
+Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s SCH-004 + Sheets
+Ingestion entries, `PROJECT_STATE.md`'s latest entry, `Wiki/log.md`
+session-bc076-card2b-shipped.
+
+Human supplied the credential-gate deliverables: a GCP service account, the
+n8n `googleApi` credential ("Google Service Account API"), and a real raw
+Shopify product-catalogue export as the test sheet.
+
+**Key-column trap caught live, not guessed:** the raw export has one row
+per product *variant*, and `Handle` (the natural-looking key) repeats
+across every variant of the same product — would have made D20's
+delete-then-reinsert silently clobber all but the last-synced variant
+under one shared row key. Confirmed `Variant SKU` (genuinely row-unique)
+with the human instead, backed by the sheet's actual live header row, not
+assumption.
+
+**Scope boundary held under pressure:** the human's whitelist answer also
+asked for real image-based product search (upload a photo, agent finds
+matches) and a recommendation carousel — correctly identified as new
+capability outside Card2b's approved spec (needs its own vision-embedding
+model and index-strategy design), and deferred as a future Build Card
+rather than improvised mid-build. Image URL/alt-text is ingested as plain
+searchable text for now, which is explicitly NOT the same thing.
+
+**4 real bugs found via live execution (none caught by `validate_workflow`,
+since none are structural — all surface only against real data):**
+inverted `Has Valid Rows?` branch logic (real rows would have skipped the
+whole embed/upsert pipeline and written a fake "success" with zero
+vectors); a strict-boolean-type crash on the same node from a leftover
+placeholder value; a Code-node per-item/all-items mode mismatch on `Chunk
+Content`; and the one that mattered most — after fixing the first three, a
+live run reported clean "success" while every single upsert had actually
+failed, because a 404 (expected, from deleting nothing on a first sync)
+wiped the row's content before the chunker read it, and `onError:
+continueRegularOutput` silently swallowed the resulting cascade of
+failures too. Fixed by sourcing row data from the last Code node instead
+of the fallible HTTP node's output.
+
+**Live-verified independently, not trusted from the workflow's own
+report:** 28 real vectors confirmed via Pinecone `describe-index-stats`;
+`SCH-004`'s generalized dispatcher correctly routed both legs (6 real
+`notion` clients + 1 `google_sheets` client) in the same live sweep, 3
+times over while debugging; `Search_business_kb`'s real webhook returned
+the exact seeded content for a live query.
+
+**Still open, needs human action:** the D20 re-key/absence proof and the
+403-vs-404 revoked-access proof both need the human to act on their own
+Google Sheet directly (a live 403 test already confirmed the service
+account's Viewer-only write boundary is real and correct, not a bug); no
+natural blank-key row existed in this test data to exercise D17's
+partial-failure path live.
+
+**This card wrote to live n8n/Supabase/Pinecone/Google Sheets state — per
+the live-infra safe-gate, Execute handed back to Commander for a human
+pulse-check rather than self-chaining into a new Build Card.**
+
+---
+
+## BC-076-Card2b build-ready spec locked + build started, blocked on Credential Gate (2026-09-01, seventh pass)
+
+Full detail: `docs/designs/zenny-launch-blueprint.md`'s "BC-076-Card2b
+build-ready spec" section + its seventh-pass GSTACK REVIEW REPORT,
+`06_Infrastructure/n8n/Workflow_Registry.md`'s SCH-004 + new Sheets
+Ingestion entries, `Wiki/log.md` session-bc076-card2b-blocked.
+
+**Ten real decisions locked (D14-D23):** client-designated key column over
+row index (D14); one designated tab per sheet (D15); cross-leg deletion
+deferred to Card 3, narrowed (D16); continue-past-bad-row partial failure
+(D17); new `source_config jsonb` column over more delimited `source_ref`
+segments (D18); composite vector ID + full metadata contract, an
+outside-voice catch correcting a real collision bug in the first draft
+(D19); delete-then-reinsert per row key every sync, another outside-voice
+catch closing 2 bugs (shrinking chunk count, edited key values) with one
+mechanism (D20); client-designated column whitelist over ingest-everything,
+closing a real content-leak risk (D21); one global service account for now,
+blast-radius tradeoff documented explicitly (D22); proceed with the
+revised Card 2b rather than a separate hardening pre-card, since D18-D21's
+fixes already generalize past Sheets (D23).
+
+**A real live incident found and fixed before it happened, unrelated to
+the new build but discovered while starting it:** `SCH-004`'s published
+version was still querying a column (`notion_page_id`) renamed away during
+BC-076's first slice — its next scheduled run would have broken the
+nightly Notion KB sync for every client. A prior session's own registry
+note had wrongly asserted this was already fixed, without ever confirming
+the fix was published, not just drafted. See Workflow_Registry.md.
+
+**Real design corrections made during the build itself, not just
+planning:** Pinecone's docs don't clearly confirm delete-by-metadata-filter
+works on serverless indexes, so D20's cleanup mechanism uses delete-by-ID
+against deterministic candidate IDs instead — same outcome, no unverified
+claim underneath it. `content_hash`/`source_ref_hash` dropped for simpler
+mechanisms with no unverified crypto-module dependency in n8n's Code node
+sandbox. D17's "blank cell" trigger narrowed to the key column specifically
+(a blank whitelisted content column is legitimate data, not a failure).
+
+**Blocked, Credential Gate (Standing Rule) — not a workaround target:**
+the new Sheets ingestion workflow (13 nodes, structurally validated) and
+SCH-004's generalized dispatcher are both built and correct, but neither
+can publish until a real Google service-account credential exists — none
+does yet (`list_credentials` confirmed 0 results). Live-verified this
+session (closing a real gap, not assuming): n8n's Google Sheets node does
+natively support `authentication: 'serviceAccount'`, confirmed from its
+type definition, not just the read operation's existence as the fifth
+pass had checked. Human needs to create the GCP service account + n8n
+credential + share a test Sheet before Execute can finish live-verifying
+this card.
+
 ## BC-076-Card1 SHIPPED (2026-08-31) — the severe client_id bug is fixed, live-verified
 
 Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s Search Business
