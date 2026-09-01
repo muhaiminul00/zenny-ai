@@ -100,20 +100,19 @@ landed — see below), invokes the `commander` Skill itself the same
 way, with a brief 1-2 line summary, to hand back — again a real
 mode-state write, not just a description of intent to hand back.
 
-**Gstack planning bridge (adopted 2026-08-29):** Commander's next
-action after receiving that handback is never to draft the next Build
-Card itself. It sends a short prompt (1-2 lines: what Execute just
-shipped, what's next) to the gstack skill that fits — `/office-hours`
-for an open strategy question, `/plan-ceo-review`/`/plan-eng-review`
-for a scoped unit of work — and lets gstack produce the actual plan:
-architecture decisions, and for infra Build Cards, a build-ready spec
-down to node/table/RPC level with edge cases pre-resolved. Only after
-gstack's plan comes back does Commander translate it into a formal
-Build Card and hand off to Execute. This exists because BC-072 hit the
-alternative failure mode directly: an architecture mismatch
-(schema-per-client vs RLS) was discovered live, mid-build, that
-gstack's planning discipline (live-check, edge-case handling) should
-have caught first. Full split: `Wiki/reference/gstack-skill-playbook.md`.
+**Gstack planning bridge — superseded 2026-09-02.** This manual
+"Commander sends a 1-2 line prompt to the right gstack skill" mechanism
+is no longer how planning happens: this project now runs `gstack-pilot`,
+whose Commander/Execute natively chain into gstack's planning
+(`office-hours`/`plan-eng-review`/`autoplan`) and wrap-up
+(`review`/`qa`/`ship`) skills on their own, with no prose bridge needed.
+Kept here only as historical record — this bridge was adopted
+2026-08-29 after BC-072 hit the alternative failure mode directly: an
+architecture mismatch (schema-per-client vs RLS) was discovered live,
+mid-build, that gstack's planning discipline (live-check, edge-case
+handling) should have caught first. Full history:
+`Wiki/reference/gstack-skill-playbook.md`; migration design:
+`docs/designs/zenny-gstack-pilot-migration.md`.
 
 Scope stays exact, per the Tool Routing Table: gstack produces specs,
 it never performs an n8n/Supabase/VPS/DNS build itself — no gstack
@@ -252,6 +251,24 @@ let Claude pick the right skill within a single-domain bundle.
 | Dashboard brand consistency | taste-skill:brandkit |
 | Dashboard minimal-direction check | taste-skill:minimalist-skill |
 | General dashboard polish | impeccable |
+| Product ideas/brainstorming | gstack `/office-hours` |
+| Strategy/scope | gstack `/plan-ceo-review` |
+| Architecture (planning stage) | gstack `/plan-eng-review` |
+| Design system/plan review | gstack `/design-consultation` or `/plan-design-review` |
+| Full review pipeline (CEO+eng+design+DX, auto-decided) | gstack `/autoplan` |
+| Visual polish pass | gstack `/design-review` |
+| Ship/deploy/PR | gstack `/ship` or `/land-and-deploy` — same `/review` pre-ship gate above applies first |
+| Save/resume working context between sessions | gstack `/context-save` / `/context-restore` |
+| Author a backlog-ready spec/issue | gstack `/spec` |
+
+Merged 2026-09-02 from gstack's own auto-injected "## Skill routing"
+flat table (which duplicated this table, per its own `TODO, not yet
+done` note) — one routing reference now, not two. Not to be confused
+with gstack-pilot's separately-seeded "Mode-gstack Bridge" section in
+`.claude/CLAUDE.md`, which covers mode-chain *sequencing* (which mode
+auto-chains into which skill, in what order), not skill *selection*
+(which skill handles a given request, this table's job) — orthogonal,
+both stay independent.
 
 ---
 
@@ -449,34 +466,6 @@ Full narrative and the live end-to-end proof this actually works:
   commit that nothing secret is staged.
 - Full governance model (Build Cards, Compliance Checklist, Change
   Requests, Definition of Done): `Claude_Build_Command_Protocol_v2.md`.
----
-
-## Skill routing
-
-When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
-
-Key routing rules:
-- Product ideas/brainstorming → invoke /office-hours
-- Strategy/scope → invoke /plan-ceo-review
-- Architecture → invoke /plan-eng-review
-- Design system/plan review → invoke /design-consultation or /plan-design-review
-- Full review pipeline → invoke /autoplan
-- Bugs/errors → invoke /investigate
-- QA/testing site behavior → invoke /qa or /qa-only
-- Code review/diff check → invoke /review
-- Visual polish → invoke /design-review
-- Ship/deploy/PR → invoke /ship or /land-and-deploy
-- Save progress → invoke /context-save
-- Resume context → invoke /context-restore
-- Author a backlog-ready spec/issue → invoke /spec
-
-**TODO, not yet done:** this block was appended verbatim by gstack's own
-onboarding (2026-08-29, same session as the gstack planning bridge above)
-and duplicates ground the existing `using-gstack` SKILL.md + Tool Routing
-Table already cover with more precision. Human's explicit call: keep both
-for now, merge into one final version the next time a Commander cycle
-picks this up — don't let it silently rot as two sources of truth.
-
 ---
 #### ZeroManual · Zenny AI Workforce · CLAUDE.md v3.1 · BUILD PHASE
 

@@ -1,10 +1,17 @@
 # gstack-pilot plugin — role-modes natively chained into gstack
 
-New sibling plugin (not a fork) to [[reference/role-modes-plugin]],
-built 2026-08-29 for the new "ZM — Company Brain" project, not for
-Zenny — Zenny keeps running plain `role-modes` + gstack global/non-team
-install unchanged for now, migrating onto this plugin only later, once
-proven live on Company Brain (Phase 3, not yet started, not designed).
+**Phase 3 done — Zenny migrated onto this plugin 2026-09-02 (BC-077).**
+Originally built 2026-08-29 for "ZM — Company Brain," proven live there
+(3 real PRs through its own review pipeline) before Zenny adopted it as
+`role-modes`' replacement. See `docs/designs/zenny-gstack-pilot-migration.md`
+for the migration design and [[reference/role-modes-plugin]] for the
+plugin this replaced there (disabled, not uninstalled — see that page
+for the switch-back mechanism).
+
+Originally a new sibling plugin (not a fork) to
+[[reference/role-modes-plugin]], built for Company Brain, not for
+Zenny — the paragraphs below through "Phase 2" record that period, kept
+as historical narrative.
 
 - **Location:** `E:\Programming\gstack-pilot`, local git repo, and now
   **live and public: `github.com/muhaiminul00/gstack-pilot`**. Renamed
@@ -620,11 +627,9 @@ project. The locked chain mapping matches that documented order.
 
 - Repo not yet pushed to GitHub (Phase 2).
 - Hook-coexistence test above is source-reasoned, not fully live-run.
-- Zenny's own unmerged "## Skill routing" vs. `using-gstack/SKILL.md`
-  duplication (pre-existing, unrelated to this build, flagged again
-  here since the new plugin's design specifically avoids repeating it)
-  is still open in Zenny's own `CLAUDE.md` — a future Commander cycle
-  item, not touched this session.
+- ~~Zenny's own unmerged "## Skill routing" vs. `using-gstack/SKILL.md`
+  duplication~~ — **closed 2026-09-02, BC-077 T4:** merged into Zenny's
+  root `CLAUDE.md` Tool Routing Table, same PR as this migration.
 
 See [[reference/gstack-skill-playbook.md]] for gstack's general
 Zenny-side decision map, [[reference/role-modes-plugin]] for the

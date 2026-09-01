@@ -1,5 +1,17 @@
 # gstack skill playbook — Commander's dispatch reference
 
+**Superseded 2026-09-02 — BC-077.** The prose-only "Gstack planning
+bridge" mechanism this page's dispatch logic backed (Commander manually
+naming a gstack skill, manually re-deriving how its output composes
+with Zenny's standing rules) is retired: Zenny now runs `gstack-pilot`
+in place of plain `role-modes`, whose Commander/Execute natively chain
+into gstack's planning/wrap-up/mid-run skills. See
+`docs/designs/zenny-gstack-pilot-migration.md` for the migration design
+and [[reference/gstack-pilot-plugin]] for the plugin itself. This page's
+narrative below is kept intact as the historical record of *why* the
+prose bridge existed and what it got right/wrong before replacement —
+not rewritten, not deleted.
+
 Commander's decision-record for which `gstack` skill (or sequence of
 skills) to invoke, and where Zenny's own existing skills/rules take
 precedence instead. Written 2026-08-27 (theoretical), installed and
