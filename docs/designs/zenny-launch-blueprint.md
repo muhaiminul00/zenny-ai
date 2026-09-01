@@ -600,7 +600,7 @@ a same-leg resync-hygiene problem. Both corrected below (D19, D20).
   (D24-D32, `06_Infrastructure/n8n/Workflow_Registry.md`'s Sheets
   Ingestion entry) diffs Pinecone's own listed vectors against the
   current sheet's keys, and — since that diff can't distinguish "renamed"
-  from "deleted entirely" — also formally supersedes D16 below, closing
+  from "deleted entirely" — also formally supersedes D16 above, closing
   Card 3's cross-leg-deletion case for this leg too. Left here, not
   deleted, so a future reader sees the original (wrong) reasoning and its
   correction side by side, not just the correction alone.
