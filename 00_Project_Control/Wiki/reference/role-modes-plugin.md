@@ -1,9 +1,25 @@
 # role-modes plugin — portable advisor/commander/execute system
 
+**Disabled (not uninstalled) in Zenny, 2026-09-02 — BC-077.** Superseded
+by [[reference/gstack-pilot-plugin]], which natively chains into gstack's
+planning/wrap-up/mid-run skills instead of relying on Commander to
+manually invoke them. `role-modes@role-modes` stays present in
+`.claude/settings.json`'s `enabledPlugins` with the value flipped to
+`false` — the plugin's own files, this page, and every local command
+below are untouched on disk. **Switch back:** flip that one boolean to
+`true` and `gstack-pilot@gstack-pilot` to `false` in
+`.claude/settings.json` (the two are never meant to run enabled
+together — see `docs/designs/zenny-gstack-pilot-migration.md`'s
+Rollback plan for the full sequence if more than the swap needs
+reverting). Everything below this line describes the system as it ran
+for Zenny from BC-TOOL-002 (2026-08-26) through BC-077 (2026-09-02) —
+kept as historical/reference record, not live instruction.
+
 Zenny's advisor/commander/execute mode system has been extracted into a
 standalone, installable Claude Code plugin, usable in any project — not
-Zenny-specific. **Zenny itself now runs on it** (BC-TOOL-002, 2026-08-26) —
-this is no longer just a portable extraction, it's Zenny's live mode system.
+Zenny-specific. **Zenny ran on it** (BC-TOOL-002, 2026-08-26 through
+BC-077, 2026-09-02) — this was no longer just a portable extraction, it
+was Zenny's live mode system for that period.
 
 - **Location:** publicly hosted at `github.com/muhaiminul00/role-modes`
   (owner: Muhaiminul Abedin Farhan / @muhaiminul00 — corrected from an

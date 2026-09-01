@@ -9,6 +9,90 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## session-bc077-gstack-pilot-migration-shipped (2026-09-02)
+
+Human's live complaint mid-build ("gstack isn't confident, isn't chaining
+itself, seems fully dependent on Commander to invoke it") plus a second
+question ("why has Zenny only ever invoked 6 of gstack's 55 skills?")
+both diagnosed to the same root cause, not two separate problems:
+Zenny ran plain `role-modes` + a hand-written prose "Gstack planning
+bridge" in `CLAUDE.md` that required Commander to *manually remember*
+to invoke a gstack skill every cycle — `gstack-pilot` (built 2026-08-29
+for Company Brain, proven live there via 3 real PRs) already solves
+this natively and Zenny had simply never adopted it. Routed through a
+real `/plan-eng-review` pass (scope-gated, Step 0, all 4 review
+sections, mandatory Outside Voice via `codex exec`) rather than
+freehanded, producing `docs/designs/zenny-gstack-pilot-migration.md`.
+
+**Two decisions reversed/held after the Codex outside-voice pass, both
+re-confirmed with the human via AskUserQuestion, never auto-incorporated:**
+D1 (drop Zenny's trivial-housekeeping PR exemption, adopt gstack-pilot's
+PR-first-always as-is) — Codex called this "process replacing judgment"
+for a 1-line status update with no safety gain; human reversed, kept
+the exemption via a new generic override point built into
+`gstack-pilot`'s own `execute.md` (project-declarable, not a Zenny
+hardcode). D2 (merge Zenny's Tool Routing Table with gstack's own
+auto-injected "## Skill routing" section, same PR) — Codex called it
+scope creep; human held the original call, merged anyway, since
+`CLAUDE.md` was already being touched for D1/T2 regardless.
+
+**Built, this repo:** `.claude/settings.json` `role-modes@role-modes`
+→ `false` (disabled, not uninstalled — flip it back to switch back);
+`CLAUDE.md` — bridge section retired to a superseded pointer (BC-072
+history untouched), Tool Routing Table absorbed gstack's routing rows,
+the now-redundant "## Skill routing" section deleted; 3 Wiki reference
+pages (`role-modes-plugin.md`, `gstack-pilot-plugin.md`,
+`gstack-skill-playbook.md`) + `Wiki/index.md` got supersession
+banners/status-line fixes, all historical narrative left as record.
+Repo-wide grep sweep (T8) found no other live `role-modes` reference
+outside what was already fixed — the remaining hits are all historical
+log/reference prose, correctly left alone.
+
+**Built, `gstack-pilot` repo (cross-repo, T3):** `execute.md`'s
+PR-first-always default now honors a project's own pre-declared
+trivial-housekeeping exemption, mirroring the file's existing
+Live-infra threshold-override pattern. Ran this plugin's own `/review`
+for real on the resulting PR — found 5 genuine staleness spots the new
+opt-in orphaned (unconditional "no exemption" language in
+`session-start.js`, `session-end.js`, `commands/init.md`,
+`VERIFICATION_CHECKLIST.md`, `README.md`), all fixed same PR. Also
+found and disclosed (not fixed, out of this PR's scope): `gstack-pilot`'s
+own `scripts/check-init-sync.js` fails on a clean `main` checkout,
+confirmed pre-existing via a worktree check against `main` before this
+PR touched anything — a real gap, needs its own investigation, not
+introduced or masked here. Merged via PR #9, tagged/released as
+`gstack-pilot` v1.6.0 same sitting.
+
+**Deferred, not built, logged with full context in `gstack-pilot`'s own
+`TODOS.md`:** the human's other two raw ideas from the same session —
+mid-build fact-indexing as an automatic chain step, and gstack-pilot's
+native commands writing into `project-memory` conditionally when that's
+a project's recorded memory system. Both genuinely unmeasured (no
+project has hit either gap in practice); Zenny itself is unaffected by
+the second since its Memory System stays the raw Wiki, not
+`project-memory`.
+
+**Resolved as a non-issue, not deferred:** `C:\Users\muhai\.claude\plans\
+jazzy-plotting-marshmallow.md` ("role-mode-gstack") — per the human's
+direct correction, this is the pre-rename planning doc for what became
+`gstack-pilot` itself, not a competing sibling plan. Nothing to
+reconcile.
+
+**Not done this session, by design:** T5 (filling gstack-pilot's freshly
+-seeded `.claude/CLAUDE.md` `State Doc:` line with `PROJECT_STATE.md`) —
+the seed block only exists after gstack-pilot's own `SessionStart` hook
+fires once post-T1, so it's the first task of the *next* session. T7's
+live-verification table (Commander self-chaining into gstack skills
+without a human naming one; a trivial wrap-up correctly taking Zenny's
+declared exemption) is also next-session work — cannot be verified
+synchronously inside the same session that just flipped the plugin.
+
+Full design record: `docs/designs/zenny-gstack-pilot-migration.md`
+(includes the full GSTACK REVIEW REPORT). See
+[[reference/gstack-pilot-plugin]] and [[reference/role-modes-plugin]].
+
+---
+
 ## session-bc076-card2c-d20-rename-safety-fix-shipped (2026-09-01, same-day follow-up to Card2b)
 
 Commander received the D20-gap handback and, per the Commander→gstack→

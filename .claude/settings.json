@@ -49,6 +49,7 @@
   },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
-    "role-modes@role-modes": true
+    "role-modes@role-modes": false,
+    "gstack-pilot@gstack-pilot": true
   }
 }
