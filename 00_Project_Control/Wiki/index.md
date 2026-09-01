@@ -137,9 +137,17 @@ Not this:  Wiki/log.md (append-only historical/audit record — when or
   the sheet's real header row, not guessed. The human's request for real
   image-based product search + a recommendation carousel was correctly
   scoped OUT as new capability needing its own design, not absorbed into
-  this card. **Still open, needs human action:** the D20 re-key/absence
-  proof and the 403-vs-404 revoked-access proof both need the human to act
-  on their own Google Sheet directly. See
+  this card. **Same-day follow-up (2026-09-01): the 403 revoked-access
+  proof closed clean, and the final D20/D17 proofs found real issues,
+  not papered over.** D17's blank-key status report had a stale-snapshot
+  bug (`"success"/failed_count:0` while naming a failed row) — fixed,
+  published, re-verified via a direct Supabase read. D20's re-key proof
+  FAILED: renaming a row's key orphans its old vectors in Pinecone
+  permanently, since the delete-then-reinsert mechanism only ever knows
+  a row's *current* key. This is a genuine design gap, not a bug — the
+  human chose the fix (track previously-synced keys, diff-delete
+  orphans), but it's new architecture needing its own `/plan-eng-review`
+  pass, so it's tracked as a follow-up Build Card, not built yet. See
   [[../decisions/agent-capability-scope-and-business-memory]]. Every
   other part still gets its own `/plan-eng-review` pass when Commander
   schedules it — this doc is a map, not a full spec.

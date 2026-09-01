@@ -9,6 +9,66 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## session-bc076-card2b-d20-gap-d17-fixed (2026-09-01, same-day follow-up)
+
+Human completed the 3 remaining DoD proofs from the SHIPPED entry below.
+
+**403 revoked-access proof, CLOSED first:** human unshared the test sheet
+from the service account; a live SCH-004 sweep (execution 69959) hit a
+clean `403 PERMISSION_DENIED` at `Read Sheet Rows` — no crash, no silent
+no-op, no false-success write to `sync_status`. New finding flagged (not
+fixed, out of scope): `Call Sheets KB Ingestion` on SCH-004 has no
+`continueOnFail`, so one client's Sheets failure marks the whole SCH-004
+execution `status: error` even though the parallel Notion leg succeeded.
+
+**D20 (re-key) + D17 (blank-key) run together, RESULT: real issues found,
+not papered over.** Human re-shared access, renamed two live rows'
+`Variant SKU` (`DPB`→`DPBP`, `TMB02`→`TMB02002`), added one blank-key row,
+resynced (execution 69967).
+
+D20 FAILED: `describe-index-stats` showed the namespace grew 28→32
+(increase, not a like-for-like replace). Built a disposable diagnostic
+workflow (`8D70hUnPvbM4YAzQ`, archived after) to fetch exact vector IDs
+from Pinecone's raw `/vectors/fetch` endpoint directly — the Pinecone
+MCP's `search-records` only works on integrated-inference indexes, not
+this raw one. Confirmed both old (`DPB`/`TMB02`) and new (`DPBP`/
+`TMB02002`) vector IDs exist simultaneously — the delete-then-reinsert
+mechanism only ever computes delete-candidate IDs from a row's *current*
+key, so a renamed key's old vectors are never targeted by any future
+sync and stay permanently orphaned. Presented to the human as a decision
+(via AskUserQuestion, 3 options + "something else"); chose "track
+previously-synced row keys, diff-delete orphans" — real new architecture
+(persistence + diff logic + edge cases: multiple renames, backfill,
+existing-orphan cleanup), so per CLAUDE.md's Commander→gstack→Execute
+planning bridge it needs its own `/plan-eng-review` pass before a Build
+Card. Tracked as a follow-up card, not built. The `DPB`/`TMB02` orphan
+vectors are left in Pinecone deliberately, as evidence, until it lands.
+
+D17 structurally held (blank-key row correctly excluded, other 14 rows'
+sync not corrupted) but exposed bug #5: `sync_status` read
+`{"status":"success","failed_count":0,...}` while naming a failed row in
+the same payload — internally inconsistent. Root cause: `Aggregate &
+Build Status Payload` read `failedCount` off `validated[0]`'s own field,
+a primitive copied by value at push time in `Validate Rows & Build
+Batch`'s `forEach` — stale for any valid row pushed before a later
+failure in sheet order (the blank-key row was last). Fixed: derive
+`failed_count` as `total_rows - synced_count`, exact regardless of row
+order. Published (`activeVersionId 2b5397d6-...`), re-ran the sweep
+(execution 69976), and independently queried `control.client_kb_source`
+directly (not trusting the workflow's own report):
+`{"status":"partial","synced_count":14,"total_rows":15,"failed_count":1,
+"failed_row_keys_sample":["(row 16, blank key)"]}` — correct. Also fixed
+a stale doc heading found during PR review: Workflow_Registry.md said
+"3 REAL BUGS" while listing 4 — corrected to match every other doc.
+
+PR #5 opened for the full branch once D17 closed and D20's gap was
+disclosed as a known, tracked limitation (human's explicit choice: ship
+now, plan D20 separately, rather than hold the PR).
+
+Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s Sheets
+Ingestion entry (D20/D17 sections), `Wiki/decisions/agent-capability-
+scope-and-business-memory.md`'s matching top section, `PROJECT_STATE.md`.
+
 ## session-bc076-card2b-shipped (2026-09-01)
 
 Human supplied BC-076-Card2b's Credential Gate deliverables: service account

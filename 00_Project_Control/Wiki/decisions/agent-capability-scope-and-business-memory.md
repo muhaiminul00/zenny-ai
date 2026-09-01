@@ -1,5 +1,42 @@
 # Agent Capability Scope & Business Memory — SCOPED OUT of BC-074/075 (2026-08-31)
 
+## BC-076-Card2b — D20 re-key gap found, D17 status bug fixed (2026-09-01, same-day follow-up)
+
+Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s Sheets Ingestion
+entry (D20/D17 sections), `PROJECT_STATE.md`'s latest entry.
+
+**D20 (delete-then-reinsert per row key) has a real design gap: it cannot
+detect a key rename.** Live-proven by renaming two real rows' `Variant SKU`
+values, resyncing, then fetching exact vector IDs directly from Pinecone
+(the Pinecone MCP's `search-records` only works on integrated-inference
+indexes, not this raw one — a disposable diagnostic workflow was built to
+hit `/vectors/fetch` directly instead). Both the old and new keys' vectors
+existed simultaneously — the old content is permanently orphaned, since
+nothing in any future sync ever again computes an ID containing the old
+key. Not a bug to patch; D20's mechanism only ever knew a row's *current*
+key.
+
+**Decision:** track previously-synced row keys per `source_ref` and
+diff-delete anything missing from the current sync (covers rename, delete,
+and reorder). This is new architecture (persistence + diff logic + real
+edge cases — multiple renames in one sync, backfilling rows synced before
+this existed, cleaning up the orphans this proof already created) — per
+the Commander→gstack→Execute planning bridge it needs its own
+`/plan-eng-review` pass before a Build Card. **Not built.** Tracked as a
+follow-up card; the `DPB`/`TMB02` orphan vectors are left in Pinecone
+deliberately as evidence until it lands.
+
+**D17 (blank-key partial-failure) structurally held — no corruption of the
+other rows — but its status report was wrong:** `sync_status` said
+`"success"/failed_count:0` while naming a failed row in the same payload.
+Root cause: `Aggregate & Build Status Payload` read `failedCount` off the
+first valid row's own stale snapshot (a primitive copied by value before
+the loop counted the later failure) instead of deriving it. **Fixed**
+(`failed_count = total_rows - synced_count`, exact regardless of row
+order), published, and re-verified independently via a direct
+`control.client_kb_source` read: `{"status":"partial","failed_count":1,...}`
+— correct. This one IS closed.
+
 ## BC-076-Card2b SHIPPED — Credential Gate cleared, live-verified, 4 real bugs found and fixed (2026-09-01)
 
 Full detail: `06_Infrastructure/n8n/Workflow_Registry.md`'s SCH-004 + Sheets
