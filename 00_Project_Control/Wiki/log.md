@@ -9,6 +9,56 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## session-bc078-safe-gate-reconcile-shipped (2026-09-02, same-day follow-up to BC-077)
+
+Human's very next message after BC-077's handback flagged two things:
+raw role-mode-era content possibly left in root `CLAUDE.md`/others
+risking "hallucination or dual instruction," and whether standing
+rules like the Credential Gate might "restrict" gstack. Investigated
+both for real rather than assuming either way.
+
+**Real, confirmed:** `.claude/CLAUDE.md`'s gstack-pilot seed block
+still carried its unedited default Live-infra safe-gate number (5).
+Root `CLAUDE.md`'s own real standing number is 3. gstack-pilot's own
+`commander.md`/`execute.md` explicitly read the override from
+`.claude/CLAUDE.md`, not root `CLAUDE.md` — so the wrong number (5)
+would have silently governed every future session's safe-gate check,
+never surfacing the mismatch on its own. Fixed: `.claude/CLAUDE.md`
+now says 3, with a note explaining why that file (not root) is the one
+that matters here.
+
+**Real, confirmed, live-demonstrated (not hypothetical):** root
+`CLAUDE.md`'s "## Modes" section used bare `/commander`/`/execute`/
+`/advisor` throughout — harmless when only `role-modes` existed, now
+ambiguous since `role-modes` stays installed (disabled, not
+uninstalled, per BC-077's own design) alongside `gstack-pilot`. Proven
+live in the same breath the human raised the concern: their own next
+message invoked `/role-modes:commander`, which still resolved and ran
+as Commander — not a bug, `enabledPlugins:false` only takes effect at
+the next session's plugin load, so a still-running session keeps the
+old plugin's commands available for its remaining lifetime. Fixed: one
+clarifying line added at the top of the Modes section naming
+gstack-pilot as the live plugin and what the bare names mean until the
+next `/clear`.
+
+**Confirmed as a non-issue, explained rather than changed:** the
+Credential Gate, Document Resolution Authority, Per-Workflow
+Documentation, and Mandatory MCP Verification standing rules are not
+restrictions ON gstack — gstack-pilot's own commands are explicitly
+built to defer to "this project's own protocol if its CLAUDE.md names
+one," and its STOP conditions name "a credential gate" generically.
+This was confirmed by source-read during BC-077's own design pass, not
+newly assumed here — restated to the human plainly rather than
+touching any of these rules.
+
+No `/plan-eng-review` chain run — both file numbers were already on
+record, gstack-pilot's own docs already state which file wins on
+conflict, so this was mechanical reconciliation per Document
+Resolution Authority's "one obviously correct answer" clause, not a
+new architecture decision.
+
+---
+
 ## session-bc077-gstack-pilot-migration-shipped (2026-09-02)
 
 Human's live complaint mid-build ("gstack isn't confident, isn't chaining

@@ -46,6 +46,17 @@ request ("when did we decide X"):
 
 ## Modes — /commander, /execute, /advisor
 
+**Active plugin (2026-09-02, BC-077/078):** `gstack-pilot` implements these
+three modes now — invoke `/gstack-pilot:commander`, `/gstack-pilot:execute`,
+`/gstack-pilot:advisor`. `role-modes` is still installed but disabled
+(`enabledPlugins` in `.claude/settings.json`), kept only as a switch-back
+fallback — its own namespaced commands (`/role-modes:commander` etc.) still
+exist on disk and, if invoked, would silently run the *retired* prose-only
+system instead. Every bare `/commander`/`/execute`/`/advisor` reference below
+means "whichever mode-plugin is actually enabled" — never both at once, see
+[[reference/gstack-pilot-plugin]] / [[reference/role-modes-plugin]] for the
+switch mechanism.
+
 This project runs on ONE tool (Claude Code) in three modes, switched via
 slash-command. Mode persists across sessions via
 `.claude/hooks/state/mode.json` until explicitly changed. A fresh
