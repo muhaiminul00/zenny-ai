@@ -35,7 +35,8 @@
       "Bash(git commit -m 'Commander: handoff note + defer appointments doc diff *)",
       "mcp__claude_ai_Supabase__list_projects",
       "mcp__plugin_n8n-skills_n8n-mcp__get_node_types",
-      "Bash(cd *)"
+      "Bash(cd *)",
+      "mcp__supabase__apply_migration"
     ]
   },
   "enableAllProjectMcpServers": true,

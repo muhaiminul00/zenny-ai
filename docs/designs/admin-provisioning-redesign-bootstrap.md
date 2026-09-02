@@ -336,74 +336,105 @@ Synthesized from this review's findings. Run against the live Supabase
 project per this project's actual test doctrine (no repo test suite for
 the Dashboard app, same as Card2a); checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~10min / CC: ~10min)** — Supabase — migration:
-      extend `dashboard_users_role_check` to include `'super_admin'`;
-      add `must_change_password boolean NOT NULL DEFAULT false` to
-      `dashboard_users`
-      - Surfaced by: D4, Architecture blast-radius finding
-      - Verify: invalid role value still rejected; new column defaults
-        correctly for existing rows
-- [ ] **T2 (P1, human: ~10min / CC: ~10min)** — Supabase — migration:
-      `ALTER TYPE client_status_enum ADD VALUE 'unprovisioned'`;
-      `ALTER TABLE control.clients ALTER COLUMN archetype DROP NOT
-      NULL, ALTER COLUMN client_schema_name DROP NOT NULL`
-      - Surfaced by: D1, D3
-      - Verify: existing 6 client rows unaffected; a NULL-archetype
-        test insert now succeeds
-- [ ] **T3 (P1, human: ~20min / CC: ~30min)** — Supabase — audit every
-      RPC/consumer of `client_schema_name`/`archetype` for NULL-safety
-      (live check via `pg_proc` search, same pattern used this review
-      for the role blast-radius)
-      - Surfaced by: D3's own stated requirement
-      - Verify: no RPC crashes or misbehaves on a NULL value in either
-        column
-- [ ] **T4 (P1, human: ~5min / CC: ~5min)** — Supabase — migration: add
-      `created_by uuid REFERENCES auth.users(id)` to `control.clients`
-      and `dashboard_users`
-      - Surfaced by: Approach A's audit-trail requirement
-      - Verify: new rows populate it; existing rows allow NULL
-- [ ] **T5 (P1, human: ~1h / CC: ~2h)** — Supabase — extend
-      `admin-provision-dashboard-user` Edge Function: new `action`
-      param (`create_client`/`create_admin`, alongside Card2a's
-      existing map-to-existing-client path); `create_client` requires
-      role IN (`admin`,`super_admin`); `create_admin` requires role =
-      `super_admin`; enforce write order from Issue 3 (client row →
-      Auth user → mapping) with matching rollback at each step;
-      duplicate-email checked before any write
-      - Surfaced by: Approach A, D4, Issues 1-3, Codex's gate-scope point
-      - Files: `supabase/functions/admin-provision-dashboard-user/index.ts`
-      - Verify: happy path; duplicate email (409); non-admin/non-super_admin
-        rejected (403) for the right action; forged role in body ignored;
-        rollback verified for both new failure points
-- [ ] **T6 (P1, human: ~20min / CC: ~30min)** — Supabase — extend
-      `dashboard_admin_list_clients()` with status/created_at/email
-      - Surfaced by: Code Quality decision
-      - Verify: **CRITICAL regression check** — `AdminProvision.tsx`'s
-        existing client picker still renders correctly, not just the
-        new list view
-- [ ] **T7 (P1, human: ~1h30 / CC: ~2h30)** — Dashboard — new Add
-      Client tab, Add Admin tab (gated on `super_admin`, both
-      client-side hidden AND blocked server-side per T5), client list
-      view (status/email/created_at)
-      - Surfaced by: Approach A
-      - Files: `05_Platform_Builds/Dashboard/src/pages/AdminProvision.tsx`,
-        `05_Platform_Builds/Dashboard/src/App.tsx`
-      - Verify: `super_admin` sees both tabs; plain `admin` sees only
-        Add Client; non-admin blocked entirely (existing Card2a
-        behavior, unchanged)
-- [ ] **T8 (P1, human: ~30min / CC: ~1h)** — Dashboard — forced
-      password-change flow: check `must_change_password` at the
-      dashboard's login/route-guard level (not just a login-page nag),
-      block privileged actions until cleared
-      - Surfaced by: D4, Codex's enforcement-point correction
-      - Files: `05_Platform_Builds/Dashboard/src/App.tsx`, `lib/AuthContext.tsx`
-      - Verify: a client with `must_change_password=true` cannot
-        navigate past the reset screen to any other route
-- [ ] **T9 (P2, human: ~30min / CC: ~20min)** — docs — `TODOS.md` (both
-      new items already added this session), `Wiki/infra/
-      dashboard-auth-mapping.md`, `PROJECT_STATE.md`, `Wiki/log.md`
-      - Surfaced by: Documentation Resolution standing rule
-      - Verify: promotion-rule cross-references present
+- [x] **T1** — Supabase — migration: extend `dashboard_users_role_check`
+      to include `'super_admin'`; add `must_change_password boolean
+      NOT NULL DEFAULT false` to `dashboard_users`
+      - **DONE, live-verified.** Constraint + column confirmed via
+        `pg_constraint`/`information_schema.columns` after applying.
+- [x] **T2** — Supabase — migration: `ALTER TYPE client_status_enum ADD
+      VALUE 'unprovisioned'`; loosen `archetype`/`client_schema_name`
+      to nullable
+      - **DONE, live-verified.** Split into 2 migrations (Postgres
+        cannot use a new enum value in the same transaction that added
+        it). All 6 existing client rows confirmed unaffected.
+- [x] **T3** — Supabase — audit every RPC/consumer of
+      `client_schema_name`/`archetype` for NULL-safety
+      - **DONE, live-verified.** 13 functions read one or both columns;
+        all already NULL-safe (`IF ... IS NULL THEN RAISE EXCEPTION`
+        guards or `coalesce()`). One real, disclosed UX corollary found
+        (not a crash): a freshly "unprovisioned" client can log in
+        immediately but hits a clean RPC exception on every page until
+        provisioned — tracked in `TODOS.md`, not fixed here (would have
+        expanded this card's scope).
+- [x] **T4** — Supabase — migration: add `created_by uuid REFERENCES
+      auth.users(id)` to `control.clients` and `dashboard_users`
+      - **DONE, live-verified.**
+- [x] **T5** — Supabase — extend `admin-provision-dashboard-user` Edge
+      Function with `create_client`/`create_admin` actions
+      - **DONE, live-verified against a real admin session** (curl + a
+        real password-grant JWT for `admin@zenny.internal`, provided by
+        the human under the Credential Gate). All cases confirmed:
+        happy paths for both new actions; `map_existing` now rejects
+        `role='admin'` (400); a real `admin`-tier caller gets 403 on
+        `create_admin` including with a forged `role` in the body; a
+        **freshly minted real `admin` account** (created via
+        `create_admin`'s own happy path) was used to re-prove it still
+        can't call `create_admin` — not a hypothetical. Duplicate-email
+        (409) and invalid-client-id (400) confirmed. **One real bug
+        found and fixed live:** `control.dashboard_users` has zero
+        `service_role` table grants (unlike `control.clients`) — the
+        audit-column write was silently no-op'ing; fixed via a new
+        `dashboard_set_provisioning_audit` `SECURITY DEFINER` RPC,
+        re-verified. All synthetic test accounts/clients cleaned up
+        after (zero leftover, confirmed live).
+- [x] **T6** — Supabase — extend `dashboard_admin_list_clients()` with
+      status/created_at/email
+      - **DONE, live-verified — CRITICAL regression check passed.** Ran
+        the query directly against all 6 real clients before touching
+        the Dashboard, then again via a real PostgREST call as the
+        actual super_admin after shipping. **One real bug found and
+        fixed live:** `auth.users.email` is `varchar(255)`, not `text`
+        — mismatched the declared `RETURNS TABLE` and every call 400'd
+        until an explicit cast was added (same bug *class* as Card2a's
+        `archetype_enum` mismatch, a different column).
+- [x] **T7** — Dashboard — Add Client tab, Add Admin tab (gated on
+      `super_admin`), client list view
+      - **DONE, browser-click-tested for real — closes the gap Card2a's
+        own T7 disclosed.** `AdminProvision.tsx` rewritten with 4 tabs
+        (Clients, Add Client, Add Login — the relocated Card2a form,
+        restricted to `client_user` — and Add Admin, `super_admin`-only).
+        `tsc -b`/`oxlint` clean. Rather than wait for merge+deploy (the
+        live container serves `main`), ran the Dashboard locally
+        (`npm run dev` + a gitignored `.env.local` against the real
+        Supabase project) and drove it with gstack `/browse`: logged in
+        as the real `super_admin`, submitted a real Add Client (200,
+        success banner, zero console errors), confirmed the client list
+        renders `status='unprovisioned'`/`archetype=null` correctly
+        ("not yet set"), confirmed Add Admin is hidden client-side for a
+        real freshly-minted plain `admin` account and visible for
+        `super_admin`.
+- [x] **T8** — Dashboard — forced password-change flow
+      - **DONE, browser-click-tested for real.** `AuthContext.tsx` now
+        holds `role`/`must_change_password` from one
+        `dashboard_get_my_flags()` call; `App.tsx`'s route guard renders
+        `ChangePassword` in place of every other route whenever the flag
+        is set, checked on every render. New
+        `dashboard_clear_must_change_password()` RPC lets a user clear
+        it themselves after a real `supabase.auth.updateUser()` change.
+        Live-verified in the browser: a fresh temp-password account was
+        forced to `ChangePassword` even when navigating directly to
+        `/admin/provision` (not just its natural landing route); after a
+        real password change, `must_change_password` cleared in the DB
+        and normal navigation resumed. The resulting client-facing page
+        showed the disclosed "unprovisioned client hits a clean RPC
+        exception" gap exactly as T3's audit predicted — confirms that
+        finding was correct, not speculative; still not fixed here
+        (tracked in `TODOS.md`, real UI work beyond this card's scope).
+- [x] **T9** — docs — `TODOS.md`, `Wiki/infra/dashboard-auth-mapping.md`,
+      `PROJECT_STATE.md`, `Wiki/log.md`
+      - **DONE.** "Admin-minting has no extra gate" moved to Completed
+        (closed by this card); new TODO added for T3's disclosed
+        unprovisioned-client-login gap; `Wiki/infra/dashboard-auth-
+        mapping.md` gained a full "Admin Provisioning Bootstrap"
+        section; `PROJECT_STATE.md` and `Wiki/log.md` both updated
+        (session-admin-provisioning-bootstrap-shipped).
+
+**One real, disclosed operational consequence of shipping this
+live:** promoting `admin@zenny.internal` to `super_admin` ahead of this
+branch's UI actually deploying means the *old, currently-live* dashboard
+code (which checks `role === 'admin'` exactly) now shows that account a
+client's orders view instead of the admin panel, until this merges and
+the container redeploys. No data risk — closes on ship.
 
 ## Completion summary
 

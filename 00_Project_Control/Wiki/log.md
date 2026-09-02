@@ -9,6 +9,140 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-09-02] session-admin-provisioning-bootstrap-shipped
+
+Full record lives in `Wiki/infra/dashboard-auth-mapping.md`'s "Admin
+Provisioning Bootstrap" section — this is a pointer + narrative summary
+of the build, review, and live-verification pass, not a duplicate.
+
+Built and live-verified the Admin Provisioning Bootstrap card (per the
+`/plan-eng-review` CLEARED spec at `docs/designs/admin-provisioning-
+redesign-bootstrap.md`, T1-T9): a real `super_admin` tier closing the
+admin-minting risk accepted at Card2a, real client creation (not just
+mapping to an existing one), a client list view, and a forced
+password-change flow.
+
+**Two real bugs found and fixed live, neither caught by `tsc`/static
+review:**
+1. `control.dashboard_users` has zero table-level grants for
+   `service_role` (unlike `control.clients`, which grants it full DML)
+   — the Edge Function's follow-up `UPDATE ... SET created_by,
+   must_change_password` was silently no-op'ing via PostgREST
+   permission-denied, an error the code never checked. Caught only by
+   verifying end-state column values after a live provisioning call,
+   not by trusting the code. Fixed by routing through a new
+   `SECURITY DEFINER` RPC (`dashboard_set_provisioning_audit`, same
+   pattern as `dashboard_provision_user`), re-verified live.
+2. `dashboard_admin_list_clients()`'s new `email` column returned
+   `auth.users.email` (`character varying(255)`) against a declared
+   `RETURNS TABLE(..., email text)` — PostgREST rejected every call with
+   `structure of query does not match function result type`. Same bug
+   *class* as Card2a's own `archetype_enum`-vs-`text` mismatch, a
+   different column this time. Fixed with an explicit `::text` cast,
+   re-verified live via a real PostgREST call as the actual super_admin
+   account (not a raw SQL emulation).
+
+**Live-verified via a real admin session, not just code review** (curl
+against the deployed Edge Function using a real password-grant JWT for
+`admin@zenny.internal`, provided by the human under this project's
+Credential Gate): platform-level 401s (no header, malformed JWT);
+`map_existing` now rejects `role='admin'` (400 `INVALID_ROLE`, points at
+`create_admin`); a real `admin`-tier caller gets `403
+SUPER_ADMIN_REQUIRED` on `create_admin`, including with a forged
+`role: 'super_admin'` in the request body (identity is JWT-derived
+only); after promoting `admin@zenny.internal` to `super_admin` (the
+real bootstrap step, permanent, not a test artifact — same precedent as
+Card2a's own first-admin bootstrap), `create_admin`'s happy path
+succeeds and mints a real second admin account; that **freshly minted
+real `admin` account** was itself used to prove it still cannot call
+`create_admin` (403) while retaining full `create_client` access —
+proving the tier gate against a genuine account, not a hypothetical.
+Duplicate-email (409) and invalid-client-id (400) checks confirmed.
+`dashboard_admin_list_clients()` regression-checked against all 6 real
+client rows both via direct SQL and, after the email-cast fix, via a
+real PostgREST call. All 6 synthetic test accounts/clients created
+during this verification pass were cleaned up afterward (zero leftover
+rows, confirmed live) — matching Card2a's own "synthetic test user
+cleaned up after" doctrine.
+
+**Real, disclosed operational consequence:** promoting
+`admin@zenny.internal` to `super_admin` in the live database, ahead of
+this branch's UI actually shipping, means the *currently deployed* (old)
+dashboard code — which checks `role === 'admin'` exactly, not `IN
+('admin','super_admin')` — now renders that account as a plain
+`client_user` (showing Client A's orders view) until this branch merges
+and the `zenny-dashboard` container redeploys. No data risk; a
+temporary display regression on a real account, closed once this card
+ships (same container-restart mechanism Card2a used for its own stale-
+deploy fix).
+
+**Not built, `tsc -b`/`oxlint` gap disclosed:** the new UI (Add Client/
+Add Admin tabs, client list, forced password-change page) could not be
+browser-click-tested against the live site for the same structural
+reason Card2a's own T7 disclosed — the deployed container serves `main`,
+and this code lives on the task branch pending PR/review/ship.
+`tsc -b` and `oxlint` are both clean on every changed file (1
+pre-existing `react(only-export-components)` warning on
+`AuthContext.tsx`, not introduced by this card).
+
+**Genuine scope trim, disclosed not silently absorbed:** a freshly
+created "unprovisioned" client (via Add Client) can log in immediately
+but will hit a clean (non-crashing) RPC exception on every client-facing
+page until an admin finishes real provisioning — found during T3's
+NULL-safety audit, not fixed in this card (would have been scope creep
+beyond the approved T1-T9), tracked in `TODOS.md`.
+
+**`/review`'s Codex adversarial pass found 3 more issues, 2 real, 1
+already-accepted-tradeoff, all resolved before shipping:**
+1. **Real, fixed:** the Edge Function authorized by `role` alone, never
+   checking `must_change_password` — a freshly-minted admin/super_admin
+   still holding their admin-set temp password could perform privileged
+   actions (mint more admins, create clients) before ever proving they
+   own the account via a real password change. Fixed by switching the
+   authorization check to `dashboard_get_my_flags()` and rejecting
+   (`403 MUST_CHANGE_PASSWORD_FIRST`) before any action-specific logic.
+   Re-verified live: a genuinely fresh temp-password admin got rejected;
+   the existing real `super_admin` account was unaffected.
+2. **Real, fixed:** `AuthContext.tsx`'s `refreshFlags()` had no
+   stale-response guard — a delayed response for a signed-out session
+   could briefly overwrite a newly-signed-in session's role/flags.
+   Fixed with a current-user-id ref that drops out-of-order responses.
+   Rollback deletes across all 3 actions also now log their own errors
+   instead of silently swallowing them.
+3. **Already an accepted tradeoff, not reopened:** `create_client`'s
+   3-write chain isn't atomic across systems (Auth users live outside
+   Postgres transactions) — this is the design doc's own Issue 3
+   decision (write-order + compensating rollback), already reviewed and
+   human-signed-off.
+
+**Codex's own sandbox is broken on this Windows machine** (`windows
+sandbox: orchestrator_helper_launch_failed`, `codex-windows-sandbox-
+setup.exe` not found) — it cannot read a file path itself via `-s
+read-only`. Worked around by piping the diff directly via stdin instead
+of asking it to read the file. Logged as a learning.
+
+**`/qa` did real browser click-through, not the disclosed-gap path
+Card2a's own T7 took.** Rather than wait for merge+deploy (the live
+`zenny-dashboard` container still serves `main`), ran the Dashboard
+locally (`npm run dev` + a gitignored `.env.local` pointing at the real,
+already-public Supabase anon key) and drove it with gstack `/browse`
+against `localhost` — genuine end-to-end verification against live
+backend data, not a mock. Confirmed live in the browser: login as the
+real `super_admin`; a real Add Client submission (200, success banner,
+zero console errors); the client list correctly rendering
+`status='unprovisioned'`/`archetype=null` as "not yet set"; the forced-
+password-reset guard blocking navigation to `/admin/provision` directly
+(not just the natural `/orders` landing route) until cleared; after a
+real password change, `must_change_password` cleared in the DB and
+normal navigation resumed; the resulting client-facing page reproduced
+the disclosed "unprovisioned client hits a clean RPC exception" gap
+exactly as T3's audit predicted (confirms that finding was correct, not
+speculative — still not fixed, tracked in `TODOS.md`); the Add Admin tab
+correctly hidden client-side for a real freshly-minted plain `admin`
+account and visible for `super_admin`. All synthetic accounts/clients
+created during both `/review`'s and `/qa`'s live verification passes
+were cleaned up after (zero leftover, confirmed live via SQL count).
+
 ## [2026-09-02] session-bc076-card3-shipped
 
 Full record lives in `06_Infrastructure/n8n/Workflow_Registry.md` (the new
