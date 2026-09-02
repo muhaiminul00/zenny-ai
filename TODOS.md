@@ -55,4 +55,38 @@ including the deferred counter)
 **Depends on:** Whatever alerting infrastructure this project has (or
 builds) for `sync_status`.
 
+## Product
+
+### Real image-based product search + recommendation carousel
+
+**What:** Let a customer upload a photo and have the agent find visually
+matching products (plus a recommendation carousel), backed by real
+vision embeddings — not text matching against an image's URL/alt-text.
+
+**Why:** Requested by the human during BC-076-Card2b. Correctly scoped
+OUT of Card2b at the time (it needs its own vision-embedding/index
+design, distinct from the text-ingestion pipeline Card2b shipped) but
+never actually written down as a tracked item — it only existed as a
+sentence in `PROJECT_STATE.md`'s BC-076-Card2b history entry, at real
+risk of being lost whenever that file's own overdue prune/archive pass
+happens. Recorded here so it survives that.
+
+**Context:** What Card2b shipped instead is genuinely different and
+insufficient for this ask: product image URLs/alt-text are ingested as
+plain searchable *text*, so a text query like "red hoodie" can match —
+but an uploaded photo has no text to match against, so this doesn't
+serve the actual request. Needs its own `/plan-eng-review` pass before
+a Build Card: at minimum, a vision-embedding model choice, a
+Pinecone index/namespace design compatible with `zenny-business-kb`'s
+existing schema (or a separate index), and an ingestion path for
+product photos distinct from Card2b's text-chunking pipeline.
+
+**Effort:** M-L (new embedding pipeline + index design + agent-side
+photo upload handling)
+**Priority:** P3 (no client has asked for this in production yet;
+tracked so it's not forgotten, not because it's urgent)
+**Depends on:** None technically, but sequencing-wise makes more sense
+after BC-076's remaining ingestion legs (Cards 3/4) land, since it's
+new scope on top of the same KB tool those cards are still building out.
+
 ## Completed
