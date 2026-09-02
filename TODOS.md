@@ -317,6 +317,41 @@ accounts exist)
 **Depends on:** Loosely related to the `control.clients.status`
 lifecycle TODO above; not blocking, could ship independently.
 
+### Admin Provisioning UI: "Add Admin" shouldn't require picking a client
+
+**What:** `AdminProvision.tsx`'s Add Admin tab requires selecting a
+"nominal home client" from a dropdown before it'll create an
+admin/super_admin account, even though that client has zero functional
+relationship to the admin being created.
+
+**Why:** `control.dashboard_users.client_id` is `NOT NULL` — the table
+was designed for one row per login mapping a login to the client it
+belongs to. Admin accounts don't belong to any client, so Bootstrap's
+`create_admin` action worked around the constraint by requiring an
+arbitrary existing client row just to satisfy the FK, rather than giving
+admin rows a real "no client" path. Human feedback (2026-09-02, live
+testing the shipped feature): the flow should just be email + temp
+password + tier — no client picker at all. Agreed, this is a schema
+wart, not intentional design.
+
+**Context:** Real fix: make `dashboard_users.client_id` nullable, add a
+CHECK constraint requiring it non-null only when `role='client_user'`,
+then drop the "nominal home client" picker from `AddAdminTab` and the
+`admin_client_id` requirement from the Edge Function's `create_admin`
+action. Touches a migration + Edge Function + UI — dedicated work, not
+a quick UI tweak; human explicitly deferred rather than asking for it
+inline. Separately, the same session's feedback flagged the three tabs
+(Add Client / Add Login / Add Admin) as visually reading like equivalent
+options when they're conceptually different (new business vs. second
+login on an existing business vs. an internal admin account) — worth
+a labeling/layout pass in the same dedicated session, not a second card.
+
+**Effort:** S-M (one migration + one Edge Function branch removed + one
+form simplified)
+**Priority:** P3 (cosmetic/UX correctness, not a security or data-
+integrity issue — the current workaround is harmless, just confusing)
+**Depends on:** None.
+
 ## Security
 
 ## Completed
