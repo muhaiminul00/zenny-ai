@@ -213,16 +213,25 @@ RPCs support this: `dashboard_get_my_flags()` (read) and
 `dashboard_clear_must_change_password()` (self-service clear, called
 after a real `supabase.auth.updateUser()` password change).
 
-**Verification status:** SQL/schema changes and the `dashboard_admin_list_clients`
-regression check are live-verified. `tsc -b` and `oxlint` clean on
-every changed Dashboard file (1 pre-existing `react(only-export-components)`
-warning on `AuthContext.tsx`, not introduced by this card). The Edge
-Function's platform-level auth checks are live-verified (401 with no
-Authorization header, 401 on a malformed JWT). The admin/super_admin-gated
-paths (`ADMIN_REQUIRED`, `SUPER_ADMIN_REQUIRED`, forged-role-ignored,
-and the `create_client`/`create_admin` happy paths) — see this card's
-final wrap-up entry in `Wiki/log.md` for how those were actually
-verified before shipping.
+**Verification status: fully live-verified, backend AND UI.** SQL/schema
+changes and the `dashboard_admin_list_clients` regression check are
+live-verified. `tsc -b`/`oxlint` clean on every changed file. The Edge
+Function's platform auth checks, every action's authorization gate
+(`ADMIN_REQUIRED`, `SUPER_ADMIN_REQUIRED`, forged-role-ignored, the new
+`MUST_CHANGE_PASSWORD_FIRST` gate), and the `create_client`/`create_admin`
+happy paths were all curl-tested against a real admin session. The new
+UI itself was then browser-click-tested for real — not deferred like
+Card2a's own T7 — by running the Dashboard locally against the live
+Supabase project (the deployed container still serves `main`) and
+driving it with gstack `/browse`: real Add Client submission, the
+client list rendering `unprovisioned`/`null archetype` correctly, the
+forced-password-reset guard blocking navigation to ANY route (not just
+its landing page) until cleared, and the Add Admin tab correctly hidden
+for a real freshly-minted plain `admin` account. Full narrative,
+including 3 real bugs found live (a `service_role` grants gap, an
+`auth.users.email` type mismatch, and a `must_change_password` bypass
+found by Codex's adversarial pass), in `Wiki/log.md`
+session-admin-provisioning-bootstrap-shipped.
 
 See [[../decisions/dashboard-auth-mapping]] (closed),
 [[../credentials/test-fixture-clients]] (the two existing accounts'

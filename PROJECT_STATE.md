@@ -115,9 +115,9 @@ including the module-by-module status table as it stood at pause time:
 - **Admin Provisioning Bootstrap** (`super_admin` tier, `create_client`/
   `create_admin` Edge Function actions, forced password-reset) — ✅
   working, live-verified against a real admin session (curl + a real
-  JWT); new Dashboard UI (Add Client/Add Admin tabs, client list,
-  `ChangePassword`) is `tsc`/`oxlint`-clean but not yet browser-click-
-  tested (deployed container still serves `main`).
+  JWT) AND browser-click-tested for real (ran the Dashboard locally
+  against the live Supabase project since the deployed container still
+  serves `main` — closes the gap Card2a's own T7 disclosed).
 
 Pre-pivot module status (Core Agent, Growth Agent, Conversion Engine,
 Recovery Engine, Email Manager, Dashboard 5B/5C, Credentials Platform,
@@ -177,10 +177,6 @@ run against real, KB-populated test clients.
   `/plan-eng-review` pass.
 - Migrate Sheets ingestion to the shared Generic Ingestion Core, and get
   a real working WooCommerce test store — both in `TODOS.md`.
-- A browser click-through of the Admin Provisioning Bootstrap's new UI,
-  once merged and the `zenny-dashboard` container has redeployed
-  (same disclosed gap Card2a's own T7 carried).
-
 Full current backlog: `TODOS.md`.
 
 Pre-pivot "Next Build Card" content (the Convocore Path A/Path B

@@ -92,6 +92,57 @@ page until an admin finishes real provisioning — found during T3's
 NULL-safety audit, not fixed in this card (would have been scope creep
 beyond the approved T1-T9), tracked in `TODOS.md`.
 
+**`/review`'s Codex adversarial pass found 3 more issues, 2 real, 1
+already-accepted-tradeoff, all resolved before shipping:**
+1. **Real, fixed:** the Edge Function authorized by `role` alone, never
+   checking `must_change_password` — a freshly-minted admin/super_admin
+   still holding their admin-set temp password could perform privileged
+   actions (mint more admins, create clients) before ever proving they
+   own the account via a real password change. Fixed by switching the
+   authorization check to `dashboard_get_my_flags()` and rejecting
+   (`403 MUST_CHANGE_PASSWORD_FIRST`) before any action-specific logic.
+   Re-verified live: a genuinely fresh temp-password admin got rejected;
+   the existing real `super_admin` account was unaffected.
+2. **Real, fixed:** `AuthContext.tsx`'s `refreshFlags()` had no
+   stale-response guard — a delayed response for a signed-out session
+   could briefly overwrite a newly-signed-in session's role/flags.
+   Fixed with a current-user-id ref that drops out-of-order responses.
+   Rollback deletes across all 3 actions also now log their own errors
+   instead of silently swallowing them.
+3. **Already an accepted tradeoff, not reopened:** `create_client`'s
+   3-write chain isn't atomic across systems (Auth users live outside
+   Postgres transactions) — this is the design doc's own Issue 3
+   decision (write-order + compensating rollback), already reviewed and
+   human-signed-off.
+
+**Codex's own sandbox is broken on this Windows machine** (`windows
+sandbox: orchestrator_helper_launch_failed`, `codex-windows-sandbox-
+setup.exe` not found) — it cannot read a file path itself via `-s
+read-only`. Worked around by piping the diff directly via stdin instead
+of asking it to read the file. Logged as a learning.
+
+**`/qa` did real browser click-through, not the disclosed-gap path
+Card2a's own T7 took.** Rather than wait for merge+deploy (the live
+`zenny-dashboard` container still serves `main`), ran the Dashboard
+locally (`npm run dev` + a gitignored `.env.local` pointing at the real,
+already-public Supabase anon key) and drove it with gstack `/browse`
+against `localhost` — genuine end-to-end verification against live
+backend data, not a mock. Confirmed live in the browser: login as the
+real `super_admin`; a real Add Client submission (200, success banner,
+zero console errors); the client list correctly rendering
+`status='unprovisioned'`/`archetype=null` as "not yet set"; the forced-
+password-reset guard blocking navigation to `/admin/provision` directly
+(not just the natural `/orders` landing route) until cleared; after a
+real password change, `must_change_password` cleared in the DB and
+normal navigation resumed; the resulting client-facing page reproduced
+the disclosed "unprovisioned client hits a clean RPC exception" gap
+exactly as T3's audit predicted (confirms that finding was correct, not
+speculative — still not fixed, tracked in `TODOS.md`); the Add Admin tab
+correctly hidden client-side for a real freshly-minted plain `admin`
+account and visible for `super_admin`. All synthetic accounts/clients
+created during both `/review`'s and `/qa`'s live verification passes
+were cleaned up after (zero leftover, confirmed live via SQL count).
+
 ## [2026-09-02] session-bc076-card3-shipped
 
 Full record lives in `06_Infrastructure/n8n/Workflow_Registry.md` (the new

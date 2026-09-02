@@ -389,23 +389,37 @@ the Dashboard app, same as Card2a); checkbox as you ship.
         `archetype_enum` mismatch, a different column).
 - [x] **T7** — Dashboard — Add Client tab, Add Admin tab (gated on
       `super_admin`), client list view
-      - **DONE.** `AdminProvision.tsx` rewritten with 4 tabs (Clients,
-        Add Client, Add Login — the relocated Card2a form, restricted
-        to `client_user` — and Add Admin, `super_admin`-only). `tsc -b`
-        and `oxlint` both clean (1 pre-existing warning, not
-        introduced). **Not yet browser-click-tested** — same disclosed
-        structural gap as Card2a's own T7 (deployed container serves
-        `main`, this code is still on the task branch pending PR/ship).
+      - **DONE, browser-click-tested for real — closes the gap Card2a's
+        own T7 disclosed.** `AdminProvision.tsx` rewritten with 4 tabs
+        (Clients, Add Client, Add Login — the relocated Card2a form,
+        restricted to `client_user` — and Add Admin, `super_admin`-only).
+        `tsc -b`/`oxlint` clean. Rather than wait for merge+deploy (the
+        live container serves `main`), ran the Dashboard locally
+        (`npm run dev` + a gitignored `.env.local` against the real
+        Supabase project) and drove it with gstack `/browse`: logged in
+        as the real `super_admin`, submitted a real Add Client (200,
+        success banner, zero console errors), confirmed the client list
+        renders `status='unprovisioned'`/`archetype=null` correctly
+        ("not yet set"), confirmed Add Admin is hidden client-side for a
+        real freshly-minted plain `admin` account and visible for
+        `super_admin`.
 - [x] **T8** — Dashboard — forced password-change flow
-      - **DONE.** `AuthContext.tsx` now holds `role`/
-        `must_change_password` from one `dashboard_get_my_flags()`
-        call; `App.tsx`'s route guard renders `ChangePassword` in place
-        of every other route whenever the flag is set, checked on every
-        render (not a login-page nag). New
+      - **DONE, browser-click-tested for real.** `AuthContext.tsx` now
+        holds `role`/`must_change_password` from one
+        `dashboard_get_my_flags()` call; `App.tsx`'s route guard renders
+        `ChangePassword` in place of every other route whenever the flag
+        is set, checked on every render. New
         `dashboard_clear_must_change_password()` RPC lets a user clear
         it themselves after a real `supabase.auth.updateUser()` change.
-        `tsc -b`/`oxlint` clean. Not yet browser-click-tested (same
-        gap as T7).
+        Live-verified in the browser: a fresh temp-password account was
+        forced to `ChangePassword` even when navigating directly to
+        `/admin/provision` (not just its natural landing route); after a
+        real password change, `must_change_password` cleared in the DB
+        and normal navigation resumed. The resulting client-facing page
+        showed the disclosed "unprovisioned client hits a clean RPC
+        exception" gap exactly as T3's audit predicted — confirms that
+        finding was correct, not speculative; still not fixed here
+        (tracked in `TODOS.md`, real UI work beyond this card's scope).
 - [x] **T9** — docs — `TODOS.md`, `Wiki/infra/dashboard-auth-mapping.md`,
       `PROJECT_STATE.md`, `Wiki/log.md`
       - **DONE.** "Admin-minting has no extra gate" moved to Completed
