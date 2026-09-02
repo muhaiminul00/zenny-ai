@@ -352,6 +352,65 @@ form simplified)
 integrity issue — the current workaround is harmless, just confusing)
 **Depends on:** None.
 
+### Client-only RPCs reject admin callers only incidentally, not explicitly
+
+**What:** `dashboard_get_my_client()`, `dashboard_get_my_client_schema()`,
+`dashboard_list_paused_recovery_leads()`, and `dashboard_release_lead_ownership()`
+all reject an admin-tier caller (NULL `client_id`) only as a side effect of
+their `INNER JOIN` finding no row — the resulting error
+("No dashboard_users mapping for this account, or client is offboarded")
+is misleading for an admin account, which does have a mapping, it just
+has no client. No explicit `IF v_role IN ('admin','super_admin') THEN
+RAISE EXCEPTION` guard exists in any of the four.
+
+**Why:** Surfaced by Codex's outside-voice review during the Admin
+Provisioning UI client-picker fix's `/plan-eng-review` (2026-09-02):
+"this is not a database safety argument — direct URL access, stale
+clients, or future UI changes can still call these RPCs." Security
+posture is already correct today (access is denied either way, and all
+four are `SECURITY DEFINER` with zero RLS exposure beyond `auth.uid()`)
+— this is about defense-in-depth and clearer error messages, not a live
+hole.
+
+**Context:** Fix is a small, mechanical addition to each function: look
+up the caller's role once, `RAISE EXCEPTION 'Admin accounts have no
+client to view'` (or similar) before the existing client-lookup query,
+same pattern `dashboard_admin_list_clients()` already uses for its own
+admin-required gate. Not fixed inline during the client-picker card
+because it touches 4 functions beyond that card's already-decided scope
+for a robustness improvement with no live bug behind it.
+
+**Effort:** S (mechanical, same guard pattern repeated 4x)
+**Priority:** P3 (correct behavior today, this is clarity/defense-in-depth)
+**Depends on:** None.
+
+### `dashboard_admin_list_clients()`'s "oldest client_user wins" policy is undefined for multi-login clients
+
+**What:** The Clients list view's login-email column picks whichever
+`client_user` row for that client has the earliest `created_at` — if a
+client ever has 2+ real logins (e.g. two staff accounts), only the
+oldest one's email shows; the rest are invisible in this view.
+
+**Why:** Surfaced by Codex's outside-voice review during the Admin
+Provisioning UI client-picker fix's `/plan-eng-review` (2026-09-02) —
+pre-existing ambiguity in the query's policy, unrelated to the
+client-picker fix itself but sitting in the same lateral join that fix
+touched (adding a `du.role = 'client_user'` filter). No real client has
+2+ logins today (confirmed live, 2026-09-02: exactly one `dashboard_users`
+row per client across all 6 real clients) — not urgent, but worth
+deciding before it silently hides a second login from an admin.
+
+**Context:** Real fix needs a small design decision: show all logins
+(comma-separated or expandable), a designated "primary" contact flag on
+`dashboard_users`, or accept "oldest wins" as the permanent policy and
+document it as intentional rather than incidental. Not decided here —
+tracked so the decision isn't made by accident the day a second login
+actually gets created.
+
+**Effort:** S (once the display policy is decided)
+**Priority:** P3 (no client has hit this yet)
+**Depends on:** None.
+
 ## Security
 
 ## Completed
