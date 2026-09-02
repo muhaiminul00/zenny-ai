@@ -2,6 +2,37 @@
 
 ## Infrastructure
 
+### `zenny-dashboard` has no automated redeploy-on-merge
+
+**What:** The live `zenny-dashboard` VPS container only rebuilds/re-clones
+`main` when someone manually restarts it (`VPS_restartProjectV1`). A merge
+to `main` sits invisible on the live site until that happens — there is no
+CI/CD hook wiring a merge to a redeploy.
+
+**Why:** Surfaced by accident during BC-076-Card2a's OAuth investigation —
+the "bug" the human reported turned out to be a 3-week-stale container
+still serving pre-BC-052 code, not a real defect. The same silent-staleness
+failure mode has since recurred by design at least once more (the Admin
+Provisioning Bootstrap card's own disclosed gap: its UI shipped
+`tsc`/`oxlint`-clean but wasn't live on the deployed bundle until a manual
+restart after merge). Each occurrence costs a manual verification step
+(download the live JS bundle, grep for a code marker) that a real
+redeploy hook would make unnecessary.
+
+**Context:** Never actually logged here despite being flagged as
+"worth a TODOS.md entry, not silently absorbed into scope" during the
+Card2a investigation — a real gap in that session's own wrap-up, closed
+now. Needs a decision on mechanism (a GitHub Actions step that calls
+`VPS_restartProjectV1`/hits a webhook on merge to `main`, vs. something
+Hostinger-native) — not designed here, just tracked so a future
+`/plan-eng-review` pass has a starting point.
+
+**Effort:** S-M (mechanism TBD — likely a GitHub Actions workflow on
+`push: main` calling into the Hostinger VPS API)
+**Priority:** P2 (has already caused 2 real "is this actually broken"
+investigations that were really just staleness)
+**Depends on:** None.
+
 ### Migrate Sheets KB Ingestion to call the shared Generic Ingestion Core
 
 **What:** `KR0kHvk3kJRThrX5` (Sheets KB Ingestion) still contains its own copy of
