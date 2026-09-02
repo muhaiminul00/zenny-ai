@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
@@ -31,9 +31,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [flagsLoading, setFlagsLoading] = useState(true);
 
+  // Codex adversarial review: refreshFlags() had no stale-response guard.
+  // If session A's flags request resolves after session B has already
+  // signed in (same tab, quick account switch), the OLDER response could
+  // land last and apply A's role/mustChangePassword to B's UI. currentUserIdRef
+  // always holds the latest known user id; a response is only applied if
+  // it's still current when the promise resolves.
+  const currentUserIdRef = useRef<string | null>(null);
+
   const refreshFlags = useCallback(() => {
+    const userIdAtCallTime = currentUserIdRef.current;
     setFlagsLoading(true);
     supabase.rpc('dashboard_get_my_flags').then(({ data, error }) => {
+      if (currentUserIdRef.current !== userIdAtCallTime) {
+        // The session changed while this request was in flight -- a
+        // fresher refreshFlags() call (triggered by that change) owns
+        // applying the result now. Drop this stale response.
+        return;
+      }
       if (error || !data) {
         // No dashboard_users mapping, or not authenticated -- least-
         // privilege default. Never surfaces admin/super_admin content.
@@ -49,11 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
+      currentUserIdRef.current = data.session?.user?.id ?? null;
       setSession(data.session);
       setLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      currentUserIdRef.current = newSession?.user?.id ?? null;
       setSession(newSession);
     });
 

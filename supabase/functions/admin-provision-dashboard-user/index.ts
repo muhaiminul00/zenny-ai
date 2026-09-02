@@ -10,10 +10,12 @@
 //
 // Identity/authorization (D4, Card2a): the caller's identity comes ONLY
 // from their own session JWT (the Authorization header, forwarded
-// automatically by supabase.functions.invoke()). Role is checked via
-// dashboard_get_my_role(), called as the CALLER (anon-key client + their
-// Authorization header), never trusted from the request body — a
-// role/admin flag in the body is never read for authorization.
+// automatically by supabase.functions.invoke()). Role AND
+// must_change_password are checked via dashboard_get_my_flags(), called
+// as the CALLER (anon-key client + their Authorization header), never
+// trusted from the request body — a role/admin flag in the body is never
+// read for authorization, and a caller still holding their temp password
+// is rejected before any action-specific logic runs.
 //
 // Admin-Provisioning-Bootstrap adds a 3rd action and closes a real risk
 // that Card2a's original map_existing path left open: previously any
@@ -116,15 +118,31 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(400, { error: { code: "INVALID_EMAIL" } });
   }
 
-  // Caller's own role, from their JWT only — never the request body.
+  // Caller's own role + must_change_password, from their JWT only —
+  // never the request body. Codex adversarial review: checking role
+  // alone let a freshly-provisioned admin/super_admin still holding
+  // their admin-set temp password perform privileged actions (mint more
+  // admins, create clients) before ever proving they own the account via
+  // a real password change — closing that here, not just at the React
+  // route-guard level (same principle as D4/T8's own enforcement point).
   const callerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: authHeader } },
   });
-  const { data: callerRole, error: roleErr } = await callerClient.rpc("dashboard_get_my_role");
-  if (roleErr || typeof callerRole !== "string") {
+  const { data: callerFlags, error: flagsErr } = await callerClient.rpc("dashboard_get_my_flags");
+  if (flagsErr || !callerFlags || typeof callerFlags !== "object") {
     // Deliberately the same shape whether the JWT is malformed or the
     // caller has no dashboard_users row — never leaks which case it was.
     return jsonResponse(403, { error: { code: "ADMIN_REQUIRED" } });
+  }
+  const callerRole = (callerFlags as { role?: string }).role;
+  const callerMustChangePassword = (callerFlags as { must_change_password?: boolean }).must_change_password === true;
+  if (typeof callerRole !== "string") {
+    return jsonResponse(403, { error: { code: "ADMIN_REQUIRED" } });
+  }
+  if (callerMustChangePassword) {
+    return jsonResponse(403, {
+      error: { code: "MUST_CHANGE_PASSWORD_FIRST", message: "Change your temporary password before performing admin actions." },
+    });
   }
 
   // Per-action authorization gate. create_admin requires super_admin
@@ -208,7 +226,10 @@ Deno.serve(async (req: Request) => {
         p_role: role,
       });
       if (provisionErr) {
-        if (created) await supabase.auth.admin.deleteUser(authUserId);
+        if (created) {
+          const { error: rollbackErr } = await supabase.auth.admin.deleteUser(authUserId);
+          if (rollbackErr) console.error("map_existing rollback (deleteUser) failed:", rollbackErr.message, "orphaned auth_user_id:", authUserId);
+        }
         return jsonResponse(500, { error: { code: "PROVISION_FAILED", message: provisionErr.message } });
       }
 
@@ -287,7 +308,8 @@ Deno.serve(async (req: Request) => {
         });
         if (createErr || !newUser?.user) {
           // Rollback: delete the client row (Issue 3).
-          await supabase.schema("control").from("clients").delete().eq("client_id", newClientId);
+          const { error: rollbackErr } = await supabase.schema("control").from("clients").delete().eq("client_id", newClientId);
+          if (rollbackErr) console.error("create_client rollback (client row) failed:", rollbackErr.message, "orphaned client_id:", newClientId);
           return jsonResponse(500, { error: { code: "AUTH_CREATE_FAILED", message: createErr?.message ?? "no user returned" } });
         }
         authUserId = newUser.user.id;
@@ -300,8 +322,12 @@ Deno.serve(async (req: Request) => {
         p_role: "client_user",
       });
       if (provisionErr) {
-        if (created) await supabase.auth.admin.deleteUser(authUserId);
-        await supabase.schema("control").from("clients").delete().eq("client_id", newClientId);
+        if (created) {
+          const { error: userRollbackErr } = await supabase.auth.admin.deleteUser(authUserId);
+          if (userRollbackErr) console.error("create_client rollback (deleteUser) failed:", userRollbackErr.message, "orphaned auth_user_id:", authUserId);
+        }
+        const { error: clientRollbackErr } = await supabase.schema("control").from("clients").delete().eq("client_id", newClientId);
+        if (clientRollbackErr) console.error("create_client rollback (client row) failed:", clientRollbackErr.message, "orphaned client_id:", newClientId);
         return jsonResponse(500, { error: { code: "PROVISION_FAILED", message: provisionErr.message } });
       }
 
@@ -381,7 +407,10 @@ Deno.serve(async (req: Request) => {
       p_role: role,
     });
     if (provisionErr) {
-      if (created) await supabase.auth.admin.deleteUser(authUserId);
+      if (created) {
+        const { error: rollbackErr } = await supabase.auth.admin.deleteUser(authUserId);
+        if (rollbackErr) console.error("create_admin rollback (deleteUser) failed:", rollbackErr.message, "orphaned auth_user_id:", authUserId);
+      }
       return jsonResponse(500, { error: { code: "PROVISION_FAILED", message: provisionErr.message } });
     }
 
