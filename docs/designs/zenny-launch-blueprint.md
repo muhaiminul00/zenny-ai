@@ -1071,3 +1071,130 @@ of that timeline).
 - Whether SCH-004's current filter query already matches the generalized schema or still targets the old `notion_page_id`-only shape — Execute's second live-check.
 - Whether a client's Google Workspace domain might block external/service-account sharing — a real onboarding-blocker risk with no precedent in this codebase to check ahead of time; flagged, not resolved.
 + 4 unresolved from prior reviews (`Provider_App_Setup_Guide_v1.md` submission status, dashboard test-client-login support, the human's real OAuth error root cause, and the tool-webhook auth security pass — all carried from the sixth pass, still open, unchanged by this one).
+
+---
+
+## Implementation Tasks — BC-076-Card3 (Shopify + WooCommerce ingestion)
+
+Synthesized from the eighth-pass review below. Run against the live n8n/
+Supabase/Pinecone stack per this project's actual test doctrine; checkbox
+as shipped.
+
+- [ ] **T1 (P1)** — n8n — before touching `KR0kHvk3kJRThrX5`, export/snapshot
+      its current definition (Codex's freeze-before-refactor discipline) so
+      a broken extraction can be rolled back without guessing at the prior
+      shape.
+- [ ] **T2 (P1)** — n8n — extract the generic ingestion core (D25) into its
+      own sub-workflow. Contract: `{row_key, content}[]` + `client_id` +
+      `source_type` + `source_ref` + `id_prefix` (id_prefix MUST be derived
+      from `source_type` + `source_ref`, not `source_type` alone — Codex's
+      source-instance-collision catch) + a read-completeness assertion
+      (`pagination_complete: true` + `record_count`) gating whether orphan
+      cleanup is allowed to run at all this cycle (extends D29/D30's
+      existing Sheets gate to the shared core explicitly).
+      - Verify: re-point `KR0kHvk3kJRThrX5` itself to call the extracted
+        core; dual-run it against the same real sheet pre- and
+        post-refactor; diff vector IDs, chunk counts, and metadata —
+        confirm byte-identical behavior before trusting the extraction.
+- [ ] **T3 (P1)** — n8n — build the Shopify fetch/normalize workflow:
+      GraphQL Admin API (D28), paginated via cursor, calling UTIL-006 (D27)
+      for a fresh token before each request. `source_ref` = the store's
+      `.myshopify.com` domain. Normalize each product to the widened D26
+      shape (title, description stripped of HTML, price, compare-at price,
+      currency, SKU, handle/URL, category, tags, vendor, variant summary
+      with per-variant SKU/price/options) — fetch variants via their own
+      paginated connection, don't assume a single top-level query returns
+      them complete. Filter to published + in-stock only (D29) at fetch
+      time, not post-hoc.
+      - Verify: a real multi-page product list against Carmelli Bakery's
+        store: pagination continues past page 1, a mid-run failure (kill
+        the workflow after page 1) leaves zero orphan deletions, a
+        deleted/unpublished test product's vectors are actually gone after
+        re-sync, re-running the same sync produces no duplicate vectors.
+- [ ] **T4 (P1)** — n8n — build the WooCommerce fetch/normalize workflow:
+      REST API (`per_page`/`page`, response pagination headers — not just
+      incrementing `page` blindly), reading the stored Consumer Key/Secret
+      directly (no UTIL-006 call needed, D27). Same D26 normalized shape
+      and D29 inclusion filter as Shopify. Explicit content-type validation
+      before treating a response as real product data — reject and report
+      rather than silently upserting garbage if the store returns
+      non-JSON (Codex's catch, given `zenny-woocom.free.je`'s known
+      flakiness).
+      - Verify: FIRST live-check whether `zenny-woocom.free.je` can
+        actually serve real JSON from its products endpoint — a genuine
+        environment risk, not assumed either way (per Wiki/credentials/
+        woocommerce.md's own disclosed gotcha). If it can't, that's a
+        real blocker to report, not something to build around. If it can,
+        same test set as T3 (pagination, mid-run-failure safety, deletion
+        proof, idempotent re-sync).
+- [ ] **T5 (P1)** — n8n — wire both new fetch workflows into SCH-004's
+      existing switch node (`Route by Source Type`), adding `shopify` and
+      `woocommerce` branches alongside the existing `notion`/
+      `google_sheets` ones — mirroring exactly how Card2b added its own
+      branch. Use explicit `addConnection` operations, not
+      `updateNodeParameters` alone (this project's own documented gotcha
+      from Shopify's Wiki page — a switch node's connections object can
+      silently not update otherwise).
+      - Verify: `get_workflow_details` on SCH-004 post-change shows both
+        new branches correctly wired in `connections`, not just in node
+        parameters.
+- [ ] **T6 (P1)** — end-to-end proof, both legs — a real product synced →
+      chunked/embedded/upserted into `zenny-business-kb` → a real
+      `Search_business_kb` tool call returns grounded content from that
+      product, for both Shopify and WooCommerce.
+      - Verify: cross-tenant isolation — confirm Client A's WooCommerce
+        sync and Carmelli's Shopify sync never appear in each other's
+        Pinecone namespace.
+- [ ] **T7 (P2)** — n8n — add durable sync-run audit fields to the shared
+      core's status payload (started/completed timestamps, source record
+      count, chunk count, vectors deleted, failure reason) — extends the
+      existing `sync_status` JSON payload shape Sheets already writes,
+      not a new mechanism.
+- [ ] **T8 (P2)** — docs — update `06_Infrastructure/n8n/
+      Workflow_Registry.md` for the 2 new fetch workflows + SCH-004's
+      changed routing + the extracted generic core, per the Standing
+      Rule — Per-Workflow Documentation (a live `get_workflow_details`
+      read, not reconstructed from memory).
+- [ ] **T9 (P2)** — docs — update `PROJECT_STATE.md`, `Wiki/log.md`, and
+      `TODOS.md` per the promotion rule; confirm the webhook-sync TODO
+      (added this pass) and Card 3b/3c's tracked-but-unspecced status are
+      all visible.
+
+---
+
+## GSTACK REVIEW REPORT — BC-076-Card3 build-ready spec (2026-09-02, eighth pass)
+
+Scope: lock Card 3's actual implementation spec now that Card2a/2b/2c have
+shipped and 2 real connected test providers exist. The original blueprint
+scope (4 ingestion legs: Shopify, WooCommerce, Baserow, generalized-Notion)
+was live-verified this pass to be materially wrong — the 4 legs are not
+comparable work, confirming the concern the seventh pass had already
+flagged but left for this pass to resolve.
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | Not run — infra/architecture planning, not a product-scope question. |
+| Codex Review | `/codex review` | Independent 2nd opinion | 1 | issues_found, all resolved | See CODEX/CROSS-MODEL below. |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | clean (post-resolution) | See table below. |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | Not run — no UI in this pass's scope. |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | Not run — not applicable to this infra plan. |
+
+| Section | Status | Findings |
+|---|---|---|
+| Step 0 (scope challenge) | Done, fired 2 real STOPs, both resolved by scope-narrowing | Live verification (Mandatory MCP Verification — Supabase `control.client_connections`/`client_kb_source`, n8n `SCH-004`/`INT-012`/`KR0kHvk3kJRThrX5`, Pinecone `list-indexes`) found the blueprint's "4 equivalent legs" framing was wrong in two separate ways, each put to the human directly rather than assumed past: (1) generalized-Notion isn't unbuilt — INT-012+SCH-004 already run daily but silently upsert into the wrong Pinecone index (`zenny-email-kb`, not `zenny-business-kb`) and lack Card2b/2c's hardening; (2) Baserow isn't a client credential to collect — the blueprint's own D4/D10 call it "embedded," meaning Zenny must host a real Baserow instance first, a genuinely different kind of work (new self-hosted infra, not "connect to an existing provider API"). Human split both out (D24) rather than folding them into this card. |
+| 1. Architecture review | Done, 6 decisions locked (D24-D29) | D24 (scope split: Card 3 = Shopify + WooCommerce only; Notion fix → Card 3b; Baserow → Card 3c, human-selected over the original 1-card framing), D25 (extract a shared generic ingestion core from `KR0kHvk3kJRThrX5` rather than duplicating its D19/D20/D24-D32 hardening into 2 new workflows — human-selected specifically to prevent the exact drift that broke the Notion leg), D26 (product-record serialization — mechanical, no real fork), D27 (Shopify token freshness reuses the existing UTIL-006 Credential Resolver rather than new inline logic), D28 (Shopify: GraphQL Admin API, not REST — Codex's outside-voice live-verified that Shopify's REST product endpoints are legacy/deprecated in 2026; human accepted over staying on the simpler REST pattern WooCommerce/Sheets already use), D29 (KB inclusion policy: published + in-stock products only, since this feeds a customer-facing agent that shouldn't recommend something a customer can't actually buy). All human-confirmed via AskUserQuestion, all recommended options accepted. |
+| 2. Code quality review | No issues — no code changes in this pass, spec-only. | — |
+| 3. Test review | Locked as part of this spec | 6-step live verification plan written directly into the spec, then hardened by 12 outside-voice-forced additions (pagination-across-multiple-pages for both providers, mid-run-failure-must-not-delete, cross-tenant/cross-source ID-collision safety, idempotent re-sync, variant-only updates, malformed/non-JSON WooCommerce response handling, empty-catalog-must-not-wipe-unrelated-vectors, and others — see CODEX below). |
+| 4. Performance review | Carried forward, unchanged | Embedding/upsert cost scales with catalog size regardless of source — still Execute's watch-item; test-client catalogs are small enough not to be a blocker at this stage. |
+
+**CODEX:** Ran (gpt-5.5, high reasoning, `codex exec -s read-only`, live web-verified against current Shopify/WooCommerce API docs — the local n8n-skill sandbox helper failed to launch this run, so the review is grounded in the plan text plus primary provider docs, not a live repo read). Verdict: would not have locked the plan as originally drafted. Findings, in order of severity: (1) the shared core's contract was missing source-instance identity (product IDs collide across stores; the id_prefix scheme needs to carry `source_ref`, not just `source_type` — already how Sheets' D28 id_prefix works, this pass's draft just hadn't carried that forward explicitly for the 2 new legs — folded in directly); (2) the shared core needs an explicit complete-read/no-delete-on-partial-read contract for the new fetchers — already exists for Sheets as D29/D30, folded in directly rather than re-derived as new; (3) Shopify REST product listing is legacy/deprecated — promoted to a human decision (D28); (4) variant handling needs explicit multi-request/pagination handling, not assumed to arrive inline — folded into D26's build notes; (5) D26's serialization was too thin for real customer questions (missing SKU, URL/handle, category, tags, vendor, stock status, compare-at price, currency, option names beyond size/color) — folded in directly, D26 widened to a full normalized-product-document shape; (6) draft/unpublished/out-of-stock inclusion policy was undefined — promoted to a human decision (D29); (7) WooCommerce's "keys don't expire" framing was operationally incomplete (revocation, permission loss, malformed/non-JSON responses all still possible) — folded in directly as an explicit test case and a content-type-validation requirement before any delete step runs; (8) 6 concrete engineering-discipline recommendations for the D25 refactor itself (freeze/export the current Sheets workflow before changing it, dual-run comparison against the same source pre/post-refactor, source-instance-scoped orphan deletion — not `client_id`/`source_type` alone, a per-source sync lock against concurrent runs, refuse deletion without asserted-complete pagination, durable sync-run audit logging) — all folded directly into the Implementation Tasks below as explicit build/verify steps, not optional polish; (9) webhooks as a future incremental-sync optimization, not a replacement for scheduled reconciliation — promoted to a TODOS.md entry, not built this card.
+
+**CROSS-MODEL:** 2 genuine tensions, both put to the human (D28 GraphQL-vs-REST, D29 inclusion policy) — both resolved as recommended, no disagreement once decided. The remaining 10 findings were unambiguous corrections to gaps in the human-approved draft (the id_prefix/source-instance scoping mistake was this session's own oversight in applying an already-established Sheets pattern, not a competing architectural stance), folded in directly per this skill's standard for non-tension findings.
+
+**VERDICT:** Card 3 (Shopify + WooCommerce ingestion via a newly-extracted shared generic core, GraphQL Admin API for Shopify, published+in-stock-only inclusion policy) is build-ready — packaged into a formal Build Card and handed to Execute next. CEO + ENG CLEARED for Card 3. Card 3b (Notion re-pointing/hardening fix) and Card 3c (embedded Baserow infrastructure) are real, tracked follow-ups, not dropped — neither has its own `/plan-eng-review` pass yet, per this doc's established convention of reviewing each card individually when picked up.
+
+**UNRESOLVED DECISIONS:**
+- Card 3b's exact scope (re-point INT-012 to `zenny-business-kb`, add D19/D20-style hardening, verify `get_client_kb_source`'s RPC return shape against the generalized `client_kb_source` schema) — named here as a real, live-verified finding, not yet specced at the implementation level; needs its own `/plan-eng-review` pass when picked up.
+- Card 3c's scope (embedded Baserow: hosting decision, VPS deployment, client-facing catalog-entry UI, then its ingestion leg) — real new infrastructure, entirely unspecced; needs its own `/plan-eng-review` pass, likely including a fresh Baserow-vs-Grist-vs-something-else check given how much time has passed since D10's original recommendation.
+- Whether `zenny-woocom.free.je` (Client A's connected WooCommerce test store) can actually serve real JSON product data via its REST API — a known risk from `Wiki/credentials/woocommerce.md`'s own disclosed gotcha, not yet re-tested against product endpoints specifically (only connection-layer validation has been exercised). Execute's first live step for the WooCommerce leg, not assumed either way.
+- Everything already listed as unresolved in the sixth/seventh passes (`Provider_App_Setup_Guide_v1.md` submission status, the tool-webhook auth security pass) — still open, unchanged by this pass.

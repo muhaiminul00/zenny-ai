@@ -9,6 +9,34 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-09-02] session-bc076-card3-eng-review
+
+Pointer entry — full record lives in `docs/designs/
+zenny-launch-blueprint.md`'s eighth-pass GSTACK REVIEW REPORT (the doc
+itself carries the full findings/decisions/Codex report — this is just a
+discoverability pointer, not a duplicate).
+
+Summary: `/plan-eng-review` for BC-076 Card 3. Live verification
+(Mandatory MCP Verification — Supabase, n8n, Pinecone) found the
+blueprint's original "4 equivalent ingestion legs" framing (Shopify/
+WooCommerce/Baserow/generalized-Notion) was wrong: generalized-Notion
+already has active daily infra (INT-012/SCH-004) silently writing into
+the wrong Pinecone index (`zenny-email-kb` not `zenny-business-kb`) and
+missing Card2b/2c's hardening; Baserow means hosting new self-hosted
+infra (per the blueprint's own "embedded" framing), not collecting a
+client credential. Both split out (Card 3b, Card 3c) rather than folded
+in. Card 3 itself narrowed to Shopify + WooCommerce only, built via a
+shared generic ingestion core extracted from the shipped
+`KR0kHvk3kJRThrX5` Sheets workflow. Codex outside-voice caught Shopify's
+REST product API is 2026-legacy (GraphQL locked instead, D28) and forced
+a much richer product-serialization shape and several destructive-sync
+safety requirements (source-instance-scoped vector IDs, no-delete-on-
+partial-read, freeze-before-refactor). 6 decisions (D24-D29), 1 new
+`TODOS.md` item (webhook-driven incremental sync). ENG CLEARED, handed
+to Execute.
+
+---
+
 ## [2026-09-02] session-admin-provisioning-redesign-eng-review
 
 Pointer entry — full record lives in `docs/designs/

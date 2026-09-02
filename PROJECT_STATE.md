@@ -19,7 +19,9 @@ cut content were relocated to `TODOS.md` rather than silently dropped.
 
 ## Last Updated
 
-2026-09-02 (latest) — by /commander — **Admin-provisioning redesign `/plan-eng-review` CLEARED.** Extends BC-076-Card2a's admin panel: Add Client (creates a new client login + `unprovisioned`-status shell row, not just mapping to an existing one), Add Admin gated by a new `super_admin` tier (closes the accepted admin-minting risk), a client list view, forced password-change on first login. Live verification found `control.clients.archetype`/`client_schema_name` are NOT NULL (blocks a literal shell row — resolved: loosen both, audit consumers) and that a schema-cloning function (`create_client_schema_from_template`) already exists but is dead/unverified code (explicitly NOT used by this card). Codex outside-voice raised 2 real tensions, both resolved with human sign-off. 6 findings total, all resolved; 2 new `TODOS.md` items (client-status lifecycle is broken; the schema-clone function needs validation before anything trusts it). Full spec + 9-task implementation plan: `docs/designs/admin-provisioning-redesign-bootstrap.md`. Human-confirmed sequencing: BC-076 Card 3 builds first, this Build Card second. Full detail: `Wiki/log.md` session-admin-provisioning-redesign-eng-review.
+2026-09-02 (latest) — by /commander — **BC-076-Card3 `/plan-eng-review` CLEARED, scope narrowed from the original 4-leg blueprint framing to 2.** Live verification found the "4 equivalent ingestion legs" premise was wrong: generalized-Notion already has active daily infra (INT-012/SCH-004) but silently upserts into the wrong Pinecone index (`zenny-email-kb`, not `zenny-business-kb`) and lacks Card2b/2c's hardening — split out as Card 3b, not built now. Baserow turned out to mean hosting a real self-hosted instance (per the blueprint's own "embedded" framing), not collecting a client credential — split out as Card 3c. **Card 3 itself = Shopify + WooCommerce ingestion only**, built via a newly-extracted shared generic ingestion core (pulled out of the shipped `KR0kHvk3kJRThrX5` Sheets workflow, to stop the exact drift that broke Notion from happening again). Codex outside-voice caught Shopify's REST product API is 2026-legacy (locked GraphQL instead) and forced a much richer product-serialization shape (SKU/URL/category/tags/vendor/stock, not just title+price). 6 decisions locked (D24-D29), 1 new `TODOS.md` item (webhook-driven incremental sync, future). Full spec + 9-task implementation plan: `docs/designs/zenny-launch-blueprint.md` (eighth pass). Full detail: `Wiki/log.md` session-bc076-card3-eng-review.
+
+2026-09-02 (prior) — by /commander — **Admin-provisioning redesign `/plan-eng-review` CLEARED.** Extends BC-076-Card2a's admin panel: Add Client (creates a new client login + `unprovisioned`-status shell row, not just mapping to an existing one), Add Admin gated by a new `super_admin` tier (closes the accepted admin-minting risk), a client list view, forced password-change on first login. Live verification found `control.clients.archetype`/`client_schema_name` are NOT NULL (blocks a literal shell row — resolved: loosen both, audit consumers) and that a schema-cloning function (`create_client_schema_from_template`) already exists but is dead/unverified code (explicitly NOT used by this card). Codex outside-voice raised 2 real tensions, both resolved with human sign-off. 6 findings total, all resolved; 2 new `TODOS.md` items (client-status lifecycle is broken; the schema-clone function needs validation before anything trusts it). Full spec + 9-task implementation plan: `docs/designs/admin-provisioning-redesign-bootstrap.md`. Human-confirmed sequencing: BC-076 Card 3 builds first, this Build Card second. Full detail: `Wiki/log.md` session-admin-provisioning-redesign-eng-review.
 
 2026-09-02 (prior) — by /execute — **Repo renamed + doc/infra hygiene pass, ahead of BC-076 Card 3.** GitHub repo renamed live: `zeromanualai/zenny-producition-sync` → `muhaiminul00/zenny-ai` (ownership had already moved to `muhaiminul00`; this fixed the repo name/typo). Local `origin` remote and the `zenny-dashboard` VPS container's hardcoded clone URL both fixed and live-verified (container redeployed, confirmed serving real traffic post-redeploy). `Claude_Build_Command_Protocol_v2.md` (removed by the human) had 4 dangling `CLAUDE.md` pointers — stripped, nothing substantive lost (already inline elsewhere in `CLAUDE.md`). Full detail: `Wiki/log.md` session-repo-rename-and-doc-cleanup. **Next:** BC-076 Card 3 (remaining ingestion legs) — unchanged from before this housekeeping pass.
 
@@ -28,6 +30,7 @@ cut content were relocated to `TODOS.md` rather than silently dropped.
 2026-09-02 (prior) — by /commander — **gstack-pilot v1.6.1 confirmed live for this project.** Human ran `/plugin update gstack-pilot@gstack-pilot`; verified via `~/.claude/plugins/installed_plugins.json` that this project's entry now resolves `installPath`/`version` to `1.6.1`. The mode.json-handback deadlock fix (T7.2) is in effect going forward — no further action needed on it. Also: the image-based product search request from BC-076-Card2b (correctly scoped out at the time, but never actually written down) is now tracked in `TODOS.md`. Full detail: `Wiki/log.md` session-gstack-pilot-v1.6.1-plugin-update-confirmed.
 
 **Recent history (last ~2 weeks), full narrative in `Wiki/log.md` by slug:**
+- `session-bc076-card3-eng-review` — `/plan-eng-review` CLEARED for BC-076 Card 3, scope narrowed to Shopify+WooCommerce only; Notion fix and Baserow infra split out as Card 3b/3c.
 - `session-admin-provisioning-redesign-eng-review` — `/office-hours` design doc + `/plan-eng-review` CLEARED for the admin-panel redesign (Add Client/Add Admin/super_admin tier/client list); queued after BC-076 Card 3.
 - `session-repo-rename-and-doc-cleanup` — repo renamed `zenny-producition-sync` → `zenny-ai`, stale git remote + VPS clone URL fixed, `Claude_Build_Command_Protocol_v2.md` removal's dangling doc pointers cleaned up.
 - `session-gstack-pilot-v1.6.1-modejson-exemption-shipped` — the mode.json handback deadlock found + fixed + released as gstack-pilot v1.6.1 (PR #10).
@@ -137,14 +140,22 @@ Client E (old): e5f6a7b8-0001-4c1d-9e2a-000000000005 — engagement — client_t
 
 ## Next
 
-**BC-076 Card 3** (remaining ingestion legs: Shopify/WooCommerce/
-Baserow/generalized Notion) — already named as the next scoped step in
-`docs/designs/zenny-launch-blueprint.md`, buildable now against the two
-real connected test clients above. Routes through `/plan-eng-review`
-(architecture lock-in), not `office-hours`, per the Commander→gstack→
-Execute bridge. Card 4 (canary/smoke-test) can run in parallel.
+**BC-076 Card 3, build-ready** (Shopify + WooCommerce ingestion only —
+narrowed from the original 4-leg framing, see Last Updated above).
+`/plan-eng-review` CLEARED 2026-09-02, full spec + 9-task implementation
+plan at `docs/designs/zenny-launch-blueprint.md`'s eighth-pass GSTACK
+REVIEW REPORT. Ready to hand to Execute. Card 4 (canary/smoke-test) can
+run in parallel.
 
-**Queued immediately after Card 3:** the admin-provisioning redesign —
+**New follow-ups from this pass, tracked not dropped:**
+- **Card 3b** (Notion leg fix — re-point INT-012 to `zenny-business-kb`,
+  add D19/D20-style hardening) — real, live-verified finding; not yet
+  specced, needs its own `/plan-eng-review` pass.
+- **Card 3c** (embedded Baserow — new self-hosted infra + client-facing
+  catalog UI, then its ingestion leg) — not yet specced, needs its own
+  `/plan-eng-review` pass.
+
+**Queued after Card 3:** the admin-provisioning redesign —
 `/plan-eng-review` CLEARED 2026-09-02, full spec + 9-task implementation
 plan at `docs/designs/admin-provisioning-redesign-bootstrap.md`. Adds
 Add Client/Add Admin tabs, a `super_admin` tier (closes the accepted

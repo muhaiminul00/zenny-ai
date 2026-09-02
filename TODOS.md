@@ -175,6 +175,29 @@ that list.
 provisioning work, but nothing currently depends on it)
 **Depends on:** None.
 
+### Webhook-driven incremental product sync (Shopify/WooCommerce)
+
+**What:** Replace (or supplement) the daily full-catalog cron sync for the
+Shopify/WooCommerce KB ingestion legs with real-time product webhooks
+(both providers support product create/update/delete topics), so catalog
+changes reach `Search_business_kb` faster than once a day.
+
+**Why:** Surfaced by Codex's outside-voice review during BC-076-Card3's
+`/plan-eng-review` (2026-09-02). Scheduled full sync is standard and
+sufficient at this project's current client count/catalog size, but a
+webhook path is real technical debt once a client's catalog changes
+intraday — not urgent, but worth tracking so it isn't lost.
+
+**Context:** Webhooks should supplement, not replace, the scheduled full
+sync — Codex's own framing: "not a replacement for full reconciliation,"
+since a missed/failed webhook delivery (WooCommerce webhooks can be
+auto-paused after repeated failures) needs a fallback that still
+eventually corrects state. Depends on Card 3 shipping first (the
+scheduled sync + shared ingestion core it introduces).
+
+**Effort:** M **Priority:** P3
+**Depends on:** BC-076-Card3 (Shopify/WooCommerce ingestion) shipping first.
+
 ## Security
 
 ### Admin-minting has no extra gate
