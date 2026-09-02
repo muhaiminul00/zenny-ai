@@ -238,3 +238,61 @@ See [[../decisions/dashboard-auth-mapping]] (closed),
 real provider connections, documented the same pass), and
 `docs/designs/admin-provisioning-redesign-bootstrap.md` for the full
 spec and review history.
+
+## Admin Provisioning: client-picker fix (2026-09-02) — `dashboard_users.client_id` is now nullable
+
+The Bootstrap card above shipped `create_admin` requiring a "nominal
+home client" purely to satisfy `dashboard_users.client_id`'s old `NOT
+NULL` constraint — human feedback after using it live: an admin account
+has no client, so it shouldn't need one. Fixed properly, not worked
+around further:
+
+- **Schema:** `client_id` is now nullable, with a strict CHECK —
+  `(role='client_user' AND client_id IS NOT NULL) OR (role IN
+  ('admin','super_admin') AND client_id IS NULL)` — the schema itself
+  states the invariant, not just permits NULL. Migration order matters:
+  drop `NOT NULL` → backfill existing admin-tier rows to `NULL` → add
+  the CHECK (adding the CHECK first would fail immediately against
+  `admin@zenny.internal`'s then-still-set `client_id`). Pre-backfill
+  value logged here for rollback reference: `admin@zenny.internal`'s
+  `client_id` was `baa673b5-c51a-4a7b-91f5-a37027f8dca4` (Client A)
+  before this migration.
+- **Real, independent bug found during the audit, fixed same PR:**
+  `dashboard_admin_list_clients()`'s login-email lookup
+  (`WHERE du.client_id = c.client_id ORDER BY du.created_at ASC LIMIT
+  1`) had no role filter — it could show an admin's email as if it were
+  a client's login, if the admin's (then-required) `client_id` was older
+  than the client's real login. Added `AND du.role = 'client_user'` to
+  the lateral join.
+- **Edge Function:** `create_admin` no longer reads/validates any
+  client-id field at all — it passes `p_client_id: null` to
+  `dashboard_provision_user` directly. `map_existing`/`create_client`
+  untouched (they already always paired a real `client_id` with
+  `role='client_user'`).
+- **UI:** `AddAdminTab` lost the client picker entirely (just email +
+  tier). The 3 tabs are now visually grouped — Clients/Add
+  Client/Add Login under one label, Add Admin under a separate
+  "Internal accounts" label — so a client-facing action and an
+  internal-staff action don't read as equivalent options.
+- **Deliberately deferred, not done here** (Codex outside-voice
+  cross-model tension, human-resolved): a shared `useProvisionForm` hook
+  across the 3 tabs (DRY, but touches 2 already-working tabs with zero
+  test coverage) — tracked in `TODOS.md`. Also deferred: explicit
+  role-guard hardening on `dashboard_get_my_client()` and its 3 siblings
+  (currently reject admins only incidentally, via NULL-join failure —
+  correct today, just not explicit), and the "oldest client_user wins"
+  ambiguity for a client with 2+ logins (no client has hit this) — both
+  logged in `TODOS.md`.
+- **Live-verified:** the strict CHECK (nullable + constraint confirmed
+  via `information_schema`/`pg_constraint`); the list-view regression
+  (all 6 real clients' login emails unchanged after the role-filter
+  edit); `create_admin` end-to-end via curl with a real super_admin JWT
+  (no client field, `client_id` NULL on the created row); the
+  `dashboard_provision_user` pairing stays consistent across a real
+  remap; `map_existing` and the `SUPER_ADMIN_REQUIRED` gate both
+  regression-checked and unaffected; the UI itself via `gstack /browse`
+  against a local dev server pointed at the live backend (all 3 tabs,
+  zero console errors). All synthetic test accounts cleaned up after,
+  zero leftover confirmed. Full narrative:
+  `docs/designs/admin-provision-client-picker-fix.md`,
+  `Wiki/log.md` session-admin-provision-client-picker-fix-shipped.

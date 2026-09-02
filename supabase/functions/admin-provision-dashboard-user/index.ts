@@ -62,8 +62,9 @@ interface RequestBody {
   // create_client
   business_name?: string;
   billing_tier?: string;
-  // create_admin
-  admin_client_id?: string;
+  // create_admin has no fields of its own -- admin/super_admin accounts
+  // never have a client (see Admin Provisioning UI client-picker fix,
+  // 2026-09-02); it only needs `role` (above) + the shared fields.
 }
 
 // Finds an existing Auth user by email. Supabase's Admin API has no
@@ -352,23 +353,16 @@ Deno.serve(async (req: Request) => {
     }
 
     // action === "create_admin"
+    // Admin Provisioning UI client-picker fix (2026-09-02): admin/super_admin
+    // accounts never have a client -- dashboard_users.client_id is now
+    // nullable with a strict CHECK enforcing exactly that (see migration
+    // dashboard_users_client_id_role_check). No client lookup/validation
+    // needed here at all -- this branch used to require a "nominal home
+    // client" purely to satisfy the old NOT NULL constraint.
     const { role } = body;
-    const clientId = body.admin_client_id ?? body.client_id;
     if (!role || !CREATE_ADMIN_ROLES.includes(role)) {
       return jsonResponse(400, { error: { code: "INVALID_ROLE", message: `role must be one of: ${CREATE_ADMIN_ROLES.join(", ")}` } });
     }
-    if (!clientId || typeof clientId !== "string" || !UUID_RE.test(clientId)) {
-      return jsonResponse(400, { error: { code: "INVALID_CLIENT_ID", message: "admin_client_id (nominal home client) must be a UUID" } });
-    }
-
-    const { data: clientRow, error: clientErr } = await supabase
-      .schema("control")
-      .from("clients")
-      .select("client_id")
-      .eq("client_id", clientId)
-      .maybeSingle();
-    if (clientErr) return jsonResponse(500, { error: { code: "CLIENT_LOOKUP_FAILED", message: clientErr.message } });
-    if (!clientRow) return jsonResponse(400, { error: { code: "INVALID_CLIENT_ID", message: "No such client" } });
 
     const existing = await findUserByEmail(supabase, email);
     if (existing && (!remap || confirmAuthUserId !== existing.id)) {
@@ -403,7 +397,7 @@ Deno.serve(async (req: Request) => {
 
     const { error: provisionErr } = await supabase.rpc("dashboard_provision_user", {
       p_auth_user_id: authUserId,
-      p_client_id: clientId,
+      p_client_id: null,
       p_role: role,
     });
     if (provisionErr) {
@@ -424,7 +418,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return jsonResponse(200, {
-      result: { auth_user_id: authUserId, client_id: clientId, role, created, initial_password: initialPassword },
+      result: { auth_user_id: authUserId, client_id: null, role, created, initial_password: initialPassword },
     });
   } catch (e) {
     return jsonResponse(500, { error: { code: "UNEXPECTED", message: e instanceof Error ? e.message : String(e) } });
