@@ -1,12 +1,32 @@
 import { Navigate, Route, Routes, NavLink } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from './lib/AuthContext';
+import { supabase } from './lib/supabase';
 import { EnsoMark } from './components/EnsoMark';
 import { Login } from './pages/Login';
 import { OrdersList } from './pages/OrdersList';
 import { OrderDetail } from './pages/OrderDetail';
 import { Integrations } from './pages/Integrations';
 import { AppointmentsList, AppointmentDetailPage, PendingApprovals, PausedLeads } from './pages/Appointments';
+import { AdminProvision } from './pages/AdminProvision';
+
+// BC-076-Card2a: UX-only nav-link gate — hides the admin link for non-
+// admins. NOT the real security boundary; that lives server-side in
+// admin-provision-dashboard-user's own role check and AdminProvision's
+// own page-level check (a guessed URL still hits both of those).
+function useIsAdmin(): boolean {
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    supabase.rpc('dashboard_get_my_role').then(({ data, error }) => {
+      if (!cancelled && !error) setIsAdmin(data === 'admin');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return isAdmin;
+}
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth();
@@ -24,6 +44,7 @@ function LoginRoute() {
 
 function Layout({ children }: { children: ReactNode }) {
   const { session, signOut } = useAuth();
+  const isAdmin = useIsAdmin();
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -47,6 +68,11 @@ function Layout({ children }: { children: ReactNode }) {
           <NavLink to="/integrations" className={({ isActive }) => (isActive ? 'active' : '')}>
             Integrations
           </NavLink>
+          {isAdmin && (
+            <NavLink to="/admin/provision" className={({ isActive }) => (isActive ? 'active' : '')}>
+              Admin
+            </NavLink>
+          )}
         </nav>
         {session && (
           <div className="header-right">
@@ -78,6 +104,7 @@ export default function App() {
                 <Route path="/approvals" element={<PendingApprovals />} />
                 <Route path="/paused-leads" element={<PausedLeads />} />
                 <Route path="/integrations" element={<Integrations />} />
+                <Route path="/admin/provision" element={<AdminProvision />} />
               </Routes>
             </Layout>
           </RequireAuth>
