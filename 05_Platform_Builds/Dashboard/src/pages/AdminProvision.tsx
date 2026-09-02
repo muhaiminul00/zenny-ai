@@ -81,7 +81,16 @@ export function AdminProvision() {
     setFormError(null);
     setSuccess(null);
     const { data, error } = await supabase.functions.invoke('admin-provision-dashboard-user', {
-      body: { email, client_id: clientId, role, remap },
+      body: {
+        email,
+        client_id: clientId,
+        role,
+        remap,
+        // Echoes back the exact id the server gave us in the prior 409 —
+        // proves this is a genuine confirmed second call, not a blindly
+        // guessed remap:true (Codex adversarial review).
+        confirm_auth_user_id: remap ? needsRemapConfirm?.auth_user_id : undefined,
+      },
     });
     setSubmitting(false);
     if (error || data?.error) {
@@ -176,8 +185,8 @@ export function AdminProvision() {
           </p>
           {success.initial_password && (
             <p>
-              <strong>One-time initial password (shown once, not stored — pass it to the user directly):</strong>{' '}
-              <code>{success.initial_password}</code>
+              <strong>Initial password (shown once here, not stored anywhere — give it to the user directly and
+              have them change it after first login):</strong> <code>{success.initial_password}</code>
             </p>
           )}
         </div>

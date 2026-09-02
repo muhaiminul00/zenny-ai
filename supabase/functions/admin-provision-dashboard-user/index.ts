@@ -39,6 +39,7 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_ROLES = ["client_user", "admin"];
 
 Deno.serve(async (req: Request) => {
@@ -49,7 +50,14 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(405, { error: { code: "METHOD_NOT_ALLOWED" } });
   }
 
-  let body: { email?: string; client_id?: string; role?: string; remap?: boolean };
+  // Identity check first (Codex adversarial review): reject unauthenticated
+  // requests before spending any work parsing/validating the body.
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return jsonResponse(401, { error: { code: "NOT_AUTHENTICATED" } });
+  }
+
+  let body: { email?: string; client_id?: string; role?: string; remap?: boolean; confirm_auth_user_id?: string };
   try {
     body = await req.json();
   } catch (_e) {
@@ -58,22 +66,18 @@ Deno.serve(async (req: Request) => {
 
   const { email, client_id, role } = body;
   const remap = body.remap === true;
+  const confirmAuthUserId = body.confirm_auth_user_id;
 
   if (!email || typeof email !== "string" || !EMAIL_RE.test(email)) {
     return jsonResponse(400, { error: { code: "INVALID_EMAIL" } });
   }
-  if (!client_id || typeof client_id !== "string") {
-    return jsonResponse(400, { error: { code: "MISSING_CLIENT_ID" } });
+  if (!client_id || typeof client_id !== "string" || !UUID_RE.test(client_id)) {
+    return jsonResponse(400, { error: { code: "INVALID_CLIENT_ID", message: "client_id must be a UUID" } });
   }
   if (!role || !VALID_ROLES.includes(role)) {
     return jsonResponse(400, { error: { code: "INVALID_ROLE", message: `role must be one of: ${VALID_ROLES.join(", ")}` } });
   }
 
-  // Identity: derive from the caller's own JWT, never the request body.
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return jsonResponse(401, { error: { code: "NOT_AUTHENTICATED" } });
-  }
   const callerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: authHeader } },
   });
@@ -102,34 +106,46 @@ Deno.serve(async (req: Request) => {
   }
 
   // Does an Auth user with this email already exist? Supabase's Admin API
-  // has no direct "get by email" — list + filter is the documented path
-  // for a small user base; paginate if this project ever needs more.
-  const { data: existingList, error: listErr } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-  if (listErr) {
-    return jsonResponse(500, { error: { code: "USER_LOOKUP_FAILED", message: listErr.message } });
+  // has no direct "get by email" — list + filter is the documented path.
+  // Paginated fully (Codex adversarial review: a fixed perPage silently
+  // misses matches past page 1 once the user base grows).
+  let existing: { id: string } | undefined;
+  for (let page = 1; ; page++) {
+    const { data: pageData, error: listErr } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+    if (listErr) {
+      return jsonResponse(500, { error: { code: "USER_LOOKUP_FAILED", message: listErr.message } });
+    }
+    existing = pageData.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (existing || pageData.users.length < 1000) break;
   }
-  const existing = existingList.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
 
   let authUserId: string;
   let created: boolean;
   // Only set (and only ever returned) when a brand-new account is created
-  // this call — the one-time initial password the admin passes along to
-  // the new user out-of-band. Never stored, never logged. This project has
-  // no confirmed-working SMTP for Supabase Auth invite emails, so a
-  // generated password beats an unusable random UUID the account could
-  // never actually log in with (an early draft's mistake, caught before
-  // this shipped).
+  // this call. This is a REAL, reusable password, not a single-use token
+  // (Codex adversarial review caught the original comment/UI copy implying
+  // otherwise — it's shown once in this response and never stored or
+  // logged anywhere, but it stays valid until the user changes it). This
+  // project has no confirmed-working SMTP for Supabase Auth invite emails,
+  // so a generated password beats an unusable random UUID the account
+  // could never actually log in with (an early draft's mistake, caught
+  // before this shipped).
   let initialPassword: string | undefined;
 
   if (existing) {
-    if (!remap) {
+    // Codex adversarial review: remap:true alone isn't a real confirmation
+    // — any caller could send it blind on the first request, skipping the
+    // "did you actually see whose account this is" step entirely. Require
+    // confirm_auth_user_id to echo back the EXACT id from the 409 below,
+    // proving this is a genuine second call, not a guessed flag.
+    if (!remap || confirmAuthUserId !== existing.id) {
       // Distinct, actionable response — the UI can offer "remap this
       // existing user?" as an explicit confirm step rather than silently
       // reassigning someone's login to a different client.
       return jsonResponse(409, {
         error: {
           code: "USER_EXISTS",
-          message: "An account with this email already exists. Resubmit with remap:true to confirm reassigning it to this client/role.",
+          message: "An account with this email already exists. Resubmit with remap:true and confirm_auth_user_id set to the id below to confirm reassigning it to this client/role.",
           auth_user_id: existing.id,
         },
       });
@@ -156,6 +172,14 @@ Deno.serve(async (req: Request) => {
     p_role: role,
   });
   if (provisionErr) {
+    // Codex adversarial review: without this, a brand-new Auth user with a
+    // real working password could be left behind with no dashboard_users
+    // mapping at all — a confirmed login nobody can find or use correctly.
+    // Only compensate for users THIS call created — never delete an
+    // existing account just because a remap failed.
+    if (created) {
+      await supabase.auth.admin.deleteUser(authUserId);
+    }
     return jsonResponse(500, { error: { code: "PROVISION_FAILED", message: provisionErr.message } });
   }
 
