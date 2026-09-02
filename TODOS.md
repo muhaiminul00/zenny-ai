@@ -111,4 +111,27 @@ originally, and now also by the current-track appointment archetype
 added to the workflow spec doc.
 **Effort:** S **Priority:** P3 **Depends on:** None.
 
+## Security
+
+### Admin-minting has no extra gate
+
+**What:** `admin-provision-dashboard-user` lets any `role='admin'` account
+create another admin — `role` is just a dropdown option in the UI, with
+no separate "who can create admins" check.
+
+**Why:** Codex's adversarial review (BC-076-Card2a) flagged this as
+privilege sprawl. Explicitly reviewed and accepted as-is by the human —
+at this project's current single-operator scale, a stricter gate (e.g. a
+`super_admin`/`can_manage_admins` tier) is speculative complexity for a
+threat that doesn't exist yet.
+
+**Context:** Revisit if/when a second admin with a genuinely different
+trust level is ever needed — e.g. an ops hire who should provision
+client logins but never create other admins. Until then, the smallest
+correct thing is the one gate that already exists (`role='admin'`
+required to call the function at all).
+
+**Effort:** S (once actually needed) **Priority:** P3
+**Depends on:** A real second-admin use case existing.
+
 ## Completed
