@@ -111,6 +111,70 @@ originally, and now also by the current-track appointment archetype
 added to the workflow spec doc.
 **Effort:** S **Priority:** P3 **Depends on:** None.
 
+## Infrastructure (continued)
+
+### `control.clients.status` lifecycle is broken
+
+**What:** Nothing in the system has ever transitioned a client's `status`
+away from `'onboarding'` — all 6 existing clients (5 test clients + the
+real demo client, Carmelli Bakery) sit at `status='onboarding'`
+regardless of whether they're fully working. `'active'` and `'paused'`
+exist in the enum but have no defined trigger anywhere.
+
+**Why:** Surfaced during the admin-provisioning-redesign
+`/plan-eng-review` (2026-09-02) by both the interactive review and
+Codex's outside-voice pass, independently. That card adds a 4th value
+(`'unprovisioned'`, for shell clients with no schema yet) on top of an
+already-overloaded 2-meaning `'onboarding'` — a real, growing problem,
+not fixed by that addition. Codex's framing: "`onboarding` already
+means both 'not fully provisioned' and 'normal existing usable demo
+client'. That ambiguity will leak into filters, list UI, and admin
+judgment."
+
+**Context:** Needs an actual state machine: what event moves a client
+from `unprovisioned` → `onboarding` (real schema exists) → `active`
+(fully connected, live)? Candidates: schema provisioning completing,
+first real integration connected, an admin manually flipping it. Until
+this is designed, admin-facing client lists cannot reliably show which
+clients are actually working.
+
+**Effort:** M (needs its own small design pass, not just a migration)
+**Priority:** P2 (affects real, growing operational visibility)
+**Depends on:** None technically; conceptually related to whatever
+provisions real client schemas going forward (see the next TODO).
+
+### `create_client_schema_from_template()` is untested, unverified infrastructure
+
+**What:** A live Postgres function,
+`public.create_client_schema_from_template(p_archetype, p_specific_tables,
+p_client_schema)`, already exists — it clones a `tpl_<archetype>`
+template schema into a new client schema (tables, FKs, RLS, grants).
+It has **zero callers anywhere in the database** and has never been run
+against a real client; none of the 6 existing clients were provisioned
+through it. It is also not `SECURITY DEFINER`, meaning it needs a
+privileged caller (service_role) to run at all.
+
+**Why:** Surfaced during the admin-provisioning-redesign
+`/plan-eng-review` (2026-09-02) — the original design doc assumed
+schema-cloning automation "doesn't exist anywhere in this repo"; that
+assumption was false, but the function's existence doesn't make it
+trustworthy. Codex's framing: "treat as untrusted legacy infrastructure
+until exercised. Its existence reduces discovery risk, not
+implementation risk."
+
+**Context:** Before any future card builds real client provisioning
+(self-serve onboarding, or an admin-triggered "provision now" action)
+on top of this function, it needs to actually be run against a
+disposable test schema and verified end-to-end — including whether
+`p_specific_tables` (archetype-specific extra tables) has a real,
+current mapping anywhere, since the function itself doesn't derive
+that list.
+
+**Effort:** S (a single live test run + verification, ~30min)
+**Priority:** P2 (blocks trusting this function for any real
+provisioning work, but nothing currently depends on it)
+**Depends on:** None.
+
 ## Security
 
 ### Admin-minting has no extra gate

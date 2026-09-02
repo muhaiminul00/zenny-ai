@@ -9,6 +9,26 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-09-02] session-admin-provisioning-redesign-eng-review
+
+Pointer entry — full record lives in `docs/designs/
+admin-provisioning-redesign-bootstrap.md` (the design doc itself carries
+the complete `/office-hours` premises/alternatives, the `/plan-eng-review`
+findings, the Codex outside-voice cross-model tensions, and the 9-task
+implementation plan; not duplicated here).
+
+One-line summary: extends BC-076-Card2a's admin panel with Add Client
+(creates a genuinely new client, not just a login for an existing one),
+Add Admin gated by a new `super_admin` tier (closes the accepted
+admin-minting risk), a client list view, and forced password-change on
+first login. Live verification found `control.clients.archetype`/
+`.client_schema_name` are `NOT NULL` (a real blocker, resolved: loosen
+both + audit consumers) and that a schema-cloning function
+(`create_client_schema_from_template`) already exists live but is
+dead/unverified code — explicitly NOT used by this card (tracked as its
+own TODO instead). Human-confirmed sequencing: BC-076 Card 3 builds
+first, this Build Card second.
+
 ## [2026-09-02] session-repo-rename-and-doc-cleanup
 
 Repo-hygiene housekeeping, human-directed, before starting BC-076 Card 3.

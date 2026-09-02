@@ -19,13 +19,16 @@ cut content were relocated to `TODOS.md` rather than silently dropped.
 
 ## Last Updated
 
-2026-09-02 (latest) — by /execute — **Repo renamed + doc/infra hygiene pass, ahead of BC-076 Card 3.** GitHub repo renamed live: `zeromanualai/zenny-producition-sync` → `muhaiminul00/zenny-ai` (ownership had already moved to `muhaiminul00`; this fixed the repo name/typo). Local `origin` remote and the `zenny-dashboard` VPS container's hardcoded clone URL both fixed and live-verified (container redeployed, confirmed serving real traffic post-redeploy). `Claude_Build_Command_Protocol_v2.md` (removed by the human) had 4 dangling `CLAUDE.md` pointers — stripped, nothing substantive lost (already inline elsewhere in `CLAUDE.md`). Full detail: `Wiki/log.md` session-repo-rename-and-doc-cleanup. **Next:** BC-076 Card 3 (remaining ingestion legs) — unchanged from before this housekeeping pass.
+2026-09-02 (latest) — by /commander — **Admin-provisioning redesign `/plan-eng-review` CLEARED.** Extends BC-076-Card2a's admin panel: Add Client (creates a new client login + `unprovisioned`-status shell row, not just mapping to an existing one), Add Admin gated by a new `super_admin` tier (closes the accepted admin-minting risk), a client list view, forced password-change on first login. Live verification found `control.clients.archetype`/`client_schema_name` are NOT NULL (blocks a literal shell row — resolved: loosen both, audit consumers) and that a schema-cloning function (`create_client_schema_from_template`) already exists but is dead/unverified code (explicitly NOT used by this card). Codex outside-voice raised 2 real tensions, both resolved with human sign-off. 6 findings total, all resolved; 2 new `TODOS.md` items (client-status lifecycle is broken; the schema-clone function needs validation before anything trusts it). Full spec + 9-task implementation plan: `docs/designs/admin-provisioning-redesign-bootstrap.md`. Human-confirmed sequencing: BC-076 Card 3 builds first, this Build Card second. Full detail: `Wiki/log.md` session-admin-provisioning-redesign-eng-review.
+
+2026-09-02 (prior) — by /execute — **Repo renamed + doc/infra hygiene pass, ahead of BC-076 Card 3.** GitHub repo renamed live: `zeromanualai/zenny-producition-sync` → `muhaiminul00/zenny-ai` (ownership had already moved to `muhaiminul00`; this fixed the repo name/typo). Local `origin` remote and the `zenny-dashboard` VPS container's hardcoded clone URL both fixed and live-verified (container redeployed, confirmed serving real traffic post-redeploy). `Claude_Build_Command_Protocol_v2.md` (removed by the human) had 4 dangling `CLAUDE.md` pointers — stripped, nothing substantive lost (already inline elsewhere in `CLAUDE.md`). Full detail: `Wiki/log.md` session-repo-rename-and-doc-cleanup. **Next:** BC-076 Card 3 (remaining ingestion legs) — unchanged from before this housekeeping pass.
 
 2026-09-02 (prior) — by /execute — **BC-076-Card2a SHIPPED: dashboard OAuth bug fixed (real root cause was a 3-week-stale deployment, not a grants bug), admin dashboard-user provisioning built, hardened by review, and live-verified end to end.** The reported error was the live `zenny-dashboard` container serving pre-BC-052 code — fixed via a human-approved container restart, no code change needed. New: `role='admin'` support (`dashboard_users_role_check_constraint`, `dashboard_get_my_role()`, `dashboard_admin_list_clients()`), a new version-controlled Edge Function (`admin-provision-dashboard-user` — this project's first, breaking the no-repo-source convention for this one admin/security boundary), and a `/admin/provision` page. `/review`'s Codex adversarial pass found 2 false-positive "critical" findings (verified wrong live) and 5 real ones, all fixed (auth-check ordering, UUID validation, full pagination, a real `remap` confirmation, orphaned-user rollback). Two real bugs caught only by live testing, not static checks: an admin account showing the same UI as a client (fixed architecturally — admin/client routes now fully separated); an `archetype_enum`-vs-`text` cast bug in the new client-list RPC (caught by the browser click-through, fixed). Credential Gate initially flagged for Shopify turned out to be a false alarm — the human clarified the two existing test/demo accounts already have every provider connected between them (documented in new `Wiki/credentials/test-fixture-clients.md`). Shipped via PR #9, squash-merged, full browser click-through completed post-merge both directions (admin-only view; non-admin blocked from admin routes). Full detail: `Wiki/log.md` session-bc076-card2a-dashboard-oauth-shipped, `Wiki/infra/dashboard-auth-mapping.md`. **Next:** BC-076 Card 3 (remaining ingestion legs — Shopify/WooCommerce/Baserow/generalized Notion) can now build against the two existing connected test clients; Card 4 (canary/smoke-test) can run in parallel.
 
 2026-09-02 (prior) — by /commander — **gstack-pilot v1.6.1 confirmed live for this project.** Human ran `/plugin update gstack-pilot@gstack-pilot`; verified via `~/.claude/plugins/installed_plugins.json` that this project's entry now resolves `installPath`/`version` to `1.6.1`. The mode.json-handback deadlock fix (T7.2) is in effect going forward — no further action needed on it. Also: the image-based product search request from BC-076-Card2b (correctly scoped out at the time, but never actually written down) is now tracked in `TODOS.md`. Full detail: `Wiki/log.md` session-gstack-pilot-v1.6.1-plugin-update-confirmed.
 
 **Recent history (last ~2 weeks), full narrative in `Wiki/log.md` by slug:**
+- `session-admin-provisioning-redesign-eng-review` — `/office-hours` design doc + `/plan-eng-review` CLEARED for the admin-panel redesign (Add Client/Add Admin/super_admin tier/client list); queued after BC-076 Card 3.
 - `session-repo-rename-and-doc-cleanup` — repo renamed `zenny-producition-sync` → `zenny-ai`, stale git remote + VPS clone URL fixed, `Claude_Build_Command_Protocol_v2.md` removal's dangling doc pointers cleaned up.
 - `session-gstack-pilot-v1.6.1-modejson-exemption-shipped` — the mode.json handback deadlock found + fixed + released as gstack-pilot v1.6.1 (PR #10).
 - `session-bc077-t5-t7-closed` — BC-077's remaining tasks closed; found the trivial-housekeeping PR-exemption wasn't actually being applied (BC-078 went through a full PR when it qualified for direct-to-main).
@@ -139,8 +142,17 @@ Baserow/generalized Notion) — already named as the next scoped step in
 `docs/designs/zenny-launch-blueprint.md`, buildable now against the two
 real connected test clients above. Routes through `/plan-eng-review`
 (architecture lock-in), not `office-hours`, per the Commander→gstack→
-Execute bridge. Card 4 (canary/smoke-test) can run in parallel. Full
-current backlog: `TODOS.md`.
+Execute bridge. Card 4 (canary/smoke-test) can run in parallel.
+
+**Queued immediately after Card 3:** the admin-provisioning redesign —
+`/plan-eng-review` CLEARED 2026-09-02, full spec + 9-task implementation
+plan at `docs/designs/admin-provisioning-redesign-bootstrap.md`. Adds
+Add Client/Add Admin tabs, a `super_admin` tier (closes the accepted
+admin-minting risk in `TODOS.md`), a client list view, and a forced
+password-change flow. Human-confirmed sequencing (2026-09-02): Card 3
+first, this second — not dropped, tracked here so it isn't lost.
+
+Full current backlog: `TODOS.md`.
 
 Pre-pivot "Next Build Card" content (the Convocore Path A/Path B
 roadmap, BC-057 through BC-071, the dual-path plan, the old Handoff
