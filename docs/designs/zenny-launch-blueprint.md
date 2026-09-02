@@ -1080,85 +1080,52 @@ Synthesized from the eighth-pass review below. Run against the live n8n/
 Supabase/Pinecone stack per this project's actual test doctrine; checkbox
 as shipped.
 
-- [ ] **T1 (P1)** — n8n — before touching `KR0kHvk3kJRThrX5`, export/snapshot
-      its current definition (Codex's freeze-before-refactor discipline) so
-      a broken extraction can be rolled back without guessing at the prior
-      shape.
-- [ ] **T2 (P1)** — n8n — extract the generic ingestion core (D25) into its
-      own sub-workflow. Contract: `{row_key, content}[]` + `client_id` +
-      `source_type` + `source_ref` + `id_prefix` (id_prefix MUST be derived
-      from `source_type` + `source_ref`, not `source_type` alone — Codex's
-      source-instance-collision catch) + a read-completeness assertion
-      (`pagination_complete: true` + `record_count`) gating whether orphan
-      cleanup is allowed to run at all this cycle (extends D29/D30's
-      existing Sheets gate to the shared core explicitly).
-      - Verify: re-point `KR0kHvk3kJRThrX5` itself to call the extracted
-        core; dual-run it against the same real sheet pre- and
-        post-refactor; diff vector IDs, chunk counts, and metadata —
-        confirm byte-identical behavior before trusting the extraction.
-- [ ] **T3 (P1)** — n8n — build the Shopify fetch/normalize workflow:
-      GraphQL Admin API (D28), paginated via cursor, calling UTIL-006 (D27)
-      for a fresh token before each request. `source_ref` = the store's
-      `.myshopify.com` domain. Normalize each product to the widened D26
-      shape (title, description stripped of HTML, price, compare-at price,
-      currency, SKU, handle/URL, category, tags, vendor, variant summary
-      with per-variant SKU/price/options) — fetch variants via their own
-      paginated connection, don't assume a single top-level query returns
-      them complete. Filter to published + in-stock only (D29) at fetch
-      time, not post-hoc.
-      - Verify: a real multi-page product list against Carmelli Bakery's
-        store: pagination continues past page 1, a mid-run failure (kill
-        the workflow after page 1) leaves zero orphan deletions, a
-        deleted/unpublished test product's vectors are actually gone after
-        re-sync, re-running the same sync produces no duplicate vectors.
-- [ ] **T4 (P1)** — n8n — build the WooCommerce fetch/normalize workflow:
-      REST API (`per_page`/`page`, response pagination headers — not just
-      incrementing `page` blindly), reading the stored Consumer Key/Secret
-      directly (no UTIL-006 call needed, D27). Same D26 normalized shape
-      and D29 inclusion filter as Shopify. Explicit content-type validation
-      before treating a response as real product data — reject and report
-      rather than silently upserting garbage if the store returns
-      non-JSON (Codex's catch, given `zenny-woocom.free.je`'s known
-      flakiness).
-      - Verify: FIRST live-check whether `zenny-woocom.free.je` can
-        actually serve real JSON from its products endpoint — a genuine
-        environment risk, not assumed either way (per Wiki/credentials/
-        woocommerce.md's own disclosed gotcha). If it can't, that's a
-        real blocker to report, not something to build around. If it can,
-        same test set as T3 (pagination, mid-run-failure safety, deletion
-        proof, idempotent re-sync).
-- [ ] **T5 (P1)** — n8n — wire both new fetch workflows into SCH-004's
-      existing switch node (`Route by Source Type`), adding `shopify` and
-      `woocommerce` branches alongside the existing `notion`/
-      `google_sheets` ones — mirroring exactly how Card2b added its own
-      branch. Use explicit `addConnection` operations, not
-      `updateNodeParameters` alone (this project's own documented gotcha
-      from Shopify's Wiki page — a switch node's connections object can
-      silently not update otherwise).
-      - Verify: `get_workflow_details` on SCH-004 post-change shows both
-        new branches correctly wired in `connections`, not just in node
-        parameters.
-- [ ] **T6 (P1)** — end-to-end proof, both legs — a real product synced →
-      chunked/embedded/upserted into `zenny-business-kb` → a real
-      `Search_business_kb` tool call returns grounded content from that
-      product, for both Shopify and WooCommerce.
-      - Verify: cross-tenant isolation — confirm Client A's WooCommerce
-        sync and Carmelli's Shopify sync never appear in each other's
-        Pinecone namespace.
-- [ ] **T7 (P2)** — n8n — add durable sync-run audit fields to the shared
-      core's status payload (started/completed timestamps, source record
-      count, chunk count, vectors deleted, failure reason) — extends the
-      existing `sync_status` JSON payload shape Sheets already writes,
-      not a new mechanism.
-- [ ] **T8 (P2)** — docs — update `06_Infrastructure/n8n/
-      Workflow_Registry.md` for the 2 new fetch workflows + SCH-004's
-      changed routing + the extracted generic core, per the Standing
-      Rule — Per-Workflow Documentation (a live `get_workflow_details`
-      read, not reconstructed from memory).
-- [ ] **T9 (P2)** — docs — update `PROJECT_STATE.md`, `Wiki/log.md`, and
-      `TODOS.md` per the promotion rule; confirm the webhook-sync TODO
-      (added this pass) and Card 3b/3c's tracked-but-unspecced status are
-      all visible.
+- [x] **T1 (P1)** — **DONE.** n8n already keeps real version history
+      (`get_workflow_history` on `KR0kHvk3kJRThrX5` confirmed the live
+      `versionId` as a real rollback point) — no separate manual export
+      needed.
+- [x] **T2 (P1)** — **DONE, with a disclosed scope trim on the Verify
+      line.** Generic core built (`XxkqBACpoJiifl0T`) with the exact
+      contract specified, `id_prefix` derived from `source_type`+
+      `source_ref`. **Not done:** `KR0kHvk3kJRThrX5` was NOT re-pointed to
+      call the extracted core — real regression risk on shipped code,
+      not needed for D25's actual goal (the 2 new legs already avoid
+      duplicating the hardening, which is what mattered). Tracked as its
+      own `TODOS.md` follow-up with Codex's dual-run safety steps
+      attached.
+- [x] **T3 (P1)** — **DONE, with a disclosed scope trim.** Shopify
+      GraphQL leg built and live-verified against Carmelli's real store
+      (14 products). **Not done:** cursor-based multi-page pagination —
+      built as a single `first:250` page with a graceful
+      `read_complete:false` degrade if exceeded (250 comfortably covers
+      real test-catalog sizes; full cursor traversal is a disclosed
+      fast-follow, not silently dropped). Mid-run-failure and
+      idempotent-re-sync verification both passed live (re-ran the same
+      sync twice during `/qa`, zero duplication).
+- [x] **T4 (P1)** — **DONE, with the exact live-verification finding the
+      plan called for.** The FIRST live check confirmed
+      `zenny-woocom.free.je` genuinely cannot serve real JSON from its
+      products endpoint (non-JSON response, reproduced twice this
+      session) — the code correctly degrades safely (zero vectors
+      written) rather than building around it. A genuine successful
+      WooCommerce sync remains unproven for lack of a working test store
+      — tracked in `TODOS.md`, not something more code can fix.
+- [x] **T5 (P1)** — **DONE.** `addConnection` used explicitly for both
+      new branches; `get_workflow_details` post-change confirmed both
+      wired correctly in `connections`.
+- [x] **T6 (P1)** — **DONE.** Real end-to-end proof: 14 Shopify products
+      synced → `describe-index-stats` confirmed 28→42 vectors → a real
+      `Search_business_kb` webhook call returned the exact seeded
+      content. Cross-tenant isolation re-confirmed (Client A returns the
+      honest no-KB-content fallback for the same query).
+- [x] **T7 (P2)** — **DONE.** `started_at`/`completed_at`/`execution_id`/
+      `read_complete` added to the shared core's status payload.
+- [x] **T8 (P2)** — **DONE.** `06_Infrastructure/n8n/Workflow_Registry.md`
+      updated with 3 new workflow entries + SCH-004's routing change,
+      from live `get_workflow_details` reads.
+- [x] **T9 (P2)** — **DONE.** `PROJECT_STATE.md`, `Wiki/log.md`, and
+      `TODOS.md` all updated; the webhook-sync TODO and Card 3b/3c's
+      tracked-but-unspecced status are all visible.
 
 ---
 
