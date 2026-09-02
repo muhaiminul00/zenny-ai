@@ -356,6 +356,24 @@ Full narrative and the live end-to-end proof this actually works:
   Change Requests, Definition of Done) is not lost: every Standing Rule
   above that used to point to it already carries its own full detail
   inline in this file. No replacement document exists or is needed.
+
+## Testing
+
+**Dashboard app only** (`05_Platform_Builds/Dashboard/`) — bootstrapped
+2026-09-02 during `/qa` on the admin-provision-client-picker-fix
+branch, human's explicit choice over the project's prior live-
+verification-only default. Vitest + `@testing-library/react`; run
+`npm run test` inside that directory. Full detail, conventions, and the
+scope boundary (this suite vs. live `/browse` verification) in
+`05_Platform_Builds/Dashboard/TESTING.md`. CI runs it on every push/PR
+to `main` (`.github/workflows/test.yml`) — this project's first CI
+pipeline.
+
+**Everywhere else** (n8n workflows, Supabase schema/RPCs/Edge
+Functions) — no comparable framework, unchanged. Verified live against
+the real Supabase project (curl, `gstack /browse`, direct MCP reads),
+per this project's actual test doctrine established across every prior
+Build Card. Not something this section's bootstrap decision touches.
 ---
 #### ZeroManual · Zenny AI Workforce · CLAUDE.md v3.1 · BUILD PHASE
 

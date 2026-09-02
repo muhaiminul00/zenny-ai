@@ -238,3 +238,85 @@ See [[../decisions/dashboard-auth-mapping]] (closed),
 real provider connections, documented the same pass), and
 `docs/designs/admin-provisioning-redesign-bootstrap.md` for the full
 spec and review history.
+
+## Admin Provisioning: client-picker fix (2026-09-02) — `dashboard_users.client_id` is now nullable
+
+The Bootstrap card above shipped `create_admin` requiring a "nominal
+home client" purely to satisfy `dashboard_users.client_id`'s old `NOT
+NULL` constraint — human feedback after using it live: an admin account
+has no client, so it shouldn't need one. Fixed properly, not worked
+around further:
+
+- **Schema:** `client_id` is now nullable, with a strict CHECK —
+  `(role='client_user' AND client_id IS NOT NULL) OR (role IN
+  ('admin','super_admin') AND client_id IS NULL)` — the schema itself
+  states the invariant, not just permits NULL. Migration order matters:
+  drop `NOT NULL` → backfill existing admin-tier rows to `NULL` → add
+  the CHECK (adding the CHECK first would fail immediately against
+  `admin@zenny.internal`'s then-still-set `client_id`). Pre-backfill
+  value logged here for rollback reference: `admin@zenny.internal`'s
+  `client_id` was `baa673b5-c51a-4a7b-91f5-a37027f8dca4` (Client A)
+  before this migration.
+- **Real, independent bug found during the audit, fixed same PR:**
+  `dashboard_admin_list_clients()`'s login-email lookup
+  (`WHERE du.client_id = c.client_id ORDER BY du.created_at ASC LIMIT
+  1`) had no role filter — it could show an admin's email as if it were
+  a client's login, if the admin's (then-required) `client_id` was older
+  than the client's real login. Added `AND du.role = 'client_user'` to
+  the lateral join.
+- **Edge Function:** `create_admin` no longer reads/validates any
+  client-id field at all — it passes `p_client_id: null` to
+  `dashboard_provision_user` directly. `map_existing`/`create_client`
+  untouched (they already always paired a real `client_id` with
+  `role='client_user'`).
+- **UI:** `AddAdminTab` lost the client picker entirely (just email +
+  tier). The 3 tabs are now visually grouped — Clients/Add
+  Client/Add Login under one label, Add Admin under a separate
+  "Internal accounts" label — so a client-facing action and an
+  internal-staff action don't read as equivalent options.
+- **Deliberately deferred, not done here** (Codex outside-voice
+  cross-model tension, human-resolved): a shared `useProvisionForm` hook
+  across the 3 tabs (DRY, but touches 2 already-working tabs with zero
+  test coverage) — tracked in `TODOS.md`. Also deferred: explicit
+  role-guard hardening on `dashboard_get_my_client()` and its 3 siblings
+  (currently reject admins only incidentally, via NULL-join failure —
+  correct today, just not explicit), and the "oldest client_user wins"
+  ambiguity for a client with 2+ logins (no client has hit this) — both
+  logged in `TODOS.md`.
+- **CRITICAL security fix, found by adversarial review during `/review`,
+  same PR:** neither `map_existing` nor `create_client`'s remap path
+  (`existing` + `remap:true` + matching `confirm_auth_user_id`) checked
+  the TARGET account's current role before remapping it —
+  `dashboard_provision_user`'s upsert has no notion of "current role", it
+  just overwrites `client_id`/`role` unconditionally. Since both actions'
+  caller gate only requires `admin`/`super_admin` (not `super_admin`
+  specifically), any plain `admin` could silently demote the platform's
+  ONLY `super_admin` to a `client_user` in a 409-then-remap round trip —
+  confirmed live-exploitable against the real `admin@zenny.internal`
+  account before the fix (reproduced safely against disposable test
+  accounts, not the real one). **Fixed:** a shared
+  `rejectIfTargetIsAdminTier()` guard, checked before either action's
+  remap-confirmation flow, blocks remapping any account whose current
+  role isn't already `client_user`. Routes through a new
+  `dashboard_get_user_role()` `SECURITY DEFINER` RPC (service_role-only)
+  rather than a direct table read — hit the exact same
+  `service_role`-has-no-grants-on-`dashboard_users` bug this project has
+  now hit 3 times (Bootstrap card's audit-column write, this). Live
+  re-verified: the exact attack (disposable attacker-admin account
+  targeting a disposable victim-admin account) now gets a clean 403
+  `CANNOT_REMAP_ADMIN_TIER`, the victim's row is unchanged, and the
+  legitimate `map_existing` happy path (a genuine `client_user` email)
+  is unaffected.
+- **Live-verified:** the strict CHECK (nullable + constraint confirmed
+  via `information_schema`/`pg_constraint`); the list-view regression
+  (all 6 real clients' login emails unchanged after the role-filter
+  edit); `create_admin` end-to-end via curl with a real super_admin JWT
+  (no client field, `client_id` NULL on the created row); the
+  `dashboard_provision_user` pairing stays consistent across a real
+  remap; `map_existing` and the `SUPER_ADMIN_REQUIRED` gate both
+  regression-checked and unaffected; the UI itself via `gstack /browse`
+  against a local dev server pointed at the live backend (all 3 tabs,
+  zero console errors). All synthetic test accounts cleaned up after,
+  zero leftover confirmed. Full narrative:
+  `docs/designs/admin-provision-client-picker-fix.md`,
+  `Wiki/log.md` session-admin-provision-client-picker-fix-shipped.

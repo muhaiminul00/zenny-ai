@@ -317,41 +317,6 @@ accounts exist)
 **Depends on:** Loosely related to the `control.clients.status`
 lifecycle TODO above; not blocking, could ship independently.
 
-### Admin Provisioning UI: "Add Admin" shouldn't require picking a client
-
-**What:** `AdminProvision.tsx`'s Add Admin tab requires selecting a
-"nominal home client" from a dropdown before it'll create an
-admin/super_admin account, even though that client has zero functional
-relationship to the admin being created.
-
-**Why:** `control.dashboard_users.client_id` is `NOT NULL` — the table
-was designed for one row per login mapping a login to the client it
-belongs to. Admin accounts don't belong to any client, so Bootstrap's
-`create_admin` action worked around the constraint by requiring an
-arbitrary existing client row just to satisfy the FK, rather than giving
-admin rows a real "no client" path. Human feedback (2026-09-02, live
-testing the shipped feature): the flow should just be email + temp
-password + tier — no client picker at all. Agreed, this is a schema
-wart, not intentional design.
-
-**Context:** Real fix: make `dashboard_users.client_id` nullable, add a
-CHECK constraint requiring it non-null only when `role='client_user'`,
-then drop the "nominal home client" picker from `AddAdminTab` and the
-`admin_client_id` requirement from the Edge Function's `create_admin`
-action. Touches a migration + Edge Function + UI — dedicated work, not
-a quick UI tweak; human explicitly deferred rather than asking for it
-inline. Separately, the same session's feedback flagged the three tabs
-(Add Client / Add Login / Add Admin) as visually reading like equivalent
-options when they're conceptually different (new business vs. second
-login on an existing business vs. an internal admin account) — worth
-a labeling/layout pass in the same dedicated session, not a second card.
-
-**Effort:** S-M (one migration + one Edge Function branch removed + one
-form simplified)
-**Priority:** P3 (cosmetic/UX correctness, not a security or data-
-integrity issue — the current workaround is harmless, just confusing)
-**Depends on:** None.
-
 ### Client-only RPCs reject admin callers only incidentally, not explicitly
 
 **What:** `dashboard_get_my_client()`, `dashboard_get_my_client_schema()`,
@@ -445,7 +410,88 @@ in the same file.
 
 ## Security
 
+### `AddAdminTab`'s remap-confirm shows no context about the account being reassigned
+
+**What:** When `create_admin` returns `USER_EXISTS` (an account with that
+email already exists), the confirm-remap UI shows only the generic
+duplicate-email message — never the target account's current role or
+client. The operator clicks "Confirm — reassign this existing account"
+with no visibility into what they're actually about to change.
+
+**Why:** Surfaced by Claude's adversarial review during the Add-Admin
+client-picker fix's `/review` pass (2026-09-02). Combined with that
+fix's own simplification (Add Admin is now just email + tier, nothing
+else to double-check), a typo'd email is easier to remap by accident
+than before. The Edge Function already fetches the target's
+`auth_user_id` on the 409 — a small addition (also return current
+role/client) lets the UI show "you are about to reassign
+`carmelli.zennyai@gmail.com` (currently: client_user @ Carmelli
+Bakery) to admin" before the irreversible-feeling click.
+
+**Context:** Not a security hole on its own — the server-side
+`CANNOT_REMAP_ADMIN_TIER` guard (added same PR) already blocks the
+one genuinely dangerous case (demoting an existing admin/super_admin).
+This is an operator-safety/UX improvement for the remaining legitimate
+case (promoting an existing client_user to admin via `create_admin`).
+
+**Effort:** S (Edge Function: return 2 more fields on the 409; UI: render them)
+**Priority:** P3
+**Depends on:** None.
+
+### `admin-provision-dashboard-user`'s CORS wildcard + plaintext password in response body
+
+**What:** The Edge Function sets `Access-Control-Allow-Origin: "*"` and
+returns `initial_password` in plaintext in its JSON response body on a
+successful account creation.
+
+**Why:** Surfaced by Claude's adversarial review during the Add-Admin
+client-picker fix's `/review` pass (2026-09-02) — pre-existing since
+Card2a, not introduced by that fix, but worth a second look now that
+this fix lowers the bar to script `create_admin` calls (fewer required
+fields). Exploitability is limited today: a cross-origin page cannot
+forge the caller's bearer JWT into the `Authorization` header, so the
+wildcard CORS alone doesn't let an attacker's page call this function
+as a real admin. Not urgent, but a wildcard CORS on a function that
+returns a plaintext credential is worth tightening on general
+principle.
+
+**Context:** Real fix is narrowing `Access-Control-Allow-Origin` to the
+actual dashboard origin(s) instead of `*` — same pattern this project
+would want to eventually apply project-wide if it ever audits all Edge
+Functions' CORS configs (none currently restrict origin, confirmed via
+Card2a-era `CORS_HEADERS` being copy-pasted across functions).
+
+**Effort:** S (one header value change, verify the real dashboard
+origin(s) first)
+**Priority:** P3 (limited exploitability today, but cheap to fix)
+**Depends on:** None.
+
 ## Completed
+
+### Admin Provisioning UI: "Add Admin" shouldn't require picking a client — CLOSED (2026-09-02)
+
+**What it was:** `AdminProvision.tsx`'s Add Admin tab required selecting a
+"nominal home client" from a dropdown before it'd create an
+admin/super_admin account, even though that client had zero functional
+relationship to the admin being created — a workaround for
+`dashboard_users.client_id`'s old `NOT NULL` constraint.
+
+**How it was closed:** `client_id` made nullable with a strict CHECK
+(`client_user` requires it, `admin`/`super_admin` must be NULL);
+`create_admin`'s Edge Function branch and `AddAdminTab` both simplified
+to drop the client field entirely; the 3 provisioning tabs visually
+regrouped (client actions vs. "Internal accounts"). Live-verified end to
+end (schema, curl against a real super_admin JWT, browser click-through).
+Bonus finding fixed in the same pass: a real, independent role-filter gap
+in `dashboard_admin_list_clients()`'s login lookup. **Also found and
+fixed, more severe than the original ask:** a CRITICAL pre-existing
+vulnerability where any `admin`-tier caller could silently demote the
+platform's only `super_admin` via `map_existing`/`create_client`'s remap
+paths — found by adversarial review, confirmed live-exploitable, fixed
+and re-verified before merge. Full detail:
+`docs/designs/admin-provision-client-picker-fix.md`,
+`Wiki/infra/dashboard-auth-mapping.md`.
+**Completed:** PR #12 (2026-09-02)
 
 ### Admin-minting has no extra gate — CLOSED (Admin Provisioning Bootstrap, 2026-09-02)
 

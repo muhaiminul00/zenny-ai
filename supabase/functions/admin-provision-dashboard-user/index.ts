@@ -62,8 +62,9 @@ interface RequestBody {
   // create_client
   business_name?: string;
   billing_tier?: string;
-  // create_admin
-  admin_client_id?: string;
+  // create_admin has no fields of its own -- admin/super_admin accounts
+  // never have a client (see Admin Provisioning UI client-picker fix,
+  // 2026-09-02); it only needs `role` (above) + the shared fields.
 }
 
 // Finds an existing Auth user by email. Supabase's Admin API has no
@@ -81,6 +82,43 @@ async function findUserByEmail(
     if (found) return found;
     if (pageData.users.length < 1000) return undefined;
   }
+}
+
+// Security guard shared by map_existing and create_client's remap paths
+// (client-picker fix PR, adversarial review): both actions can remap an
+// EXISTING auth user to role='client_user' via a 409-then-remap round
+// trip, and dashboard_provision_user's upsert has no notion of "current
+// role" -- it just overwrites both client_id and role unconditionally.
+// Neither action's own caller gate requires super_admin specifically (both
+// accept plain 'admin'), so without this check any 'admin' could silently
+// strip the platform's only super_admin (or any admin) down to a client
+// login in two API calls. Returns a 403 Response if the target is
+// currently admin-tier, otherwise null (caller proceeds normally).
+//
+// Routes through dashboard_get_user_role() (SECURITY DEFINER,
+// service_role-only) rather than a direct table select -- control.
+// dashboard_users has ZERO service_role table grants (unlike
+// control.clients), confirmed live: a direct .schema("control")
+// .from("dashboard_users").select() 500s with "permission denied for
+// table dashboard_users" even under the service-role key. Same pattern
+// as dashboard_provision_user/dashboard_set_provisioning_audit.
+async function rejectIfTargetIsAdminTier(
+  supabase: ReturnType<typeof createClient>,
+  targetAuthUserId: string,
+): Promise<Response | null> {
+  const { data: targetRole, error: targetErr } = await supabase.rpc("dashboard_get_user_role", {
+    p_auth_user_id: targetAuthUserId,
+  });
+  if (targetErr) return jsonResponse(500, { error: { code: "TARGET_LOOKUP_FAILED", message: targetErr.message } });
+  if (targetRole && targetRole !== "client_user") {
+    return jsonResponse(403, {
+      error: {
+        code: "CANNOT_REMAP_ADMIN_TIER",
+        message: "This account is currently admin-tier. It cannot be remapped to a client login through this action.",
+      },
+    });
+  }
+  return null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -190,6 +228,16 @@ Deno.serve(async (req: Request) => {
       if (!clientRow) return jsonResponse(400, { error: { code: "INVALID_CLIENT_ID", message: "No such client" } });
 
       const existing = await findUserByEmail(supabase, email);
+
+      // Security fix (client-picker fix PR, adversarial review): checked
+      // BEFORE the remap-confirmation flow below, not just at write time,
+      // so an admin-tier account is never even offered for remap through
+      // this path. See rejectIfTargetIsAdminTier's own comment for why.
+      if (existing) {
+        const rejection = await rejectIfTargetIsAdminTier(supabase, existing.id);
+        if (rejection) return rejection;
+      }
+
       if (existing && (!remap || confirmAuthUserId !== existing.id)) {
         return jsonResponse(409, {
           error: {
@@ -260,6 +308,15 @@ Deno.serve(async (req: Request) => {
 
       // Duplicate-email checked before ANY write (Issue 3 / T5 spec).
       const existing = await findUserByEmail(supabase, email);
+
+      // Security fix (client-picker fix PR, adversarial review): same guard
+      // as map_existing -- this action's remap path can also flip an
+      // existing admin/super_admin's row to client_user for a new client.
+      if (existing) {
+        const rejection = await rejectIfTargetIsAdminTier(supabase, existing.id);
+        if (rejection) return rejection;
+      }
+
       if (existing && (!remap || confirmAuthUserId !== existing.id)) {
         return jsonResponse(409, {
           error: {
@@ -352,23 +409,16 @@ Deno.serve(async (req: Request) => {
     }
 
     // action === "create_admin"
+    // Admin Provisioning UI client-picker fix (2026-09-02): admin/super_admin
+    // accounts never have a client -- dashboard_users.client_id is now
+    // nullable with a strict CHECK enforcing exactly that (see migration
+    // dashboard_users_client_id_role_check). No client lookup/validation
+    // needed here at all -- this branch used to require a "nominal home
+    // client" purely to satisfy the old NOT NULL constraint.
     const { role } = body;
-    const clientId = body.admin_client_id ?? body.client_id;
     if (!role || !CREATE_ADMIN_ROLES.includes(role)) {
       return jsonResponse(400, { error: { code: "INVALID_ROLE", message: `role must be one of: ${CREATE_ADMIN_ROLES.join(", ")}` } });
     }
-    if (!clientId || typeof clientId !== "string" || !UUID_RE.test(clientId)) {
-      return jsonResponse(400, { error: { code: "INVALID_CLIENT_ID", message: "admin_client_id (nominal home client) must be a UUID" } });
-    }
-
-    const { data: clientRow, error: clientErr } = await supabase
-      .schema("control")
-      .from("clients")
-      .select("client_id")
-      .eq("client_id", clientId)
-      .maybeSingle();
-    if (clientErr) return jsonResponse(500, { error: { code: "CLIENT_LOOKUP_FAILED", message: clientErr.message } });
-    if (!clientRow) return jsonResponse(400, { error: { code: "INVALID_CLIENT_ID", message: "No such client" } });
 
     const existing = await findUserByEmail(supabase, email);
     if (existing && (!remap || confirmAuthUserId !== existing.id)) {
@@ -403,7 +453,7 @@ Deno.serve(async (req: Request) => {
 
     const { error: provisionErr } = await supabase.rpc("dashboard_provision_user", {
       p_auth_user_id: authUserId,
-      p_client_id: clientId,
+      p_client_id: null,
       p_role: role,
     });
     if (provisionErr) {
@@ -424,7 +474,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return jsonResponse(200, {
-      result: { auth_user_id: authUserId, client_id: clientId, role, created, initial_password: initialPassword },
+      result: { auth_user_id: authUserId, client_id: null, role, created, initial_password: initialPassword },
     });
   } catch (e) {
     return jsonResponse(500, { error: { code: "UNEXPECTED", message: e instanceof Error ? e.message : String(e) } });

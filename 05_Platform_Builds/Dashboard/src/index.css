@@ -118,6 +118,35 @@ button.secondary:hover {
   max-width: 60ch;
 }
 
+/* Admin Provisioning: groups Clients (Clients/Add Client/Add Login) and
+   Internal accounts (Add Admin, super_admin-only) visually, so 3 tabs
+   about clients and 1 tab about staff accounts don't read as equivalent
+   options -- client-picker fix, 2026-09-02. */
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.tabs-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tabs-group-admin {
+  padding-left: 20px;
+  border-left: 1px solid var(--border);
+}
+
+.tabs-group-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
 /* Login */
 .login-page {
   display: flex;

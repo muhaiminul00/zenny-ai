@@ -100,26 +100,32 @@ export function AdminProvision() {
       <h2>Admin</h2>
 
       <nav className="tabs">
-        <button type="button" className={tab === 'clients' ? 'active' : ''} onClick={() => setTab('clients')}>
-          Clients
-        </button>
-        <button type="button" className={tab === 'add_client' ? 'active' : ''} onClick={() => setTab('add_client')}>
-          Add Client
-        </button>
-        <button type="button" className={tab === 'add_login' ? 'active' : ''} onClick={() => setTab('add_login')}>
-          Add Login (existing client)
-        </button>
-        {isSuperAdmin && (
-          <button type="button" className={tab === 'add_admin' ? 'active' : ''} onClick={() => setTab('add_admin')}>
-            Add Admin
+        <span className="tabs-group">
+          <span className="tabs-group-label">Clients</span>
+          <button type="button" className={tab === 'clients' ? 'active' : ''} onClick={() => setTab('clients')}>
+            Clients
           </button>
+          <button type="button" className={tab === 'add_client' ? 'active' : ''} onClick={() => setTab('add_client')}>
+            Add Client
+          </button>
+          <button type="button" className={tab === 'add_login' ? 'active' : ''} onClick={() => setTab('add_login')}>
+            Add Login
+          </button>
+        </span>
+        {isSuperAdmin && (
+          <span className="tabs-group tabs-group-admin">
+            <span className="tabs-group-label">Internal accounts</span>
+            <button type="button" className={tab === 'add_admin' ? 'active' : ''} onClick={() => setTab('add_admin')}>
+              Add Admin
+            </button>
+          </span>
         )}
       </nav>
 
       {tab === 'clients' && <ClientsTab clients={clients} listError={listError} />}
       {tab === 'add_client' && <AddClientTab onDone={loadClients} />}
       {tab === 'add_login' && <AddLoginTab clients={clients} />}
-      {tab === 'add_admin' && isSuperAdmin && <AddAdminTab clients={clients} />}
+      {tab === 'add_admin' && isSuperAdmin && <AddAdminTab />}
     </div>
   );
 }
@@ -345,18 +351,17 @@ function AddLoginTab({ clients }: { clients: ClientRow[] | null }) {
   );
 }
 
-function AddAdminTab({ clients }: { clients: ClientRow[] | null }) {
+function AddAdminTab() {
   const [email, setEmail] = useState('');
   const [adminRole, setAdminRole] = useState<'admin' | 'super_admin'>('admin');
-  const [homeClientId, setHomeClientId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [needsRemapConfirm, setNeedsRemapConfirm] = useState<{ auth_user_id: string } | null>(null);
   const [success, setSuccess] = useState<{ auth_user_id: string; created: boolean; initial_password?: string } | null>(null);
 
   const submit = async (remap: boolean) => {
-    if (!email || !homeClientId) {
-      setFormError('Email and a nominal home client are both required (dashboard_users always maps to one client row).');
+    if (!email) {
+      setFormError('Email is required.');
       return;
     }
     setSubmitting(true);
@@ -367,7 +372,6 @@ function AddAdminTab({ clients }: { clients: ClientRow[] | null }) {
         action: 'create_admin',
         email,
         role: adminRole,
-        admin_client_id: homeClientId,
         remap,
         confirm_auth_user_id: remap ? needsRemapConfirm?.auth_user_id : undefined,
       },
@@ -391,8 +395,8 @@ function AddAdminTab({ clients }: { clients: ClientRow[] | null }) {
   return (
     <div>
       <p className="note">
-        super_admin only. An admin/super_admin account has no client of its own to view — the client below is only
-        the row dashboard_users requires a mapping for.
+        super_admin only. An admin/super_admin account has no client of its own to view — no client selection
+        needed (dashboard_users.client_id is NULL for every admin-tier account).
       </p>
       <form
         onSubmit={(e) => {
@@ -417,19 +421,6 @@ function AddAdminTab({ clients }: { clients: ClientRow[] | null }) {
           <select value={adminRole} onChange={(e) => setAdminRole(e.target.value as 'admin' | 'super_admin')}>
             <option value="admin">admin</option>
             <option value="super_admin">super_admin</option>
-          </select>
-        </label>
-        <label>
-          Nominal home client
-          <select value={homeClientId} onChange={(e) => setHomeClientId(e.target.value)} required>
-            <option value="" disabled>
-              Select a client…
-            </option>
-            {clients?.map((c) => (
-              <option key={c.client_id} value={c.client_id}>
-                {c.business_name}
-              </option>
-            ))}
           </select>
         </label>
         {formError && <p className="error-text">{formError}</p>}
