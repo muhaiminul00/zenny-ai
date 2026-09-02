@@ -19,7 +19,9 @@ cut content were relocated to `TODOS.md` rather than silently dropped.
 
 ## Last Updated
 
-2026-09-02 (latest) — by /commander — **BC-076-Card3 `/plan-eng-review` CLEARED, scope narrowed from the original 4-leg blueprint framing to 2.** Live verification found the "4 equivalent ingestion legs" premise was wrong: generalized-Notion already has active daily infra (INT-012/SCH-004) but silently upserts into the wrong Pinecone index (`zenny-email-kb`, not `zenny-business-kb`) and lacks Card2b/2c's hardening — split out as Card 3b, not built now. Baserow turned out to mean hosting a real self-hosted instance (per the blueprint's own "embedded" framing), not collecting a client credential — split out as Card 3c. **Card 3 itself = Shopify + WooCommerce ingestion only**, built via a newly-extracted shared generic ingestion core (pulled out of the shipped `KR0kHvk3kJRThrX5` Sheets workflow, to stop the exact drift that broke Notion from happening again). Codex outside-voice caught Shopify's REST product API is 2026-legacy (locked GraphQL instead) and forced a much richer product-serialization shape (SKU/URL/category/tags/vendor/stock, not just title+price). 6 decisions locked (D24-D29), 1 new `TODOS.md` item (webhook-driven incremental sync, future). Full spec + 9-task implementation plan: `docs/designs/zenny-launch-blueprint.md` (eighth pass). Full detail: `Wiki/log.md` session-bc076-card3-eng-review.
+2026-09-02 (latest) — by /execute — **BC-076-Card3 SHIPPED: Shopify + WooCommerce KB ingestion built and live-verified end to end.** New shared `Generic KB Ingestion Core` (D25) extracted from `KR0kHvk3kJRThrX5`; new Shopify (GraphQL Admin API, D28) and WooCommerce (REST) fetch/normalize workflows, both calling the shared core; `SCH-004`'s dispatcher extended with 2 new routing branches. **Real bug found and fixed live (not by static validation):** `get_client_connection`'s `p_category` filters on a functional grouping (`'ecommerce'`), not the provider name — both new workflows initially passed the wrong value, fixed after UTIL-006 correctly rejected a real connected account. **Real, independently-verified proof:** 14 real Shopify products fetched from Carmelli Bakery's live store, embedded, and upserted (Pinecone `describe-index-stats` confirmed 28→42 records); a real `Search_business_kb` webhook call returned the exact seeded Shopify content; cross-tenant isolation re-confirmed (Client A sees none of it). **WooCommerce's known-flaky test store reproduced live** (non-JSON response) — the ingestion code correctly degraded safely (zero vectors written, no corruption), but a genuine successful WooCommerce sync remains unproven for lack of a working test store (tracked in `TODOS.md`). One design gap found and fixed in the same pass: a failed read and a genuinely empty source were both reported as `status:'success'` — now `status:'failed'` when a read didn't complete and produced zero rows. Sheets (`KR0kHvk3kJRThrX5`) was deliberately NOT migrated to call the new shared core this pass (real refactor risk on shipped code) — tracked as its own `TODOS.md` follow-up. Full detail: `Wiki/log.md` session-bc076-card3-shipped, `06_Infrastructure/n8n/Workflow_Registry.md`.
+
+2026-09-02 (prior) — by /commander — **BC-076-Card3 `/plan-eng-review` CLEARED, scope narrowed from the original 4-leg blueprint framing to 2.** Live verification found the "4 equivalent ingestion legs" premise was wrong: generalized-Notion already has active daily infra (INT-012/SCH-004) but silently upserts into the wrong Pinecone index (`zenny-email-kb`, not `zenny-business-kb`) and lacks Card2b/2c's hardening — split out as Card 3b, not built now. Baserow turned out to mean hosting a real self-hosted instance (per the blueprint's own "embedded" framing), not collecting a client credential — split out as Card 3c. **Card 3 itself = Shopify + WooCommerce ingestion only**, built via a newly-extracted shared generic ingestion core (pulled out of the shipped `KR0kHvk3kJRThrX5` Sheets workflow, to stop the exact drift that broke Notion from happening again). Codex outside-voice caught Shopify's REST product API is 2026-legacy (locked GraphQL instead) and forced a much richer product-serialization shape (SKU/URL/category/tags/vendor/stock, not just title+price). 6 decisions locked (D24-D29), 1 new `TODOS.md` item (webhook-driven incremental sync, future). Full spec + 9-task implementation plan: `docs/designs/zenny-launch-blueprint.md` (eighth pass). Full detail: `Wiki/log.md` session-bc076-card3-eng-review.
 
 2026-09-02 (prior) — by /commander — **Admin-provisioning redesign `/plan-eng-review` CLEARED.** Extends BC-076-Card2a's admin panel: Add Client (creates a new client login + `unprovisioned`-status shell row, not just mapping to an existing one), Add Admin gated by a new `super_admin` tier (closes the accepted admin-minting risk), a client list view, forced password-change on first login. Live verification found `control.clients.archetype`/`client_schema_name` are NOT NULL (blocks a literal shell row — resolved: loosen both, audit consumers) and that a schema-cloning function (`create_client_schema_from_template`) already exists but is dead/unverified code (explicitly NOT used by this card). Codex outside-voice raised 2 real tensions, both resolved with human sign-off. 6 findings total, all resolved; 2 new `TODOS.md` items (client-status lifecycle is broken; the schema-clone function needs validation before anything trusts it). Full spec + 9-task implementation plan: `docs/designs/admin-provisioning-redesign-bootstrap.md`. Human-confirmed sequencing: BC-076 Card 3 builds first, this Build Card second. Full detail: `Wiki/log.md` session-admin-provisioning-redesign-eng-review.
 
@@ -30,6 +32,7 @@ cut content were relocated to `TODOS.md` rather than silently dropped.
 2026-09-02 (prior) — by /commander — **gstack-pilot v1.6.1 confirmed live for this project.** Human ran `/plugin update gstack-pilot@gstack-pilot`; verified via `~/.claude/plugins/installed_plugins.json` that this project's entry now resolves `installPath`/`version` to `1.6.1`. The mode.json-handback deadlock fix (T7.2) is in effect going forward — no further action needed on it. Also: the image-based product search request from BC-076-Card2b (correctly scoped out at the time, but never actually written down) is now tracked in `TODOS.md`. Full detail: `Wiki/log.md` session-gstack-pilot-v1.6.1-plugin-update-confirmed.
 
 **Recent history (last ~2 weeks), full narrative in `Wiki/log.md` by slug:**
+- `session-bc076-card3-shipped` — Shopify+WooCommerce KB ingestion built and live-verified; a real `category`-param bug found and fixed live; WooCommerce's known-flaky test store reproduced (safe degrade confirmed, success unproven).
 - `session-bc076-card3-eng-review` — `/plan-eng-review` CLEARED for BC-076 Card 3, scope narrowed to Shopify+WooCommerce only; Notion fix and Baserow infra split out as Card 3b/3c.
 - `session-admin-provisioning-redesign-eng-review` — `/office-hours` design doc + `/plan-eng-review` CLEARED for the admin-panel redesign (Add Client/Add Admin/super_admin tier/client list); queued after BC-076 Card 3.
 - `session-repo-rename-and-doc-cleanup` — repo renamed `zenny-producition-sync` → `zenny-ai`, stale git remote + VPS clone URL fixed, `Claude_Build_Command_Protocol_v2.md` removal's dangling doc pointers cleaned up.
@@ -54,13 +57,13 @@ cut content were relocated to `TODOS.md` rather than silently dropped.
 stopped the Convocore service and committed to its own n8n+Supabase
 infrastructure (2026-08-29). Shipped so far: BC-072 (shared runtime
 foundation), BC-073/074/075 (commerce-ecom/appointment/consultation
-archetype nodes), BC-076 Cards 1/2a/2b/2c (business-memory KB tool +
+archetype nodes), BC-076 Cards 1/2a/2b/2c/3 (business-memory KB tool +
 dashboard OAuth fix + admin provisioning + Sheets ingestion + rename-
-safety fix — all live-verified), BC-077/078 (migrated tooling from
-`role-modes` to `gstack-pilot`, safe-gate reconciled). **Next: BC-076
-Card 3** (remaining ingestion legs: Shopify/WooCommerce/Baserow/
-generalized Notion, buildable now against the two existing connected
-test clients) and Card 4 (canary/smoke-test, parallel with Card 3).
+safety fix + Shopify/WooCommerce ingestion — all live-verified),
+BC-077/078 (migrated tooling from `role-modes` to `gstack-pilot`,
+safe-gate reconciled). **Next: BC-076 Card 4** (canary/smoke-test) —
+Cards 3b (Notion fix) and 3c (Baserow infra) are real follow-ups, each
+needing their own `/plan-eng-review` pass before a Build Card.
 Target architecture docs: `05_Platform_Builds/Zenny_SaaS/`
 MultiNode Runtime v1.0 + Channel Adapter v2.0. Full record:
 `docs/designs/zenny-saas-runtime-pivot.md`,
@@ -92,9 +95,19 @@ including the module-by-module status table as it stood at pause time:
   directions (admin-only view; non-admin blocked from admin routes).
 - **Dashboard "Disconnect" flow** — ✅ working again; the real bug was a
   3-week-stale container deployment, not a code defect (BC-076-Card2a).
-- Remaining ingestion legs (Shopify/WooCommerce/Baserow/generalized
-  Notion) — not yet built, BC-076 Card 3. Buildable now against two
-  real connected test clients — see Test-Client Roster below.
+- **Shopify KB ingestion** (`a7VNICxO5vPAp034`) — ✅ working, published,
+  live-verified against Carmelli Bakery's real store (14 products,
+  real `Search_business_kb` retrieval proof) — BC-076-Card3.
+- **WooCommerce KB ingestion** (`omhitVMzXB5jXE8A`) — ✅ built, published,
+  fails safely against real (broken) test data — BC-076-Card3. A
+  genuine successful sync is unproven; Client A's only test store is
+  known-flaky (`TODOS.md`).
+- **Generic KB Ingestion Core** (`XxkqBACpoJiifl0T`) — ✅ working, shared
+  by Shopify/WooCommerce; Sheets (`KR0kHvk3kJRThrX5`) not yet migrated
+  to it (disclosed scope trim, `TODOS.md`) — BC-076-Card3.
+- Baserow (Card 3c) and the Notion leg's wrong-Pinecone-index fix
+  (Card 3b) — not yet built, real live-verified findings, each needs
+  its own `/plan-eng-review` pass before a Build Card.
 
 Pre-pivot module status (Core Agent, Growth Agent, Conversion Engine,
 Recovery Engine, Email Manager, Dashboard 5B/5C, Credentials Platform,
@@ -140,22 +153,22 @@ Client E (old): e5f6a7b8-0001-4c1d-9e2a-000000000005 — engagement — client_t
 
 ## Next
 
-**BC-076 Card 3, build-ready** (Shopify + WooCommerce ingestion only —
-narrowed from the original 4-leg framing, see Last Updated above).
-`/plan-eng-review` CLEARED 2026-09-02, full spec + 9-task implementation
-plan at `docs/designs/zenny-launch-blueprint.md`'s eighth-pass GSTACK
-REVIEW REPORT. Ready to hand to Execute. Card 4 (canary/smoke-test) can
-run in parallel.
+**BC-076 Card 3 — SHIPPED** (Shopify + WooCommerce ingestion, see Last
+Updated above for the full live-verification summary). Card 4
+(canary/smoke-test) can now run against real, KB-populated test
+clients.
 
-**New follow-ups from this pass, tracked not dropped:**
+**Follow-ups from Card 3, tracked not dropped:**
 - **Card 3b** (Notion leg fix — re-point INT-012 to `zenny-business-kb`,
   add D19/D20-style hardening) — real, live-verified finding; not yet
   specced, needs its own `/plan-eng-review` pass.
 - **Card 3c** (embedded Baserow — new self-hosted infra + client-facing
   catalog UI, then its ingestion leg) — not yet specced, needs its own
   `/plan-eng-review` pass.
+- Migrate Sheets ingestion to the shared Generic Ingestion Core, and get
+  a real working WooCommerce test store — both in `TODOS.md`.
 
-**Queued after Card 3:** the admin-provisioning redesign —
+**Queued next:** the admin-provisioning redesign —
 `/plan-eng-review` CLEARED 2026-09-02, full spec + 9-task implementation
 plan at `docs/designs/admin-provisioning-redesign-bootstrap.md`. Adds
 Add Client/Add Admin tabs, a `super_admin` tier (closes the accepted

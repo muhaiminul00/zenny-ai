@@ -2,6 +2,60 @@
 
 ## Infrastructure
 
+### Migrate Sheets KB Ingestion to call the shared Generic Ingestion Core
+
+**What:** `KR0kHvk3kJRThrX5` (Sheets KB Ingestion) still contains its own copy of
+the chunk/embed/upsert/orphan-cleanup logic — the exact logic BC-076-Card3's
+`Zenny Runtime - Generic KB Ingestion Core` (D25) extracted FROM it, for
+Shopify/WooCommerce to reuse. Sheets itself was deliberately NOT migrated to
+call the new shared core, a disclosed scope trim, not an oversight.
+
+**Why:** Two copies of the same hardening logic (D19/D20/D24-D32) is exactly
+the drift risk this project already lived through once — the Notion leg
+(BC-047-era INT-012) silently fell behind the same pattern and had to be
+rediscovered as broken. Migrating Sheets closes that gap for real, leaving
+one canonical implementation instead of two that can drift apart.
+
+**Context:** Not done in Card3 because it means refactoring a shipped,
+working production workflow with real regression risk — Codex's own
+recommendation for exactly this refactor: freeze/export the current Sheets
+workflow before changing it (n8n's built-in version history already covers
+this, per Card3's own T1), then dual-run the new call-the-core version
+against the same real sheet and diff vector IDs/chunk counts/metadata before
+trusting it, not just "looks the same."
+
+**Effort:** S-M (the logic already exists and is proven; this is a rewiring
++ regression-verification task, not new design)
+**Priority:** P2 (closes a real, already-once-materialized drift risk)
+**Depends on:** None technically; BC-076-Card3 (this TODO's origin) already shipped.
+
+### Get a real, working WooCommerce test store
+
+**What:** Client A's only WooCommerce connection (`zenny-woocom.free.je`) is
+a known-flaky free-tier host that returns non-JSON responses to real API
+calls — confirmed again, live, during BC-076-Card3's first end-to-end test
+of the new WooCommerce KB ingestion leg (a real `Fetch WooCommerce Products`
+call got back "Response body is not valid JSON").
+
+**Why:** The WooCommerce ingestion *mechanism* (fetch, normalize, shared-core
+ingest) is built and verified to fail safely against this broken store — but
+a genuine SUCCESSFUL WooCommerce sync has never been proven end-to-end,
+because no working test store exists. This is the same gap
+`Wiki/credentials/woocommerce.md` already disclosed before Card3 started;
+Card3 just re-confirmed it's still true.
+
+**Context:** Needs either a real client's actual WooCommerce store connected
+(once one exists) or a genuinely working free/sandbox WooCommerce install
+provisioned deliberately for testing — not something to build around with
+more defensive code, since the code already degrades safely; what's missing
+is a real target to point it at.
+
+**Effort:** S (once a working store exists) — the ingestion code doesn't
+need to change, only be pointed at something real
+**Priority:** P2 (blocks ever confirming the WooCommerce leg actually works,
+not just that it fails safely)
+**Depends on:** A real or sandbox WooCommerce store becoming available.
+
 ### Periodic cross-source Pinecone orphan audit
 
 **What:** A scheduled job that lists every `client_kb_source`'s vectors in
