@@ -9,6 +9,64 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-09-02] session-repo-rename-and-doc-cleanup
+
+Repo-hygiene housekeeping, human-directed, before starting BC-076 Card 3.
+Three independent items:
+
+1. **`Claude_Build_Command_Protocol_v2.md` removed** (human's own action,
+   672 lines). Checked whether any Standing Rule in root `CLAUDE.md`
+   still depended on it for real substance before deciding how to
+   handle the 4 dangling pointers found (Mandatory MCP Verification,
+   Credential Gate, Branch/PR Workflow, Repo Notes) — confirmed via
+   Document Resolution Authority that every one of those rules already
+   carries its own full detail inline in `CLAUDE.md`, so nothing
+   substantive was lost. Stripped the dangling "Full detail: ..."
+   pointer sentences, added one explicit note in Repo Notes recording
+   the removal and why it's safe. The `coward-simentic-search` folder
+   the human also removed had zero references anywhere in the repo —
+   nothing to clean up there.
+2. **GitHub repo renamed live:** `zeromanualai/zenny-producition-sync`
+   → `muhaiminul00/zenny-ai` (ownership had already moved to
+   `muhaiminul00` before this session; this session did the actual
+   rename, fixing the "producition" typo in the same move, via
+   `gh repo rename`, live-verified with `gh repo view` before and
+   after). Local `origin` remote was stale even before the rename
+   (still pointed at the pre-transfer `zeromanualai` URL) — the human
+   fixed it directly (`git remote set-url`, blocked for Claude by the
+   permission classifier), re-verified live here with a real
+   `git fetch origin main` against the new URL. Doc references to the
+   old URL fixed in `CLAUDE.md` (Standing Rule — Branch/PR Workflow)
+   and `docs/designs/zenny-saas-runtime-pivot.md`; `Wiki/log.md`'s own
+   historical entries mentioning the old name are left untouched (true
+   when written) per the Wiki's own historical-record rule.
+3. **Live-infra fragility found and fixed, not just flagged:** the
+   `zenny-dashboard` Docker Compose project on Hostinger VPS
+   `srv1881104` had the OLD repo URL hardcoded literally in its
+   `git clone` command — confirmed live via
+   `VPS_getProjectContentsV1` before assuming. Left as-is, this would
+   have silently broken on a future restart once GitHub's
+   rename/transfer redirect eventually lapsed. Fixed with human
+   approval (asked explicitly before touching a live production
+   container, same as BC-076-Card2a's restart precedent): pushed an
+   updated compose file via `VPS_createNewProjectV1` with the corrected
+   `muhaiminul00/zenny-ai` clone URL, then live-verified the container
+   actually came back up serving real traffic (`curl
+   https://dashboard.zeromanuals.com/` → `200`, confirmed via a
+   polling Monitor rather than assumed from the deploy action's own
+   "success" status alone).
+
+Doc-only diff in this repo (CLAUDE.md, docs/designs/zenny-saas-runtime-
+pivot.md, deletion of Claude_Build_Command_Protocol_v2.md) — no
+application code/workflow riding along, so shipped direct-to-`main`
+under the existing trivial-housekeeping exemption rather than a full
+PR. The GitHub rename and VPS redeploy are outside this repo's own git
+history by nature (platform/infra actions, not file changes) but are
+the substantive part of this session's work — recorded here, not
+silently folded into "just a doc commit."
+
+---
+
 ## session-bc076-card2a-dashboard-oauth-shipped (2026-09-02, same day as BC-079)
 
 BC-076-Card2a: both open unknowns from the blueprint resolved via real

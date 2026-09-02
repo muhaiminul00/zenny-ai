@@ -172,8 +172,7 @@ Before executing any Build Card, verify the specific node, capability,
 or field it depends on directly against the live n8n MCP / Supabase MCP
 connection — not recited from a frozen architecture document. Scoped to
 the one capability the current Build Card needs, not a full platform
-audit every session. Full detail: `Claude_Build_Command_Protocol_v2.md`
-Section 6.1.
+audit every session.
 
 ---
 
@@ -192,7 +191,7 @@ integration.
 Never create or invent a credential. If a Build Card needs one: build
 every non-secret field, leave the credential empty or use the agreed
 placeholder pattern, stop and report exactly what's required. Human
-adds it, you resume. Full detail: Protocol v2 Section 8.
+adds it, you resume.
 
 ---
 
@@ -302,9 +301,11 @@ At the END of every session, before ending:
    sections (overwrite, don't append) and/or the relevant Wiki page(s).
 2. Commit the full repo via real git commands (not any MCP git tool),
    add/commit/push to `origin` (renamed from `zenny-sync` 2026-08-29 —
-   see Standing Rule — Branch/PR Workflow below for why). Trivial
-   Wiki/log/PROJECT_STATE-only wrap-up commits go direct-to-`main`, same
-   as always; substantive work follows the branch/PR flow instead.
+   see Standing Rule — Branch/PR Workflow below for why; the remote's
+   underlying GitHub repo was renamed again 2026-09-02, see that
+   section). Trivial Wiki/log/PROJECT_STATE-only wrap-up commits go
+   direct-to-`main`, same as always; substantive work follows the
+   branch/PR flow instead.
 3. Confirm in your final output that PROJECT_STATE.md/Wiki were updated
    and pushed — part of Definition of Done, not optional cleanup.
 
@@ -314,9 +315,16 @@ At the END of every session, before ending:
 
 Adopted 2026-08-29 so gstack's `/review`/`/ship` pipeline is actually
 usable, not just documented — both hard-require a remote literally
-named `origin` and a real branch-vs-base-branch diff. The remote
-(`github.com/zeromanualai/zenny-producition-sync`) was renamed
-`zenny-sync` → `origin` for this; nothing else about the remote changed.
+named `origin` and a real branch-vs-base-branch diff. The remote's
+local alias (`zenny-sync` → `origin`) was renamed for this; nothing
+else about the remote changed at the time.
+
+**The underlying GitHub repo itself was later renamed** (2026-09-02):
+ownership had already moved to `github.com/muhaiminul00`, and the repo
+was renamed `zenny-producition-sync` → `zenny-ai` (fixing the typo in
+the same move) — live now at `github.com/muhaiminul00/zenny-ai`. The
+local `origin` alias is unaffected by this; only the URL it points at
+changed.
 
 **Substantive work** (a Build Card's implementation, code/workflow
 changes, anything Execute builds against an approved scope): feature
@@ -343,8 +351,11 @@ Full narrative and the live end-to-end proof this actually works:
   never commit real secrets in `.mcp.json`/backups/any credential
   `.txt` file at root; `.gitignore` excludes these — check before every
   commit that nothing secret is staged.
-- Full governance model (Build Cards, Compliance Checklist, Change
-  Requests, Definition of Done): `Claude_Build_Command_Protocol_v2.md`.
+- `Claude_Build_Command_Protocol_v2.md` was removed 2026-09-02 (human
+  call) — its governance detail (Build Cards, Compliance Checklist,
+  Change Requests, Definition of Done) is not lost: every Standing Rule
+  above that used to point to it already carries its own full detail
+  inline in this file. No replacement document exists or is needed.
 ---
 #### ZeroManual · Zenny AI Workforce · CLAUDE.md v3.1 · BUILD PHASE
 
