@@ -137,7 +137,7 @@ button.secondary:hover {
 
 .tabs-group-admin {
   padding-left: 20px;
-  border-left: 1px solid var(--mist);
+  border-left: 1px solid var(--border);
 }
 
 .tabs-group-label {
