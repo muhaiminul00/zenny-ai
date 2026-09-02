@@ -411,6 +411,38 @@ actually gets created.
 **Priority:** P3 (no client has hit this yet)
 **Depends on:** None.
 
+### Extract a shared `useProvisionForm` hook for AdminProvision.tsx's 3 tabs
+
+**What:** `AddClientTab`, `AddLoginTab`, and `AddAdminTab` each hand-roll
+an identical ~40-line submit/remap/`needsRemapConfirm` state machine
+(the duplicate-email confirmation flow, error extraction, success
+banner). DRY violation, not introduced by any single card — it grew as
+each tab was added on top of the last.
+
+**Why:** Real repetition across 3 files doing the exact same thing.
+Originally scoped to be done as part of the Add-Admin client-picker fix
+(2026-09-02) — reconsidered after Codex's outside-voice review flagged
+it as scope creep: extracting the hook now would touch AddClientTab's
+and AddLoginTab's already-working code with zero automated test
+coverage as a safety net, for a fix whose actual bug was schema-level.
+Deferred to its own PR instead, where it can be reviewed and
+regression-tested on its own terms.
+
+**Context:** The extraction itself is straightforward (one
+`useProvisionForm({ action, extraFields })`-shaped hook covering
+`submitting`/`formError`/`needsRemapConfirm`/`success` state + the
+`extractFunctionError` call), but it must be tested against ALL 3 tabs'
+existing happy paths post-extraction (Add Client, Add Login, Add Admin
+all still work identically), not just the tab motivating the change —
+same Iron Rule regression discipline as any refactor of shipped code in
+a repo with no test framework.
+
+**Effort:** S (mechanical extraction, ~30min)
+**Priority:** P3 (real DRY debt, not urgent — 3 working tabs today)
+**Depends on:** None; cleanest done once the client-picker fix (above)
+has landed, so this refactor isn't racing a simultaneous behavior change
+in the same file.
+
 ## Security
 
 ## Completed
