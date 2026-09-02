@@ -445,6 +445,62 @@ in the same file.
 
 ## Security
 
+### `AddAdminTab`'s remap-confirm shows no context about the account being reassigned
+
+**What:** When `create_admin` returns `USER_EXISTS` (an account with that
+email already exists), the confirm-remap UI shows only the generic
+duplicate-email message — never the target account's current role or
+client. The operator clicks "Confirm — reassign this existing account"
+with no visibility into what they're actually about to change.
+
+**Why:** Surfaced by Claude's adversarial review during the Add-Admin
+client-picker fix's `/review` pass (2026-09-02). Combined with that
+fix's own simplification (Add Admin is now just email + tier, nothing
+else to double-check), a typo'd email is easier to remap by accident
+than before. The Edge Function already fetches the target's
+`auth_user_id` on the 409 — a small addition (also return current
+role/client) lets the UI show "you are about to reassign
+`carmelli.zennyai@gmail.com` (currently: client_user @ Carmelli
+Bakery) to admin" before the irreversible-feeling click.
+
+**Context:** Not a security hole on its own — the server-side
+`CANNOT_REMAP_ADMIN_TIER` guard (added same PR) already blocks the
+one genuinely dangerous case (demoting an existing admin/super_admin).
+This is an operator-safety/UX improvement for the remaining legitimate
+case (promoting an existing client_user to admin via `create_admin`).
+
+**Effort:** S (Edge Function: return 2 more fields on the 409; UI: render them)
+**Priority:** P3
+**Depends on:** None.
+
+### `admin-provision-dashboard-user`'s CORS wildcard + plaintext password in response body
+
+**What:** The Edge Function sets `Access-Control-Allow-Origin: "*"` and
+returns `initial_password` in plaintext in its JSON response body on a
+successful account creation.
+
+**Why:** Surfaced by Claude's adversarial review during the Add-Admin
+client-picker fix's `/review` pass (2026-09-02) — pre-existing since
+Card2a, not introduced by that fix, but worth a second look now that
+this fix lowers the bar to script `create_admin` calls (fewer required
+fields). Exploitability is limited today: a cross-origin page cannot
+forge the caller's bearer JWT into the `Authorization` header, so the
+wildcard CORS alone doesn't let an attacker's page call this function
+as a real admin. Not urgent, but a wildcard CORS on a function that
+returns a plaintext credential is worth tightening on general
+principle.
+
+**Context:** Real fix is narrowing `Access-Control-Allow-Origin` to the
+actual dashboard origin(s) instead of `*` — same pattern this project
+would want to eventually apply project-wide if it ever audits all Edge
+Functions' CORS configs (none currently restrict origin, confirmed via
+Card2a-era `CORS_HEADERS` being copy-pasted across functions).
+
+**Effort:** S (one header value change, verify the real dashboard
+origin(s) first)
+**Priority:** P3 (limited exploitability today, but cheap to fix)
+**Depends on:** None.
+
 ## Completed
 
 ### Admin-minting has no extra gate — CLOSED (Admin Provisioning Bootstrap, 2026-09-02)

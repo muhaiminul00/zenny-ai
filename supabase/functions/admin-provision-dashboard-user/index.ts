@@ -84,6 +84,43 @@ async function findUserByEmail(
   }
 }
 
+// Security guard shared by map_existing and create_client's remap paths
+// (client-picker fix PR, adversarial review): both actions can remap an
+// EXISTING auth user to role='client_user' via a 409-then-remap round
+// trip, and dashboard_provision_user's upsert has no notion of "current
+// role" -- it just overwrites both client_id and role unconditionally.
+// Neither action's own caller gate requires super_admin specifically (both
+// accept plain 'admin'), so without this check any 'admin' could silently
+// strip the platform's only super_admin (or any admin) down to a client
+// login in two API calls. Returns a 403 Response if the target is
+// currently admin-tier, otherwise null (caller proceeds normally).
+//
+// Routes through dashboard_get_user_role() (SECURITY DEFINER,
+// service_role-only) rather than a direct table select -- control.
+// dashboard_users has ZERO service_role table grants (unlike
+// control.clients), confirmed live: a direct .schema("control")
+// .from("dashboard_users").select() 500s with "permission denied for
+// table dashboard_users" even under the service-role key. Same pattern
+// as dashboard_provision_user/dashboard_set_provisioning_audit.
+async function rejectIfTargetIsAdminTier(
+  supabase: ReturnType<typeof createClient>,
+  targetAuthUserId: string,
+): Promise<Response | null> {
+  const { data: targetRole, error: targetErr } = await supabase.rpc("dashboard_get_user_role", {
+    p_auth_user_id: targetAuthUserId,
+  });
+  if (targetErr) return jsonResponse(500, { error: { code: "TARGET_LOOKUP_FAILED", message: targetErr.message } });
+  if (targetRole && targetRole !== "client_user") {
+    return jsonResponse(403, {
+      error: {
+        code: "CANNOT_REMAP_ADMIN_TIER",
+        message: "This account is currently admin-tier. It cannot be remapped to a client login through this action.",
+      },
+    });
+  }
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -191,6 +228,16 @@ Deno.serve(async (req: Request) => {
       if (!clientRow) return jsonResponse(400, { error: { code: "INVALID_CLIENT_ID", message: "No such client" } });
 
       const existing = await findUserByEmail(supabase, email);
+
+      // Security fix (client-picker fix PR, adversarial review): checked
+      // BEFORE the remap-confirmation flow below, not just at write time,
+      // so an admin-tier account is never even offered for remap through
+      // this path. See rejectIfTargetIsAdminTier's own comment for why.
+      if (existing) {
+        const rejection = await rejectIfTargetIsAdminTier(supabase, existing.id);
+        if (rejection) return rejection;
+      }
+
       if (existing && (!remap || confirmAuthUserId !== existing.id)) {
         return jsonResponse(409, {
           error: {
@@ -261,6 +308,15 @@ Deno.serve(async (req: Request) => {
 
       // Duplicate-email checked before ANY write (Issue 3 / T5 spec).
       const existing = await findUserByEmail(supabase, email);
+
+      // Security fix (client-picker fix PR, adversarial review): same guard
+      // as map_existing -- this action's remap path can also flip an
+      // existing admin/super_admin's row to client_user for a new client.
+      if (existing) {
+        const rejection = await rejectIfTargetIsAdminTier(supabase, existing.id);
+        if (rejection) return rejection;
+      }
+
       if (existing && (!remap || confirmAuthUserId !== existing.id)) {
         return jsonResponse(409, {
           error: {

@@ -67,6 +67,23 @@ hardening on 4 client-only RPCs (currently reject admins correctly, just
 incidentally), and the "oldest client_user wins" ambiguity for a
 multi-login client (no client has hit this).
 
+**CRITICAL security bug found and fixed during `/review`'s adversarial
+pass (same PR, before merge):** neither `map_existing` nor
+`create_client`'s remap path checked the target account's CURRENT role
+before remapping it — `dashboard_provision_user`'s upsert unconditionally
+overwrites `client_id`/`role`, and neither action's caller gate requires
+`super_admin` specifically. Any plain `admin` could have silently demoted
+the platform's only `super_admin` to a `client_user` via a 409-then-remap
+round trip — confirmed live-exploitable against disposable test accounts
+before shipping the fix. Fixed with a shared `rejectIfTargetIsAdminTier()`
+guard (routed through a new `dashboard_get_user_role()` SECURITY DEFINER
+RPC — a direct table read hit the same `service_role`-has-no-grants-on-
+`dashboard_users` bug this project has now hit 3 times). Re-verified live:
+the exact attack now 403s, the target account is unchanged, the legitimate
+`map_existing` happy path is unaffected. Two follow-up TODOs logged
+(remap-confirm UI context, CORS wildcard + plaintext password on this
+same Edge Function) — both lower-severity, not blocking.
+
 Full detail: `Wiki/infra/dashboard-auth-mapping.md`'s new "client-picker
 fix" section, `docs/designs/admin-provision-client-picker-fix.md`.
 

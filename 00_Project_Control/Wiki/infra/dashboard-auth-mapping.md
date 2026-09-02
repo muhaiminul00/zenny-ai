@@ -283,6 +283,30 @@ around further:
   correct today, just not explicit), and the "oldest client_user wins"
   ambiguity for a client with 2+ logins (no client has hit this) — both
   logged in `TODOS.md`.
+- **CRITICAL security fix, found by adversarial review during `/review`,
+  same PR:** neither `map_existing` nor `create_client`'s remap path
+  (`existing` + `remap:true` + matching `confirm_auth_user_id`) checked
+  the TARGET account's current role before remapping it —
+  `dashboard_provision_user`'s upsert has no notion of "current role", it
+  just overwrites `client_id`/`role` unconditionally. Since both actions'
+  caller gate only requires `admin`/`super_admin` (not `super_admin`
+  specifically), any plain `admin` could silently demote the platform's
+  ONLY `super_admin` to a `client_user` in a 409-then-remap round trip —
+  confirmed live-exploitable against the real `admin@zenny.internal`
+  account before the fix (reproduced safely against disposable test
+  accounts, not the real one). **Fixed:** a shared
+  `rejectIfTargetIsAdminTier()` guard, checked before either action's
+  remap-confirmation flow, blocks remapping any account whose current
+  role isn't already `client_user`. Routes through a new
+  `dashboard_get_user_role()` `SECURITY DEFINER` RPC (service_role-only)
+  rather than a direct table read — hit the exact same
+  `service_role`-has-no-grants-on-`dashboard_users` bug this project has
+  now hit 3 times (Bootstrap card's audit-column write, this). Live
+  re-verified: the exact attack (disposable attacker-admin account
+  targeting a disposable victim-admin account) now gets a clean 403
+  `CANNOT_REMAP_ADMIN_TIER`, the victim's row is unchanged, and the
+  legitimate `map_existing` happy path (a genuine `client_user` email)
+  is unaffected.
 - **Live-verified:** the strict CHECK (nullable + constraint confirmed
   via `information_schema`/`pg_constraint`); the list-view regression
   (all 6 real clients' login emails unchanged after the role-filter
