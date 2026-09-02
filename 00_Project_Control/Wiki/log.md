@@ -9,6 +9,75 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## session-bc076-card2a-dashboard-oauth-shipped (2026-09-02, same day as BC-079)
+
+BC-076-Card2a: both open unknowns from the blueprint resolved via real
+investigation, not guessed past.
+
+**T1-T3 (OAuth reconnect error) — real root cause was a stale deployment,
+not a grants bug.** The `zenny-dashboard` container had been running 3
+weeks (self-healing entrypoint re-clones `main` fresh on every start,
+per `Wiki/infra/vps-and-docker.md`) — the live dashboard was still
+serving pre-BC-052 code, still calling `dashboard_disconnect_connection`
+directly instead of the `connection-lifecycle` Edge Function BC-052
+introduced. Proven via: `pg_proc.proacl` showing the RPC's grants were
+actually fine; a live JS-bundle diff showing the deployed bundle
+referenced the old RPC and never `connection-lifecycle`; a live browser
+reproduction (gstack `/browse`) matching the human's exact reported
+error, network log confirming a direct `403` RPC call. Fixed via
+`VPS_restartProjectV1` (human-approved — a real production action,
+correctly permission-gated), re-verified live: new bundle, real
+Disconnect click through `connection-lifecycle`, correct honest
+WooCommerce disclosure message. No separate "JWT key" error ever
+existed — the human's own uncertain guess before actually clicking
+Disconnect, not a second bug.
+
+**T4-T7 (admin provisioning) — built, deployed, then hardened by
+`/review`'s Codex adversarial pass.** New `dashboard_users_role_check_
+constraint`, `dashboard_get_my_role()`, `dashboard_admin_list_clients()`
+RPCs; new Edge Function `admin-provision-dashboard-user` (this project's
+first version-controlled Edge Function source, D5); new `/admin/
+provision` page. Codex flagged 2 false-positive "critical" findings
+(verified wrong via live `pg_proc.proacl`/`prosecdef` reads — the RPCs
+were already correctly locked down or self-guarding) and 5 real ones,
+all fixed: auth-check-before-body-parse ordering, UUID validation on
+`client_id`, full pagination on the email-lookup, a real confirmation
+requirement on `remap` (was a bare body flag), and rollback of an
+orphaned Auth user if provisioning fails mid-flight. One finding (any
+admin can mint another admin) reviewed and explicitly accepted at
+current single-operator scale — `TODOS.md`.
+
+**Real UX bug caught by the human, not the review:** the admin account
+was showing the exact same client-scoped UI as any regular test client
+(an architectural gap — `dashboard_users` requires a `client_id` per
+row, used as the admin's nominal home, but every other page resolves
+"which client am I" from it). Fixed architecturally: `role='admin'` now
+gets only the admin nav/routes, `role='client_user'` gets the reverse,
+each redirecting away from the other's paths — confirmed live both
+directions.
+
+**Real live bug caught only by the browser click-through, not `tsc`:**
+`dashboard_admin_list_clients()`'s first version declared `archetype
+text` but the actual column is `archetype_enum` — `structure of query
+does not match function result type` at call time. Fixed with an
+explicit cast, re-verified live.
+
+**Credential Gate resolved, not hit:** the human clarified which of the
+two existing test/demo accounts already has which real connection
+(Calendar/Gmail/WooCommerce on one, Calendly/Shopify on the other) —
+between them, every provider Card 3 needs already exists for real. No
+new test client provisioning was needed. Documented in the new
+`Wiki/credentials/test-fixture-clients.md`, including why Google/
+Calendly credentials can't be "backed up" past a real disconnect while
+Shopify/WooCommerce already survive one (local-only, no revoke API).
+
+Shipped: PR #9, squash-merged to `main`, `zenny-dashboard` restarted a
+second time to deploy the new admin UI, full browser click-through
+completed post-merge (both the admin path and the reverse
+non-admin-blocked path). Full detail:
+`Wiki/infra/dashboard-auth-mapping.md`,
+`Wiki/credentials/test-fixture-clients.md`.
+
 ## session-bc079-project-state-prune (2026-09-02, same day as the v1.6.1 plugin-update confirmation)
 
 BC-079: `PROJECT_STATE.md` pruned from 1774 lines to 126, back in line
