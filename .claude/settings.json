@@ -3,11 +3,10 @@
     "allow": [
       "Bash(git commit -m *)",
       "Bash(curl -s -X POST*)",
-      "Write(* .claude\\\\hooks\\\\state\\\\mode.json)",
       "Read(* .claude)",
       "Bash(cat .claude/hooks/state/mode.json)",
       "Bash(cat > .claude/hooks/state/mode.json:*)",
-      "supabase - Deploy edge function (MCP)"
+      "Supabase - Deploy edge function (MCP)"
     ]
   },
   "hooks": {
