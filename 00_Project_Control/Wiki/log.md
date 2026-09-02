@@ -9,6 +9,101 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-09-02] session-bc076-card3-shipped
+
+Full record lives in `06_Infrastructure/n8n/Workflow_Registry.md` (the new
+`Generic KB Ingestion Core`, Shopify KB Ingestion, and WooCommerce KB
+Ingestion entries, plus SCH-004's updated entry) — this is a pointer +
+narrative summary, not a duplicate.
+
+Built and live-verified BC-076 Card 3 (Shopify + WooCommerce ingestion,
+per the eighth-pass `/plan-eng-review`): extracted a shared Generic KB
+Ingestion Core (`XxkqBACpoJiifl0T`, D25) from `KR0kHvk3kJRThrX5`'s proven
+chunk/embed/upsert/orphan-cleanup logic; built new Shopify (GraphQL Admin
+API 2026-07, D28) and WooCommerce (REST) fetch/normalize workflows, both
+calling the shared core; extended `SCH-004`'s dispatcher with 2 new
+routing branches (`addConnection` used explicitly, not
+`updateNodeParameters` alone, per this project's own documented gotcha).
+
+**Real bug found and fixed via live testing, not caught by any static
+check:** `get_client_connection`'s `p_category` parameter filters on
+`control.client_connections.category` — a functional grouping
+(`'ecommerce'`), not the provider name. Both new workflows initially
+passed `category: 'shopify'`/`'woocommerce'`; UTIL-006 correctly returned
+`available:false` for a real, connected, working Shopify account on the
+first live test. Fixed to `category: 'ecommerce'` for both, re-verified.
+
+**Real, independently-verified end-to-end proof (not trusted from the
+workflow's own status report):** 14 real Shopify products fetched live
+from Carmelli Bakery's store, normalized (HTML stripped, brand/SKU/price
+included), embedded, and upserted — `describe-index-stats` confirmed
+`zenny-business-kb`'s `eb27a21f-...` namespace grew 28→42 records (exact
+expected delta). A real `Search_business_kb` webhook call (`curl`, not
+simulated) returned the exact seeded Shopify content for "Do you have a
+Curren watch for men?" — real grounded retrieval, not just "vectors
+exist." Cross-tenant isolation re-confirmed: the same query against
+Client A (no Shopify data) correctly returned the honest "no KB content"
+fallback, zero leakage.
+
+**WooCommerce: the exact disclosed risk from the eng-review materialized
+live, and was handled exactly as designed.** `Wiki/credentials/
+woocommerce.md` had already flagged Client A's only test store
+(`zenny-woocom.free.je`, free-tier) as known to return non-JSON to real
+API calls. It did, again, live. The new workflow's explicit
+content-type/shape validation (a direct fold-in of Codex's outside-voice
+catch during the eng-review) correctly treated this as a failed,
+incomplete read — zero vectors written, zero orphan cleanup attempted,
+confirmed via `describe-index-stats` showing no `baa673b5-...` namespace
+at all. **One real design gap found and fixed in the same pass:** the
+shared core's status payload couldn't distinguish "genuinely empty
+source" from "the read itself failed" — both produced
+`status:'success', total_rows:0`. Fixed: `read_complete:false` with zero
+rows now honestly reports `status:'failed'`.
+
+**Deliberately not done this pass, tracked in `TODOS.md`, not silently
+dropped:** `KR0kHvk3kJRThrX5` (Sheets) was not migrated to call the new
+shared core, even though the core's logic was extracted FROM it — real
+refactor risk on shipped, working production code, not needed to satisfy
+D25's actual goal (new legs don't duplicate the hardening, which they
+don't). A genuinely successful WooCommerce sync remains unproven for
+lack of a working test store — the code degrades safely, but that's a
+different claim than "it works."
+
+Follow-ups tracked: Card 3b (Notion leg fix — wrong Pinecone index, no
+D19/D20-style hardening) and Card 3c (embedded Baserow infrastructure),
+both real live-verified findings from the eng-review, neither built yet
+— each needs its own `/plan-eng-review` pass.
+
+---
+
+## [2026-09-02] session-bc076-card3-eng-review
+
+Pointer entry — full record lives in `docs/designs/
+zenny-launch-blueprint.md`'s eighth-pass GSTACK REVIEW REPORT (the doc
+itself carries the full findings/decisions/Codex report — this is just a
+discoverability pointer, not a duplicate).
+
+Summary: `/plan-eng-review` for BC-076 Card 3. Live verification
+(Mandatory MCP Verification — Supabase, n8n, Pinecone) found the
+blueprint's original "4 equivalent ingestion legs" framing (Shopify/
+WooCommerce/Baserow/generalized-Notion) was wrong: generalized-Notion
+already has active daily infra (INT-012/SCH-004) silently writing into
+the wrong Pinecone index (`zenny-email-kb` not `zenny-business-kb`) and
+missing Card2b/2c's hardening; Baserow means hosting new self-hosted
+infra (per the blueprint's own "embedded" framing), not collecting a
+client credential. Both split out (Card 3b, Card 3c) rather than folded
+in. Card 3 itself narrowed to Shopify + WooCommerce only, built via a
+shared generic ingestion core extracted from the shipped
+`KR0kHvk3kJRThrX5` Sheets workflow. Codex outside-voice caught Shopify's
+REST product API is 2026-legacy (GraphQL locked instead, D28) and forced
+a much richer product-serialization shape and several destructive-sync
+safety requirements (source-instance-scoped vector IDs, no-delete-on-
+partial-read, freeze-before-refactor). 6 decisions (D24-D29), 1 new
+`TODOS.md` item (webhook-driven incremental sync). ENG CLEARED, handed
+to Execute.
+
+---
+
 ## [2026-09-02] session-admin-provisioning-redesign-eng-review
 
 Pointer entry — full record lives in `docs/designs/
