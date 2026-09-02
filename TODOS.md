@@ -89,4 +89,26 @@ tracked so it's not forgotten, not because it's urgent)
 after BC-076's remaining ingestion legs (Cards 3/4) land, since it's
 new scope on top of the same KB tool those cards are still building out.
 
+## Documentation debt
+
+Carried forward from `PROJECT_STATE.md`'s Active Blockers list during
+BC-079's prune pass (2026-09-02) — both pre-date the pivot but reference
+tables/workflows still live in the current track, so not safe to drop
+as pure pre-pivot history.
+
+### `appointments` table undocumented in `Database_Structure_v4_FINAL.md`
+
+**What:** The real, deployed `appointments` table (BC-013) has no
+section in the master schema doc.
+**Why still relevant:** Used by 5 of 11 Conversion Engine Tools
+originally, and now also by the current-track appointment archetype
+(BC-074). Not just old-Convocore-era debt.
+**Effort:** S **Priority:** P3 **Depends on:** None.
+
+### `n8n_Workflow_Specification_v1.md` missing SCH-007's row
+
+**What:** SCH-007 (a scheduled workflow, Phase 11) was built but never
+added to the workflow spec doc.
+**Effort:** S **Priority:** P3 **Depends on:** None.
+
 ## Completed
