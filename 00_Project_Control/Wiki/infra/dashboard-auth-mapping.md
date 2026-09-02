@@ -112,14 +112,120 @@ very first admin — that one mapping is still a manual step
 before self-serve existed). Every admin after that first one goes
 through the real UI.
 
-**Accepted, not fixed:** any admin can create another admin — no
-separate `super_admin` tier exists. Reviewed (Codex flagged it,
-human explicitly accepted at current single-operator scale) — tracked
-in `TODOS.md` under Security, revisit if a second admin with a
-different trust level is ever actually needed.
+**Superseded below:** the "any admin can create another admin" gap
+noted here was closed by the Admin Provisioning Bootstrap card
+(2026-09-02) — see that section.
+
+## Admin Provisioning Bootstrap (2026-09-02) — closes the admin-minting gap, adds real client creation
+
+Card2a's `/admin/provision` could only map a login to a client that
+**already existed** — creating the client itself, and minting an admin,
+had no real gate beyond "any `role='admin'` account can do both."  This
+card closes both gaps.
+
+**Schema changes:**
+- `dashboard_users_role_check` extended to a 3rd tier:
+  `role IN ('client_user', 'admin', 'super_admin')`.
+- `dashboard_users.must_change_password boolean NOT NULL DEFAULT false`
+  — set `true` whenever a brand-new Auth user is created with an
+  admin-set temp password; cleared by the user themselves after a real
+  password change (see the forced-reset flow below).
+- `client_status_enum` gained `'unprovisioned'` — used only for
+  Add-Client shell rows (a client that exists as a login but has no
+  archetype/schema yet). `'onboarding'` keeps its existing meaning
+  (schema exists, still being set up) — **note:** all 6 pre-existing
+  clients still sit at `'onboarding'` and nothing transitions status
+  forward automatically; this ambiguity is real and tracked in
+  `TODOS.md` ("`control.clients.status` lifecycle is broken"), not
+  fixed by this card.
+- `control.clients.archetype` and `.client_schema_name` both loosened
+  to nullable (live-verified both were `NOT NULL` before this — a real
+  blocker for shell rows, not assumed). **Live-audited** every one of
+  the 13 functions that reads either column before loosening them —
+  all already NULL-safe (`IF ... IS NULL THEN RAISE EXCEPTION` guards
+  or `coalesce()`); no crash risk found. One real, disclosed UX
+  corollary from that audit: a freshly created "unprovisioned" client
+  can log in immediately, but every client-facing page will hit a
+  clean (not crashing) RPC exception until an admin finishes real
+  provisioning — tracked in `TODOS.md`, not fixed here (out of this
+  card's approved scope).
+- `created_by uuid REFERENCES auth.users(id)` added to both
+  `control.clients` and `control.dashboard_users` — audit trail for who
+  created each privileged row.
+
+**`dashboard_admin_list_clients()` extended** (DROP+CREATE required —
+Postgres cannot `CREATE OR REPLACE` a changed `RETURNS TABLE` column
+list; this is the exact grant-loss trap this project has hit 3 times
+before, BC-052/063/064) to return `status`, `created_at`, `email` (the
+first client_user login mapped to that client, via a `LEFT JOIN
+LATERAL`, ordered by earliest mapping — `NULL` for a shell client with
+no login yet). **Grants re-verified live after the DROP+CREATE**
+(`has_function_privilege`): `anon`/`authenticated`/`service_role` all
+still have `EXECUTE` — Postgres grants `EXECUTE` to `PUBLIC` by default
+on newly created `public`-schema functions, so no explicit re-grant was
+even needed this time, but it was verified, not assumed. Also gated on
+`role IN ('admin', 'super_admin')` now, not just `'admin'` — the
+original check would have wrongly rejected a `super_admin` trying to
+view the client list. **Regression-checked** (per the Iron Rule, this
+RPC's return shape already caused a real live bug once in Card2a): ran
+the underlying query directly against all 6 real client rows before
+touching the Dashboard — every existing client still resolves
+`client_id`/`business_name`/`archetype` correctly, so `AdminProvision.tsx`'s
+picker keeps working unchanged.
+
+**`admin-provision-dashboard-user` Edge Function extended** with a new
+`action` field (`map_existing` | `create_client` | `create_admin`,
+default `map_existing` for backward compatibility):
+- **`map_existing`** (Card2a's original path) — now restricted to
+  `role: 'client_user'` only. Assigning `admin`/`super_admin` through
+  this path is exactly the risk this card closes; it's rejected with a
+  message pointing at `create_admin` instead. Caller must be
+  `admin` or `super_admin`.
+- **`create_client`** — new. Creates a real client (write order,
+  cheapest-rollback-first: `control.clients` row →Auth user → 
+  `dashboard_provision_user` mapping, each step's failure rolling back
+  everything written so far) with `status='unprovisioned'`,
+  `archetype`/`client_schema_name` both `NULL` — the client's own
+  onboarding, not this card, decides those later (the design doc's own
+  key insight: you can't pick an archetype before the client tells you
+  their business). Duplicate email checked *before* any write. Caller
+  must be `admin` or `super_admin`.
+- **`create_admin`** — new. Mints an `admin` or `super_admin` mapped to
+  a nominal home client (still required — `dashboard_users.client_id`
+  is `NOT NULL`). **Caller must already be `super_admin`** — the actual
+  gate closure. Identity is derived from the caller's own JWT only,
+  never a body-supplied role/tier flag (same doctrine as Card2a's D4).
+- Every action sets `created_by` on the `dashboard_users` row it
+  touches, and `must_change_password = true` whenever a *brand-new*
+  Auth user was created this call (never for a `remap` of an existing
+  account — they already have a working password).
+
+**Dashboard UI:** `AdminProvision.tsx` rewritten with tabs — Clients
+(list view: business/status/archetype/login email/created), Add Client,
+Add Login (existing client — the relocated Card2a form, `client_user`
+only), and Add Admin (rendered only for `super_admin`, both hidden
+client-side and blocked server-side). New `ChangePassword.tsx` +
+`AuthContext.tsx` now holds `role`/`must_change_password` from a single
+`dashboard_get_my_flags()` call — `App.tsx`'s route guard renders
+`ChangePassword` in place of every other route whenever the flag is
+set, checked on every render (not a one-time login-page nag). Two new
+RPCs support this: `dashboard_get_my_flags()` (read) and
+`dashboard_clear_must_change_password()` (self-service clear, called
+after a real `supabase.auth.updateUser()` password change).
+
+**Verification status:** SQL/schema changes and the `dashboard_admin_list_clients`
+regression check are live-verified. `tsc -b` and `oxlint` clean on
+every changed Dashboard file (1 pre-existing `react(only-export-components)`
+warning on `AuthContext.tsx`, not introduced by this card). The Edge
+Function's platform-level auth checks are live-verified (401 with no
+Authorization header, 401 on a malformed JWT). The admin/super_admin-gated
+paths (`ADMIN_REQUIRED`, `SUPER_ADMIN_REQUIRED`, forged-role-ignored,
+and the `create_client`/`create_admin` happy paths) — see this card's
+final wrap-up entry in `Wiki/log.md` for how those were actually
+verified before shipping.
 
 See [[../decisions/dashboard-auth-mapping]] (closed),
 [[../credentials/test-fixture-clients]] (the two existing accounts'
 real provider connections, documented the same pass), and
-`docs/designs/zenny-launch-blueprint.md`'s Card 2a section — n/a, no
-n8n workflow touched by this card.
+`docs/designs/admin-provisioning-redesign-bootstrap.md` for the full
+spec and review history.

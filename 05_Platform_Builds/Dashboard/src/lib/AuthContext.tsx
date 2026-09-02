@@ -1,11 +1,23 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+
+// Admin Provisioning Bootstrap: role + must_change_password now live here
+// (single source of truth), read via dashboard_get_my_flags() in one
+// call. Previously App.tsx and AdminProvision.tsx each fetched role
+// separately via dashboard_get_my_role() — consolidated so the
+// must_change_password route-guard (T8) and every role check share one
+// fetch and one refresh path.
+export type DashboardRole = 'admin' | 'super_admin' | 'client_user';
 
 interface AuthContextValue {
   session: Session | null;
   loading: boolean;
   clientSchemaName: string | null;
+  role: DashboardRole | null;
+  mustChangePassword: boolean;
+  flagsLoading: boolean;
+  refreshFlags: () => void;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
@@ -15,6 +27,25 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<DashboardRole | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [flagsLoading, setFlagsLoading] = useState(true);
+
+  const refreshFlags = useCallback(() => {
+    setFlagsLoading(true);
+    supabase.rpc('dashboard_get_my_flags').then(({ data, error }) => {
+      if (error || !data) {
+        // No dashboard_users mapping, or not authenticated -- least-
+        // privilege default. Never surfaces admin/super_admin content.
+        setRole(null);
+        setMustChangePassword(false);
+      } else {
+        setRole((data as { role: DashboardRole }).role);
+        setMustChangePassword((data as { must_change_password: boolean }).must_change_password === true);
+      }
+      setFlagsLoading(false);
+    });
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -29,6 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (session) {
+      refreshFlags();
+    } else {
+      setRole(null);
+      setMustChangePassword(false);
+      setFlagsLoading(false);
+    }
+  }, [session, refreshFlags]);
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error ? error.message : null };
@@ -42,7 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (session?.user?.app_metadata?.client_schema_name as string | undefined) ?? null;
 
   return (
-    <AuthContext.Provider value={{ session, loading, clientSchemaName, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ session, loading, clientSchemaName, role, mustChangePassword, flagsLoading, refreshFlags, signIn, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

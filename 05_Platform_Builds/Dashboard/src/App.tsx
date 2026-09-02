@@ -1,7 +1,6 @@
 import { Navigate, Route, Routes, NavLink } from 'react-router-dom';
-import { useEffect, useState, type ReactNode } from 'react';
-import { useAuth } from './lib/AuthContext';
-import { supabase } from './lib/supabase';
+import type { ReactNode } from 'react';
+import { useAuth, type DashboardRole } from './lib/AuthContext';
 import { EnsoMark } from './components/EnsoMark';
 import { Login } from './pages/Login';
 import { OrdersList } from './pages/OrdersList';
@@ -9,6 +8,7 @@ import { OrderDetail } from './pages/OrderDetail';
 import { Integrations } from './pages/Integrations';
 import { AppointmentsList, AppointmentDetailPage, PendingApprovals, PausedLeads } from './pages/Appointments';
 import { AdminProvision } from './pages/AdminProvision';
+import { ChangePassword } from './pages/ChangePassword';
 
 // BC-076-Card2a: UX-only role gate — drives which nav links/pages render,
 // NOT the real security boundary (that's server-side in
@@ -24,22 +24,12 @@ import { AdminProvision } from './pages/AdminProvision';
 // logging in saw a random test client's orders, not an admin-only view).
 // Admin accounts get ONLY the admin pages; client accounts get the
 // reverse — never both, per the schema's own real constraint.
-type DashboardRole = 'admin' | 'client_user' | 'loading';
-
-function useDashboardRole(): DashboardRole {
-  const [role, setRole] = useState<DashboardRole>('loading');
-  useEffect(() => {
-    let cancelled = false;
-    supabase.rpc('dashboard_get_my_role').then(({ data, error }) => {
-      if (cancelled) return;
-      setRole(!error && data === 'admin' ? 'admin' : 'client_user');
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return role;
-}
+//
+// Admin Provisioning Bootstrap (T8): role + must_change_password now
+// come from AuthContext (dashboard_get_my_flags(), one call) instead of
+// this file's own separate RPC fetch — see lib/AuthContext.tsx.
+// super_admin is a superset of admin for routing purposes; the Add Admin
+// tab's own tier gate lives inside AdminProvision.tsx.
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth();
@@ -65,7 +55,7 @@ function Layout({ children, role }: { children: ReactNode; role: DashboardRole }
           Zenny<span className="dot">.</span>
         </span>
         <nav>
-          {role === 'admin' ? (
+          {role === 'admin' || role === 'super_admin' ? (
             <NavLink to="/admin/provision" className={({ isActive }) => (isActive ? 'active' : '')}>
               Admin
             </NavLink>
@@ -102,13 +92,23 @@ function Layout({ children, role }: { children: ReactNode; role: DashboardRole }
 }
 
 function DashboardRoutes() {
-  const role = useDashboardRole();
-  if (role === 'loading') return <p>Loading…</p>;
+  const { role: rawRole, mustChangePassword, flagsLoading } = useAuth();
+  if (flagsLoading) return <p>Loading…</p>;
+
+  // T8 (D4, Codex correction): forced password-change is a route-guard
+  // check on every render of this tree, not a one-time login-page nag —
+  // no path below this reaches any other page while the flag is set.
+  if (mustChangePassword) {
+    return <ChangePassword />;
+  }
+
+  const role: DashboardRole = rawRole ?? 'client_user';
+  const isAdminTier = role === 'admin' || role === 'super_admin';
 
   return (
     <Layout role={role}>
       <Routes>
-        {role === 'admin' ? (
+        {isAdminTier ? (
           <>
             <Route path="/" element={<Navigate to="/admin/provision" replace />} />
             <Route path="/admin/provision" element={<AdminProvision />} />

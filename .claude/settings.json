@@ -6,7 +6,8 @@
       "Write(* .claude\\\\hooks\\\\state\\\\mode.json)",
       "Read(* .claude)",
       "Bash(cat .claude/hooks/state/mode.json)",
-      "Bash(cat > .claude/hooks/state/mode.json:*)"
+      "Bash(cat > .claude/hooks/state/mode.json:*)",
+      "supabase - Deploy edge function (MCP)"
     ]
   },
   "hooks": {

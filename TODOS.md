@@ -252,27 +252,56 @@ scheduled sync + shared ingestion core it introduces).
 **Effort:** M **Priority:** P3
 **Depends on:** BC-076-Card3 (Shopify/WooCommerce ingestion) shipping first.
 
+### A freshly created "unprovisioned" client hits raw RPC errors on first login
+
+**What:** The Admin Provisioning Bootstrap's Add Client flow creates a
+real dashboard login in the same call as the client shell row (status
+`'unprovisioned'`, `archetype`/`client_schema_name` both NULL). That
+client CAN log in immediately, but every client-facing page
+(Orders/Appointments/Integrations) calls `dashboard_get_my_client_schema()`
+first, which cleanly `RAISE EXCEPTION`s ("No dashboard_users mapping for
+this account, or client is offboarded") when the schema is NULL — a
+correct, non-crashing error, but a confusing message for a legitimately
+provisioned-but-not-yet-onboarded client.
+
+**Why:** Found live during the Admin Provisioning Bootstrap's T3 audit
+(checking every consumer of `client_schema_name`/`archetype` for
+NULL-safety before loosening their NOT NULL constraints). Not a crash or
+data-integrity risk — every consumer already guards NULL cleanly — but a
+real UX gap the design doc's own "self-serve half isn't real" disclosure
+didn't fully spell out.
+
+**Context:** Not fixed in that card — its Implementation Tasks (T1-T9)
+never scoped a "setup pending" screen, and adding one would have been
+scope creep beyond the approved spec. The real fix is probably a small,
+friendly interstitial ("your account is being set up") gated on
+`status = 'unprovisioned'`, checked at the same route-guard level as the
+forced-password-reset flow (T8) — natural to build together with
+whatever eventually drives the `unprovisioned` → `onboarding` → `active`
+state machine (see `control.clients.status` lifecycle TODO above).
+
+**Effort:** S (a route-guard check + one interstitial page)
+**Priority:** P3 (no real client has hit this yet — only test/demo
+accounts exist)
+**Depends on:** Loosely related to the `control.clients.status`
+lifecycle TODO above; not blocking, could ship independently.
+
 ## Security
 
-### Admin-minting has no extra gate
-
-**What:** `admin-provision-dashboard-user` lets any `role='admin'` account
-create another admin — `role` is just a dropdown option in the UI, with
-no separate "who can create admins" check.
-
-**Why:** Codex's adversarial review (BC-076-Card2a) flagged this as
-privilege sprawl. Explicitly reviewed and accepted as-is by the human —
-at this project's current single-operator scale, a stricter gate (e.g. a
-`super_admin`/`can_manage_admins` tier) is speculative complexity for a
-threat that doesn't exist yet.
-
-**Context:** Revisit if/when a second admin with a genuinely different
-trust level is ever needed — e.g. an ops hire who should provision
-client logins but never create other admins. Until then, the smallest
-correct thing is the one gate that already exists (`role='admin'`
-required to call the function at all).
-
-**Effort:** S (once actually needed) **Priority:** P3
-**Depends on:** A real second-admin use case existing.
-
 ## Completed
+
+### Admin-minting has no extra gate — CLOSED (Admin Provisioning Bootstrap, 2026-09-02)
+
+**What it was:** `admin-provision-dashboard-user` let any `role='admin'`
+account create another admin — `role` was just a dropdown option in the
+UI, with no separate "who can create admins" check.
+
+**How it was closed:** The Admin Provisioning Bootstrap card added a
+`super_admin` tier. Minting an admin/super_admin now requires a
+dedicated `create_admin` action on the Edge Function, gated server-side
+on the CALLER already being `super_admin` — the original `map_existing`
+path can no longer assign `role='admin'` at all (restricted to
+`client_user` only). Verified live: a plain `admin` caller attempting
+`create_admin` gets a clean 403, and a forged `role`/tier value in the
+request body is ignored (identity comes from the caller's JWT only, same
+doctrine as Card2a's original D4).
