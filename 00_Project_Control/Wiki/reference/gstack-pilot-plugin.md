@@ -719,10 +719,13 @@ Until then, this exact deadlock can recur in live sessions.
   2026-09-02**, see above.
 - **T7.1 still open** (not blocking) — closes on the next real Commander
   task that's genuinely new or prior-scoped-but-unbuilt; see above.
-- **`v1.6.1`'s mode.json-exemption fix needs `/plugin update
-  gstack-pilot@gstack-pilot`** to actually take effect in this or any
-  session's cached install — human-run only, no tool-equivalent exists.
-  Until then the T7.2 deadlock this fix closes can still recur live.
+- ~~`v1.6.1`'s mode.json-exemption fix needs `/plugin update
+  gstack-pilot@gstack-pilot`~~ — **closed 2026-09-02.** Human ran the
+  update; confirmed via `installed_plugins.json`: this project's
+  `gstack-pilot@gstack-pilot` entry now resolves `installPath`/`version`
+  to `1.6.1`. The T7.2 deadlock is fixed and live for this project going
+  forward. (Note: `E:\Programming\ZM-Brain`, a separate project, is still
+  pinned to `1.6.0` in the same file — its own concern, not touched here.)
 
 See [[reference/gstack-skill-playbook.md]] for gstack's general
 Zenny-side decision map, [[reference/role-modes-plugin]] for the

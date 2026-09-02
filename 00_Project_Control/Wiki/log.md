@@ -9,6 +9,21 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## session-gstack-pilot-v1.6.1-plugin-update-confirmed (2026-09-02, same day as the v1.6.1 ship)
+
+Human ran `/plugin update gstack-pilot@gstack-pilot` after the v1.6.1
+mode.json-handback fix shipped (see session-gstack-pilot-v1.6.1-
+modejson-exemption-shipped below). Verified, not assumed: read `~/
+.claude/plugins/installed_plugins.json` directly and confirmed this
+project's (`E:\Programming\Zenny - breakthrough`) `gstack-pilot@
+gstack-pilot` entry now resolves `installPath`/`version` to `1.6.1`
+(a separate project, `E:\Programming\ZM-Brain`, is a distinct entry in
+the same file still pinned to `1.6.0` — its own concern, unrelated).
+The T7.2 mode.json-handback deadlock fix is confirmed live for this
+project's sessions going forward. Closed `Wiki/reference/gstack-pilot-
+plugin.md`'s corresponding open item and `PROJECT_STATE.md`'s "Next"
+line accordingly.
+
 ## session-bc077-t5-t7-closed (2026-09-02, same day as BC-077/078)
 
 Human asked Commander for a status summary, picked BC-077's two
