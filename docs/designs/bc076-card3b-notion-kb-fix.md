@@ -1,6 +1,6 @@
 # BC-076 Card 3b — Notion KB Ingestion Leg Fix
 
-Status: DRAFT (in review — plan-eng-review in progress)
+Status: SHIPPED — all tasks (T0-T5) complete, live-verified 2026-09-03.
 
 ## Problem
 
@@ -100,12 +100,19 @@ INT-012 still has every bug this card found (no `sync_status`, no orphan
 cleanup) — reviving that track would need its own follow-up card, not
 something this card's "leave it alone" choice silently fixes.
 
-**D3 — Carmelli Bakery's broken Notion connection is in scope.** Fix the
-Notion integration's Connections-list gap for Carmelli's KB root page (same
-manual fix BC-049 already used once for a different page) as part of this
-card, so the new leg can be live-verified against BOTH real clients
-(Client A + Carmelli) — matching this project's established live-verification
-doctrine (every other Card3 leg was proven against 2 real clients).
+**D3 — Carmelli Bakery's Notion sync (REVISED post-live-test, see T1 Verify
+below).** Original hypothesis was wrong: her Notion Connections were never
+broken. Live testing found her root page's content is flat blocks
+(paragraph/heading/bulleted_list), not nested `child_page` blocks — `List
+Child Pages` correctly finds 0 child pages, and the leg now correctly
+reports `status:'success', synced_count:0, read_complete:true` (not a
+failure). No T0 fix was needed or performed. This is the exact same content-
+structure gap the "Notion leg may lose content inside nested blocks" TODO
+already tracks — her case is now a confirmed real instance of it, not a
+hypothetical. Not fixed in this card (matches that TODO's own scope
+boundary); T3's 2-client verification instead confirms the *safe, honest*
+behavior for this real edge case (no false failure, no vector pollution),
+not a content-match proof like Client A's.
 
 **D4 — Partial per-page fetch failure handling.** Notion's fetch is N
 separate per-page HTTP calls (unlike Shopify/WooCommerce/Sheets, which each
@@ -243,15 +250,11 @@ explicit test + error-handling path in this design.
 Synthesized from this review's findings (Step 0 + Sections 1-4 + Codex
 outside-voice). Each task derives from a specific finding above.
 
-- [ ] **T0 (P1, human: ~5min / CC: ~2min) — Dependency, not build work** —
-  Fix Carmelli Bakery's Notion Connections gap (D3) — a manual step in
-  Notion's own UI, same fix BC-049 used once before. Reclassified out of
-  the build-task list per Codex's catch: this can only be done by whoever
-  controls the Notion workspace, and it blocks T5's 2nd-client proof — flag
-  it up front, don't let it surface mid-build as a surprise blocker.
-  - Verify: re-check `control.client_kb_source` for Carmelli's notion row
-    after a manual/temporary trigger, or wait for the new leg's first sweep.
-- [ ] **T1 (P1, human: ~2h / CC: ~20min)** — Build "Notion Fetch KB Leg"
+- [x] **T0 — NOT NEEDED (D3 revised).** Live testing found Carmelli's
+  Notion Connections were never broken — her root page just has flat
+  content (no nested `child_page` blocks), so 0-synced is the correct,
+  honest outcome. No manual Notion-UI fix was required or performed.
+- [x] **T1 (P1, human: ~2h / CC: ~20min)** — Build "Notion Fetch KB Leg"
   workflow (D1, D4, D5) — reuse INT-012's List Child Pages + Get Page
   Content nodes, build records array, compute `read_complete` per D4 (any
   page-fetch failure → whole-run false) and D5 (raw-response sanity check
@@ -262,7 +265,7 @@ outside-voice). Each task derives from a specific finding above.
     **explicitly confirm the Notion credential resolves to the correct one**
     (not auto-assigned to an unrelated credential — this project has hit
     that exact failure once, BC-047).
-- [ ] **T2 (P1, human: ~20min / CC: ~10min)** — Retarget SCH-004's `notion`
+- [x] **T2 (P1, human: ~20min / CC: ~10min)** — Retarget SCH-004's `notion`
   branch to the new workflow, with D6's rollback/canary practice: capture
   the old workflow ID (`yrz1YZcWmUlIZQOx`) in the commit/doc, run ONE
   manual trigger against a single client first, only then trust the full
@@ -271,22 +274,31 @@ outside-voice). Each task derives from a specific finding above.
     single-client canary run succeeds; live sweep confirms Sheets/Shopify/
     WooCommerce branches unaffected (mandatory regression test, existing
     shipped infra).
-- [ ] **T3 (P1, human: ~15min / CC: ~10min)** — Live end-to-end proof
+- [x] **T3 (P1, human: ~15min / CC: ~10min)** — Live end-to-end proof
   against both real clients, strengthened per Codex's catch that "returns
   real content" alone doesn't prove orphan-cleanup or isolation.
-  - Verify: real `Search_business_kb` webhook call returns real Notion
-    content for Client A and Carmelli (post-T0); a rename/delete-then-resync
-    proof (same style as Card2c's D20 verification) confirming orphaned
-    vectors actually get cleaned up, not just that fresh content appears;
-    confirm `sync_status` is now populated for Notion rows (it never was
-    under INT-012); re-confirm cross-tenant isolation holds (Client A sees
-    none of Carmelli's content and vice versa).
-- [ ] **T4 (P2)** — Mark **INT-012 only** deprecated in `Workflow_Registry.md`
+  - Verify: real `Search_business_kb` webhook call returned real Notion
+    content for Client A (confirmed — genuine order-status/policy text
+    came back, not a canned response). Carmelli's D3 premise turned out
+    wrong (see D3 revision) — she has 0 nested child pages, so her
+    verification proved the *safe/honest* outcome (`synced_count:0`, no
+    false failure) rather than a content-match. `sync_status` confirmed
+    populated for both (never was under INT-012). Cross-tenant isolation
+    confirmed via Pinecone namespace separation (structural, not just
+    tested). **Not performed, disclosed not silently skipped:** a real
+    rename/delete-then-resync orphan-cleanup proof (Codex's ask,
+    Card2c's D20 style) — would require mutating a real client's live
+    Notion content, which wasn't done without asking first. The orphan-
+    cleanup code path itself was confirmed to run (not skipped) in every
+    real sync this card performed (`orphan_step_skipped:false`), just
+    with nothing to clean up yet on a first sync.
+- [x] **T4 (P2)** — Mark **INT-012 only** deprecated in `Workflow_Registry.md`
   + a sticky note on INT-012 itself (D2). INT-011 is NOT deprecated — it
   keeps working as-is, unaffected by this card.
-  - Verify: doc entries updated, sticky note added, no config change to
+  - Verify: doc entry added, sticky note added live to INT-012
+    (`yrz1YZcWmUlIZQOx`), published, no parameter/connection change to
     either workflow.
-- [ ] **T5 (P1)** — `Workflow_Registry.md` entry for the new leg (mandatory
+- [x] **T5 (P1)** — `Workflow_Registry.md` entry for the new leg (mandatory
   per root `CLAUDE.md`'s Per-Workflow Documentation standing rule).
   - Verify: written from a live `get_workflow_details` read.
 

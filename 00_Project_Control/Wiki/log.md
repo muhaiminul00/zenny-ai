@@ -9,6 +9,68 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-09-03] session-bc076-card3b-shipped
+
+BC-076 Card 3b (Notion KB ingestion leg fix) built, live-tested, and
+shipped per its `/plan-eng-review`-locked design
+(`docs/designs/bc076-card3b-notion-kb-fix.md`). New workflow "Notion Fetch
+KB Leg" (`1o9Hr4Am1dgvEhmS`) feeds the existing Generic KB Ingestion Core;
+SCH-004's `notion` branch retargeted to it (D6 rollback/canary followed —
+old target `yrz1YZcWmUlIZQOx` documented for revert, single-client canary
+run via the draft version before publish, then a full live sweep before
+trusting it). INT-012 left running untouched, marked deprecated for
+Business KB purposes (Workflow_Registry.md + a live sticky note on the
+workflow itself).
+
+**Two real bugs found and fixed during this card's own live testing, not
+by static validation:**
+1. `$('NodeName').all()` throws `ExpressionError` (not an empty array)
+   when that node never executed in a given run — hit immediately on the
+   first test (Client A, all pages succeeded, `Format Page Failure` never
+   ran). Fixed with `try/catch`, same pattern Generic KB Ingestion Core's
+   own author already used for an analogous case.
+2. **Bigger, genuinely new finding:** the n8n Workflow SDK's own
+   zero-item-safety reference guidance states `splitInBatches` always
+   fires its `onDone` branch even on 0 input items. Live-verified this is
+   false: when the node feeding `splitInBatches` itself emits 0 items,
+   `splitInBatches` is simply never started at all (same skip-on-0-items
+   rule n8n applies to any ordinary node) — so `onDone` never fires
+   either. Caught against Carmelli Bakery's real Notion page mid-sweep
+   (execution 71104): her content is flat blocks, not nested `child_page`
+   blocks, so the filter correctly reduced 3→0 items, and her sync
+   silently dead-ended (`sync_status`/`last_synced_at` never updated) —
+   `lastNodeExecuted` stopped at the filter with nothing queued after,
+   despite the node itself reporting overall `executionStatus:"success"`.
+   Fixed with the SDK's own documented pattern for exactly this situation
+   (`alwaysOutputData` + an explicit real-vs-synthetic-item IF gate,
+   bypassing the loop for the 0-item case) — logged as a durable
+   `n8n-workflow-lifecycle-official` pitfall for future sessions.
+
+**D3's original premise (Carmelli's Notion Connections were broken) was
+wrong** — live testing showed her Connections were fine all along; her
+real page just isn't organized into sub-pages. No manual Notion-UI fix (the
+originally-planned T0) was needed or performed. This is now a confirmed
+real instance of the already-tracked "Notion leg may lose nested-block
+content" TODO (upgraded P3→P2, since it's no longer hypothetical).
+
+**Pre-existing, unrelated bug found incidentally**, not caused by this
+card: Shopify KB ingestion is currently failing in production (UTIL-006
+call 404s) — found during the mandatory SCH-004 regression sweep
+(confirmed via `get_workflow_details` that UTIL-006 itself still exists;
+root cause not diagnosed further). Logged as a new `TODOS.md` item (P1),
+not fixed here.
+
+**Live-verified, not assumed:** Client A's real Notion content (order-
+status/return-policy text) confirmed retrievable via a live
+`Search_business_kb` webhook call — genuine content in the response, not a
+canned/fallback answer. `sync_status` confirmed populated for both real
+clients (never was under INT-012). Full SCH-004 sweep confirmed the
+retargeted routing works in production context and doesn't disturb the
+Sheets branch (Shopify's pre-existing failure aside).
+
+Full detail, all 6 architecture decisions (D1-D6) and the Codex
+outside-voice resolution: `docs/designs/bc076-card3b-notion-kb-fix.md`.
+
 ## [2026-09-03] session-bc076-card3b-eng-review
 
 Pointer entry — full record lives in

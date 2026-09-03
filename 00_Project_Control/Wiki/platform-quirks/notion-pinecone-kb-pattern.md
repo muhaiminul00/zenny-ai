@@ -142,21 +142,24 @@ INT-010 (BC-045, not this pattern's own code) that was silently causing
 every real categorization to fail — see
 [[n8n-node-behaviors]] for the n8n array-response-splitting root cause.
 
-## Superseded for Business KB — BC-076 Card 3b (2026-09-03)
+## Superseded for Business KB — BC-076 Card 3b, SHIPPED (2026-09-03)
 
 This pattern's `zenny-email-kb` index was always Email Manager-specific
 (Phase 10). When the Phase 14 Business KB pivot needed a Notion ingestion
 leg, `SCH-004` (see `Workflow_Registry.md`) was generalized to route other
 source types to `zenny-business-kb`, but its `notion` branch was left
 pointing at INT-012 unchanged — a real gap: Notion KB content was
-unreachable via `Search_business_kb` at all. Card 3b's `/plan-eng-review`
-(`docs/designs/bc076-card3b-notion-kb-fix.md`) locked the fix: a NEW
-parallel "Notion Fetch KB Leg" workflow reusing this page's proven
-List-Child-Pages/Get-Page-Content logic, feeding the Generic KB Ingestion
-Core (D25) instead of INT-012's own hand-rolled upsert. INT-012/INT-011
-stay exactly as documented above, untouched, dormant once SCH-004 is
-retargeted — this page's content remains accurate for Email Manager's own
-(near-unused, 3 executions ever) Draft Email path.
+unreachable via `Search_business_kb` at all. Card 3b
+(`docs/designs/bc076-card3b-notion-kb-fix.md`) shipped the fix: a NEW
+parallel "Notion Fetch KB Leg" workflow (`1o9Hr4Am1dgvEhmS`) reusing this
+page's proven List-Child-Pages/Get-Page-Content logic, feeding the Generic
+KB Ingestion Core (D25) instead of INT-012's own hand-rolled upsert.
+SCH-004's `notion` branch now calls it; INT-012/INT-011 stay exactly as
+documented above, untouched, confirmed dormant (its only known caller —
+this page's content remains accurate for Email Manager's own, near-unused,
+Draft Email path). Live-verified: Client A's real content confirmed
+retrievable via `Search_business_kb`. Full narrative:
+`Wiki/log.md` session-bc076-card3b-shipped.
 
 **New finding from Card 3b's review, not previously documented here:**
 INT-012 never writes `sync_status` — it calls a different, older RPC

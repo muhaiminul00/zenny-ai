@@ -2,6 +2,38 @@
 
 ## Infrastructure
 
+### Shopify KB ingestion is currently broken in production — UTIL-006 call fails
+
+**What:** `Zenny Runtime - Shopify KB Ingestion` (`a7VNICxO5vPAp034`)'s
+"Resolve Shopify Credential (UTIL-006)" node fails every real run with
+`NodeOperationError: The resource you are requesting could not be found`
+when calling `LzP5m25iMmhROVsD` (UTIL-006, Credential Resolver). The error
+fires immediately on the call (~1s), before any of UTIL-006's own internal
+nodes show execution data — `get_workflow_details` confirms UTIL-006 itself
+still exists and is active, so the failure is more specific than "workflow
+deleted" (a permissions/project-visibility change, or something broken one
+level deeper inside UTIL-006's own logic — not diagnosed further).
+
+**Why:** This means Carmelli Bakery's daily Shopify KB sync (SCH-004's
+`shopify` branch) has been silently failing in production — confirmed live
+during BC-076 Card 3b's T2 regression sweep (execution 71104/71113,
+2026-09-03). Not something Card 3b touched or caused (Shopify's branch,
+UTIL-006, and the Shopify ingestion workflow were never modified this
+card) — found incidentally while verifying Card 3b's own changes didn't
+break sibling branches.
+
+**Context:** Needs its own investigation — check UTIL-006's real internal
+execution (a direct manual trigger against it, unpinned) to see exactly
+which of its own downstream calls 404s (`get_client_connection` RPC,
+`NiBCdKzb0pkvWBQn` refresh sub-workflow, or something else). SCH-004 also
+lacks `continueOnFail` on this branch, matching the already-known "one
+leg's failure marks the whole SCH-004 execution error" quirk — both are
+real gaps, not the same fix.
+
+**Effort:** S (diagnosis) / S-M (fix, once root cause is known)
+**Priority:** P1 (a real client's real Shopify content has stopped syncing)
+**Depends on:** None — can be picked up independently.
+
 ### `zenny-dashboard` has no automated redeploy-on-merge
 
 **What:** The live `zenny-dashboard` VPS container only rebuilds/re-clones
@@ -207,15 +239,23 @@ inside these block types would never reach the agent via `Search_business_kb`
 
 **Context:** Pre-existing since BC-047 (INT-012 uses the same `getMarkdown`
 approach), never audited. Card 3b's new Notion leg inherits this unchanged,
-by design (D1 — reuse INT-012's proven read logic verbatim). Unverified
-whether it's an actual problem for this project's real KB pages, which so
-far are simple text/paragraphs — needs a live test page using these block
-types to confirm either way.
+by design (D1 — reuse INT-012's proven read logic verbatim).
+
+**Confirmed real, not just hypothetical (2026-09-03, Card 3b T1 live
+test):** Carmelli Bakery's real Notion root page has its entire content as
+flat blocks (paragraph/heading_2/bulleted_list_item) directly under the
+root — zero nested `child_page` blocks. `List Child Pages` correctly finds
+0 child pages and the leg correctly reports `status:'success',
+synced_count:0` (not a false failure — D5 verified this is honest, not
+buggy) — but her real content (kosher bakery details, ordering policy,
+contact info) never reaches `Search_business_kb` at all. Not fixed in
+Card 3b (matches this TODO's own scope), but no longer theoretical.
 
 **Effort:** S (audit) / S-M (fix, if real — likely means walking Notion's
 block-children API recursively instead of relying on getMarkdown's flat
-export)
-**Priority:** P3
+export, or listing root-level blocks directly instead of only child pages)
+**Priority:** P2 (upgraded from P3 — a real client's real content is
+confirmed silently missing, not a hypothetical edge case)
 **Depends on:** None — can be picked up independently.
 
 ## Product

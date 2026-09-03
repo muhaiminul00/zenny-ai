@@ -19,7 +19,33 @@ cut content were relocated to `TODOS.md` rather than silently dropped.
 
 ## Last Updated
 
-2026-09-03 (latest) — by /commander — **BC-076 Card 3b (Notion KB
+2026-09-03 (latest) — by /execute — **BC-076 Card 3b (Notion KB ingestion
+leg fix) SHIPPED, live-verified end to end.** New workflow
+`Notion Fetch KB Leg` (`1o9Hr4Am1dgvEhmS`) feeds the Generic KB Ingestion
+Core; SCH-004's `notion` branch retargeted to it (D6 rollback/canary
+practice followed — old target `yrz1YZcWmUlIZQOx` documented, single-client
+canary run before the full sweep). **Two real bugs found and fixed during
+this card's own live testing:** `$('Node').all()` throws (not empty array)
+when that node never ran a given execution; and — bigger — the SDK's own
+zero-item-safety guidance claiming `splitInBatches.onDone` always fires on
+0 input items is empirically false (caught live against Carmelli Bakery's
+real page, which has flat content blocks, not nested child pages — her
+sync silently never completed until fixed). **D3's original premise was
+wrong**, found via live test: Carmelli's Notion Connections were never
+broken; her content just isn't organized into sub-pages — now correctly
+reported as `synced_count:0`, not a false failure, and tracked as a
+confirmed (not hypothetical) instance of the existing "Notion leg may lose
+nested-block content" TODO (upgraded P3→P2). **Pre-existing, unrelated
+bug found incidentally** during the mandatory SCH-004 regression sweep:
+Shopify KB ingestion is currently broken in production (UTIL-006 call
+fails) — logged as a new P1 `TODOS.md` item, not fixed (out of this
+card's scope). Client A's real Notion content confirmed retrievable via a
+live `Search_business_kb` webhook call. Full detail:
+`docs/designs/bc076-card3b-notion-kb-fix.md`,
+`06_Infrastructure/n8n/Workflow_Registry.md`, `Wiki/log.md`
+session-bc076-card3b-shipped.
+
+2026-09-03 (prior) — by /commander — **BC-076 Card 3b (Notion KB
 ingestion leg fix) `/plan-eng-review` CLEARED, 0 unresolved decisions.**
 Human questioned whether Card 4 (canary) was worth finishing now given the
 project is still in active build phase and Cards 3b/3c would likely change
@@ -204,10 +230,13 @@ Client E (old): e5f6a7b8-0001-4c1d-9e2a-000000000005 — engagement — client_t
 
 **Admin Provisioning client-picker fix — SHIPPED** (see Last Updated
 above). **Admin Provisioning Bootstrap — SHIPPED.** **BC-076 Card 3 —
-SHIPPED** (Shopify + WooCommerce ingestion). **Card 4 (canary/smoke-test)
-— PAUSED, T1 of 8 done** (branch `bc076-card4-canary-smoke-test`, not yet
-PR'd; `control.canary_results` table + 3 RPCs already live in Supabase,
-leg-agnostic so no rework risk from resequencing below).
+SHIPPED** (Shopify + WooCommerce ingestion). **BC-076 Card 3b — SHIPPED**
+(Notion KB ingestion leg fix, see Last Updated above). **Card 4
+(canary/smoke-test) — PAUSED, T1 of 8 done** (branch
+`bc076-card4-canary-smoke-test`, not yet PR'd; `control.canary_results`
+table + 3 RPCs already live in Supabase, leg-agnostic so no rework risk
+from resequencing below). **Next in queue: Card 3c**, per the resequencing
+decision below.
 
 **Resequencing decision (2026-09-03, /commander):** human raised the
 concern that finishing Card 4 now, before Cards 3b/3c change the
@@ -222,16 +251,7 @@ already-flagged-as-v1 freshness mechanism — but sequencing 3b/3c first
 avoids touching the canary build mid-flight at all.
 
 **Follow-ups, tracked not dropped:**
-- **Card 3b** (Notion leg fix) — `/plan-eng-review` **CLEARED 2026-09-03**
-  (`docs/designs/bc076-card3b-notion-kb-fix.md`, 0 unresolved decisions).
-  Locked: a NEW parallel "Notion Fetch KB Leg" workflow feeds the existing
-  Generic KB Ingestion Core (not a re-point of INT-012 — live verification
-  found INT-011/INT-012's real usage is near-zero, 3 executions ever, so
-  touching them wasn't worth the risk). Also found INT-012 never wrote
-  `sync_status` at all — a silent-failure blind spot closed by this fix.
-  Codex outside-voice caught 2 real gaps (empty-KB wipe safety, SCH-004
-  retarget rollback/canary), both folded in. **Ready to build — not yet
-  started.**
+- **Card 3b — SHIPPED**, see Last Updated above.
 - **Card 3c** (embedded Baserow — new self-hosted infra + client-facing
   catalog UI, then its ingestion leg) — not yet specced, needs its own
   `/plan-eng-review` pass.
