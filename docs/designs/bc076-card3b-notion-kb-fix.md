@@ -198,9 +198,14 @@ CODE PATHS (new: "Notion Fetch KB Leg" workflow)
 USER-FACING FLOW
 [+] Search_business_kb query for Notion-sourced content
   ├── [GAP] Client A: real query returns real Notion content (round-trip proof)
-  └── [GAP] Carmelli (post-D3 fix): same round-trip proof — 2nd real client
+  └── [GAP] Carmelli (0 nested child pages, D3 revised): safe-status proof
+        (synced_count:0, not a false failure) — content itself not indexed,
+        tracked separately as a confirmed nested-block-content TODO
 
-COVERAGE: 0/10 paths tested (0%) — none built yet, this plan defines the full test set
+COVERAGE (as planned, pre-build): 0/10 paths tested (0%) — this plan
+defines the full test set. **Actual post-build coverage: see "Post-build
+results" section below** — this diagram was never updated in place after
+the build; treat it as the plan's intent, not a report of outcomes.
 ```
 
 **REGRESSION RULE:** SCH-004 is existing, shipped, active production infra
@@ -235,8 +240,8 @@ noting as a known scaling limit if KB sizes grow. No blocking issues.
 
 | Codepath | Failure | Test? | Error handling? | User-visible? |
 |---|---|---|---|---|
-| List Child Pages | Notion API 404/no Connections | Yes (D3 fix + live verify) | Yes — `read_complete:false` → `status:'failed'` | Visible via `sync_status` (new — INT-012 never had this) |
-| Get Page Content (per page) | Transient fetch failure | Yes (D4) | Yes — whole-run `read_complete:false` | Visible via `sync_status` |
+| List Child Pages | Notion API 404/no Connections | Yes (D5 raw-response check + live verify) | Yes — `read_complete:false` → `status:'failed'` | Visible via `sync_status` (new — INT-012 never had this) |
+| Get Page Content (per page) | Transient fetch failure | **Not live-triggered** — verified only by reading Generic Core's wiring (D4's own note above), no real mid-loop failure was actually forced during T1/T2 testing | Yes — whole-run `read_complete:false` | Visible via `sync_status` |
 | SCH-004 retarget | Wrong workflow ID wired | Yes (live `get_workflow_details` check) | N/A (config, not runtime) | Silent if unverified — mandatory pre-ship check |
 | SCH-004 other branches | Retarget accidentally breaks Sheets/Shopify/WooCommerce | Yes (regression sweep, mandatory) | N/A | Would be silent without live sweep — critical gap if skipped |
 | Empty-KB report (D5) | Parsing/API bug reports 0 pages when client has real content | Yes (raw-response sanity check) | Yes — falls back to `read_complete:false` | Would have silently wiped a client's real KB without D5 |
@@ -305,6 +310,54 @@ outside-voice). Each task derives from a specific finding above.
 _JSONL task artifact skipped — `jq` not installed in this environment (same
 gap noted during BC-076 Card 4's review)._
 
+## Post-build results (added after live testing — not part of the original locked plan)
+
+**T1's actual verify method differed from the plan.** The plan called for
+`test_workflow` against pinned data. What actually happened: genuine live
+**unpinned** round trips via temporary harness workflows (matching this
+project's established BC-049 convention), which is a stronger proof (real
+Notion API + real embed/upsert) but a different method than planned —
+noted here since the plan itself was never updated to say so.
+
+**Two real bugs found during T1/T2 live testing, neither anticipated by
+this plan, `/plan-eng-review`, or Codex's outside-voice pass:**
+
+1. `$('NodeName').all()` throws `ExpressionError` (not an empty array)
+   when that node never executed in a given run. Fixed with `try/catch`
+   in `Build Records and Read Complete`.
+2. **The bigger one:** the n8n SDK reference's zero-item-safety guidance
+   claims `splitInBatches.onDone` always fires even on 0 input items.
+   Live-verified false — first caught during T2's SCH-004 canary sweep
+   (execution 71104) against Carmelli Bakery's real page (flat content
+   blocks, 0 nested `child_page` blocks): her sync silently dead-ended,
+   `sync_status`/`last_synced_at` never updated, despite the calling node
+   reporting overall `executionStatus:"success"`. Fixed with an explicit
+   `alwaysOutputData` + real-vs-synthetic-item `IF` gate bypassing the
+   loop for the 0-item case. Re-confirmed fixed via a dedicated re-test
+   against Carmelli specifically, execution 71148 — **not** within
+   execution 71104 itself, which is where the bug was first caught,
+   before the fix (a citation error in an earlier pass of this doc set
+   conflated the two; corrected here and in `Workflow_Registry.md`).
+
+**Worth naming directly: D5 and this second bug are different failure
+modes.** D5 (the empty-KB safety decision, locked before any build) guards
+against a malformed/unexpected Notion API response being misread as
+"genuinely empty." The real bug that hit Carmelli was a pure n8n
+control-flow gap — a *correct* 0-item filter result never reaching the
+Generic Core at all. Neither the architecture review nor Codex's outside
+voice caught this class of gap; only live testing did. The plan's own
+Section 3 close ("No critical gaps remain unaddressed") was accurate for
+every gap identified *at plan time* — it just didn't anticipate a platform
+behavior contradicting the SDK's own documented guarantee, which is a
+different, more fundamental class of miss than what a design review can
+catch by inspection.
+
+**D4's whole-run `read_complete:false` mechanism was never live-triggered.**
+Verified only by reading Generic Core's actual wiring (confirmed correct,
+see D4 above) — no real execution actually forced a mid-loop per-page
+fetch failure during T1/T2. The Failure Modes table below is corrected to
+reflect this rather than claim it as tested.
+
 ## Completion summary
 
 - Step 0: Scope Challenge — scope accepted as-is (1 new workflow + 1 SCH-004
@@ -337,7 +390,7 @@ gap noted during BC-076 Card 4's review)._
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | not run (not a product-direction change) |
-| Codex Review | `/codex review` | Independent 2nd opinion | 1 | RAN | 15 points raised, 6 substantive (2→decisions D5/D6, 2→TODOS, 1 dismissed w/ evidence, 1 doc fix), 8 resolved by evidence already in hand |
+| Codex Review | `/codex review` | Independent 2nd opinion | 1 | RAN | 15 points raised: 2→decisions D5/D6, 2→TODOS, 1 dismissed w/ evidence, 1 doc fix, 1 folded into T2's Verify step (credential-binding), 8 resolved by evidence already in hand (2+2+1+1+1+8=15) |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 6 issues found (D1-D6), 0 unresolved, 0 critical gaps |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | not run (no UI changes) |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | not run |

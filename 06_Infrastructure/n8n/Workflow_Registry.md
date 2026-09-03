@@ -1128,10 +1128,12 @@ directly rather than doing its own internal lookup. **Published**
 `activeVersionId 31873c73-...`). D6 rollback note: revert this node's
 `workflowId` to `yrz1YZcWmUlIZQOx` + drop the `source_ref` mapping to
 restore the pre-Card3b routing. **Live-verified via a full real sweep**
-(execution 71104, canary run before publish per D6): all 6 real `notion`
-rows synced correctly through the new leg (Client A got real content
-indexed; Carmelli correctly got `status:'success', synced_count:0` — see
-the new leg's own entry for why); `google_sheets` branch unaffected
+(execution 71104, canary run before publish per D6 — this is the SAME run
+that first caught the `splitInBatches.onDone` bug against Carmelli's real
+page, see the new leg's own entry; her sync was fixed and re-confirmed
+separately afterward, execution 71148, not re-proven within 71104 itself):
+Client A got real content indexed correctly through the new leg;
+`google_sheets` branch unaffected
 (idempotent re-sync, empty diff, no error). **Pre-existing, unrelated bug
 found incidentally, not caused by this change:** the `shopify` branch
 failed (`Resolve Shopify Credential (UTIL-006)` → "resource could not be
@@ -1214,9 +1216,12 @@ Client A (`baa673b5-...`, real content, 1 page) — `sync_status:
 real `Search_business_kb` webhook call (real content returned, not a
 canned response). Carmelli Bakery (`eb27a21f-...`, 0 nested child pages) —
 `sync_status: {status:'success', synced_count:0, read_complete:true}`,
-correctly not a false failure. Full SCH-004 sweep (execution 71104, see
-its entry above) confirmed the retargeted production routing itself works
-and doesn't disturb sibling branches.
+correctly not a false failure — confirmed via a dedicated re-test
+(execution 71148) after the `splitInBatches.onDone` fix, not within the
+original sweep execution 71104 (which is where that bug was first caught,
+before the fix). Full SCH-004 sweep (execution 71104, see its entry above)
+separately confirmed the retargeted production routing itself works and
+doesn't disturb sibling branches.
 
 **KNOWN GAP, disclosed not hidden, tracked in `TODOS.md`:** only lists
 direct `child_page`-type children — a client whose real Notion content is
