@@ -9,6 +9,126 @@
 # Session Log and Session_Log_Archive.md verbatim on 2026-08-10.
 ---
 
+## [2026-09-03] session-bc076-card3b-shipped
+
+BC-076 Card 3b (Notion KB ingestion leg fix) built, live-tested, and
+shipped per its `/plan-eng-review`-locked design
+(`docs/designs/bc076-card3b-notion-kb-fix.md`). New workflow "Notion Fetch
+KB Leg" (`1o9Hr4Am1dgvEhmS`) feeds the existing Generic KB Ingestion Core;
+SCH-004's `notion` branch retargeted to it (D6 rollback/canary followed —
+old target `yrz1YZcWmUlIZQOx` documented for revert, single-client canary
+run via the draft version before publish, then a full live sweep before
+trusting it). INT-012 left running untouched, marked deprecated for
+Business KB purposes (Workflow_Registry.md + a live sticky note on the
+workflow itself).
+
+**Two real bugs found and fixed during this card's own live testing, not
+by static validation:**
+1. `$('NodeName').all()` throws `ExpressionError` (not an empty array)
+   when that node never executed in a given run — hit immediately on the
+   first test (Client A, all pages succeeded, `Format Page Failure` never
+   ran). Fixed with `try/catch`, same pattern Generic KB Ingestion Core's
+   own author already used for an analogous case.
+2. **Bigger, genuinely new finding:** the n8n Workflow SDK's own
+   zero-item-safety reference guidance states `splitInBatches` always
+   fires its `onDone` branch even on 0 input items. Live-verified this is
+   false: when the node feeding `splitInBatches` itself emits 0 items,
+   `splitInBatches` is simply never started at all (same skip-on-0-items
+   rule n8n applies to any ordinary node) — so `onDone` never fires
+   either. Caught against Carmelli Bakery's real Notion page mid-sweep
+   (execution 71104): her content is flat blocks, not nested `child_page`
+   blocks, so the filter correctly reduced 3→0 items, and her sync
+   silently dead-ended (`sync_status`/`last_synced_at` never updated) —
+   `lastNodeExecuted` stopped at the filter with nothing queued after,
+   despite the node itself reporting overall `executionStatus:"success"`.
+   Fixed with the SDK's own documented pattern for exactly this situation
+   (`alwaysOutputData` + an explicit real-vs-synthetic-item IF gate,
+   bypassing the loop for the 0-item case) — logged as a durable
+   `n8n-workflow-lifecycle-official` pitfall for future sessions.
+
+**D3's original premise (Carmelli's Notion Connections were broken) was
+wrong** — live testing showed her Connections were fine all along; her
+real page just isn't organized into sub-pages. No manual Notion-UI fix (the
+originally-planned T0) was needed or performed. This is now a confirmed
+real instance of the already-tracked "Notion leg may lose nested-block
+content" TODO (upgraded P3→P2, since it's no longer hypothetical).
+
+**Pre-existing, unrelated bug found incidentally**, not caused by this
+card: Shopify KB ingestion is currently failing in production (UTIL-006
+call 404s) — found during the mandatory SCH-004 regression sweep
+(confirmed via `get_workflow_details` that UTIL-006 itself still exists;
+root cause not diagnosed further). Logged as a new `TODOS.md` item (P1),
+not fixed here.
+
+**Live-verified, not assumed:** Client A's real Notion content (order-
+status/return-policy text) confirmed retrievable via a live
+`Search_business_kb` webhook call — genuine content in the response, not a
+canned/fallback answer. `sync_status` confirmed populated for both real
+clients (never was under INT-012). Full SCH-004 sweep confirmed the
+retargeted routing works in production context and doesn't disturb the
+Sheets branch (Shopify's pre-existing failure aside).
+
+Full detail, all 6 architecture decisions (D1-D6) and the Codex
+outside-voice resolution: `docs/designs/bc076-card3b-notion-kb-fix.md`.
+
+## [2026-09-03] session-bc076-card3b-eng-review
+
+Pointer entry — full record lives in
+`docs/designs/bc076-card3b-notion-kb-fix.md`'s `## GSTACK REVIEW REPORT`
+(the doc itself carries the full findings/decisions/Codex report — this is
+just a discoverability pointer, not a duplicate).
+
+Summary: `/plan-eng-review` for BC-076 Card 3b (Notion KB ingestion leg
+fix), run per the 2026-09-03 resequencing decision (Card 3b → 3c → resume
+Card 4). Live verification (Mandatory MCP Verification — n8n, Supabase,
+Pinecone) confirmed INT-012 still writes to `zenny-email-kb` (not
+`zenny-business-kb`), SCH-004's `notion` branch still calls unmodified
+INT-012, and — a new finding not previously documented — INT-012 never
+writes `sync_status` at all (a different, older RPC only touches
+`last_synced_at`), so a silently-failing Notion sync is currently
+invisible. Also found INT-011 (Draft Email) has only 3 executions ever,
+last 2026-09-01 — confirming near-zero real production dependency on the
+Phase 10 path this card was worried about disturbing.
+
+6 architecture decisions locked (D1-D6): build a new parallel "Notion Fetch
+KB Leg" workflow feeding the existing Generic KB Ingestion Core (D25),
+leaving INT-012/INT-011 running untouched (D1); deprecate INT-012 only, not
+INT-011, in docs (D2); fix Carmelli Bakery's broken Notion Connections gap
+in-scope so the fix can be verified against both real clients (D3);
+whole-run `read_complete:false` on any per-page fetch failure (D4); an
+empty-KB raw-response safety check to prevent a parsing bug from wiping a
+client's real KB (D5, Codex catch); SCH-004 retarget rollback+canary
+practice before trusting the full daily sweep (D6, Codex catch). Codex
+outside-voice raised 15 points — 8 resolved by evidence already gathered
+this session (Generic Core's actual `read_complete` wiring, INT-012's real
+node config, pagination already handled via `returnAll:true`), 2 became
+D5/D6, 2 became TODOS.md items (shared fetch-adapter contract; nested-block
+content-fidelity audit), 1 dismissed (a false positive from Codex's
+restricted read access), 1 was a doc-wording fix. 0 unresolved decisions.
+
+## [2026-09-03] session-bc076-card4-anon-grant-third-occurrence-fixed
+
+During BC-076 Card 4's (canary/smoke-test) `/plan-eng-review` → build
+transition, found `public.upsert_client_kb_source` (created 2026-09-02,
+BC-076-Card3) had the same anon/authenticated over-grant vulnerability
+class as BC-052/BC-064 — `SECURITY DEFINER`, zero internal auth check,
+`EXECUTE` granted to both `PUBLIC` and a separate explicit `authenticated`
+grant. Any caller with either key could overwrite any client's
+`client_kb_source` row (source_ref/sync_status/source_config) for any
+client_id. Found incidentally while checking grant conventions before
+writing new RPCs for Card 4's `canary_results` table — not a dedicated
+audit. Fixed same session: revoked both grants, left `service_role` only
+(the real caller, same as every prior occurrence). Live-verified via
+`get_advisors(type: security)` re-run — cleared from both SECURITY
+DEFINER finding categories; remaining findings are the already-accepted
+`dashboard_*` family. Two lower-severity siblings
+(`create_archetype_template`/`create_client_schema_from_template`,
+PUBLIC-granted but SECURITY INVOKER, not actually exploitable) logged in
+`TODOS.md`, not fixed this pass. Full detail:
+`Wiki/platform-quirks/anon-grant-exposure-bc052.md`.
+
+---
+
 ## [2026-09-02] session-admin-provision-client-picker-fix-shipped
 
 Follow-up to the Admin Provisioning Bootstrap card (below), same day —

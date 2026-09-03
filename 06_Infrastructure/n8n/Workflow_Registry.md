@@ -978,6 +978,18 @@ Published (`a5c4b85d-7adb-480b-a92c-38a41ef5188d`).
 ### INT-012 — Zenny Email Manager - SyncNotionKB (INT-012)
 **n8n ID:** `yrz1YZcWmUlIZQOx` · **published**, active (no production trigger — see Trigger)
 
+**DEPRECATED for Business KB, BC-076-Card3b (2026-09-03):** SCH-004's
+`notion` branch no longer calls this workflow — see its updated entry
+below and the new **Notion Fetch KB Leg** entry after it. This workflow
+now goes naturally dormant (its only known caller was SCH-004; live
+`search_workflows` confirmed no other workflow references it). Left
+running, untouched, still correct for Email Manager's own (near-unused,
+3 executions ever) INT-011 Draft Email path — see D1/D2,
+`docs/designs/bc076-card3b-notion-kb-fix.md`. Every gap this entry
+documents below (no `sync_status`, no orphan-cleanup, `zenny-email-kb`
+not `zenny-business-kb`) is now fixed **for Business KB only**, by the new
+leg — this workflow itself was not modified and still has them.
+
 **PURPOSE:** BC-047. KB ingest side of the Notion+Pinecone pivot that replaces the Convocore-KB plan (blocked — see `Wiki/log.md` and `Wiki/platform-quirks/notion-pinecone-kb-pattern.md`). Invoked per-client, syncs that client's Notion KB root page's child pages into Pinecone (index `zenny-email-kb`, namespace = `client_id`) for INT-011 to query at draft time.
 
 **TRIGGER:** `executeWorkflowTrigger` only — no production cadence yet (a future SCH-004 cron card, not built this session; today it's manual/on-demand only).
@@ -1105,6 +1117,117 @@ Published (`a5c4b85d-7adb-480b-a92c-38a41ef5188d`).
 **BC-076-Card3 (2026-09-02) — two more branches, same generalized pattern.** `Get Clients With KB Source`'s filter extended to `source_type=in.(notion,google_sheets,shopify,woocommerce)`; `Route by Source Type` gained `shopify` → `Call Shopify KB Ingestion` and `woocommerce` → `Call WooCommerce KB Ingestion` branches (new Execute Workflow nodes, `addConnection` used explicitly per this project's own documented switch-node gotcha, not `updateNodeParameters` alone). Unlike the Notion/Sheets legs, these two new fetch workflows resolve their own `source_ref` live via UTIL-006 rather than needing it read from `client_kb_source` — so the dispatcher only passes `client_id` to them. **Published** (`activeVersionId 62f5118f-...`). **A real gap found live, not assumed:** neither Carmelli Bakery nor Client A had a `client_kb_source` row for `shopify`/`woocommerce` yet — unlike Notion/Sheets, nothing had ever provisioned one. Two rows inserted live via `upsert_client_kb_source` (`source_config: null`, since these legs don't need it) before the dispatcher could pick them up at all — a manual step, not yet part of any onboarding flow (worth noting for whenever self-serve provisioning is built). **Live-verified, full sweep (execution 70527, sub-executions 70535/70537 Shopify, 70538/70540 WooCommerce):** all 9 rows (6 notion + 1 google_sheets + 1 shopify + 1 woocommerce) routed correctly in one real dispatcher run; see the new workflows' own entries below for what each leg actually proved.
 
 **One real bug found and fixed during this pass' first live test, not caught by `validate_workflow`:** `get_client_connection(p_client_id, p_category)` filters on `control.client_connections.category` — a functional grouping (`ecommerce`/`calendar`/`email`/`telephony`), not the provider name. Both new fetch workflows initially passed `category: 'shopify'`/`category: 'woocommerce'` (the provider name, wrongly assumed to double as the category) — UTIL-006 correctly returned `available:false` for a real, connected, working Shopify account, since no row matched. Live-verified the actual `category` value (`'ecommerce'` for both) via `control.client_connections` directly rather than guessing from the RPC's parameter name, fixed both workflows, re-verified with a second live sweep. A client can only have one `category='ecommerce'` connection at a time in the current schema — a real constraint (a client uses either Shopify or WooCommerce, not both), not a bug in this fix.
+
+**BC-076-Card3b (2026-09-03) — `notion` branch retargeted off INT-012.**
+`Route by Source Type`'s `notion` output now calls the new **Notion Fetch
+KB Leg** (`1o9Hr4Am1dgvEhmS`, see its own entry below) instead of INT-012
+— now also passes `source_ref` (read directly from `client_kb_source`,
+matching the Sheets leg's convention) since the new leg receives it
+directly rather than doing its own internal lookup. **Published**
+(`activeVersionId 83f0a939-...` on the new leg; SCH-004's own
+`activeVersionId 31873c73-...`). D6 rollback note: revert this node's
+`workflowId` to `yrz1YZcWmUlIZQOx` + drop the `source_ref` mapping to
+restore the pre-Card3b routing. **Live-verified via a full real sweep**
+(execution 71104, canary run before publish per D6 — this is the SAME run
+that first caught the `splitInBatches.onDone` bug against Carmelli's real
+page, see the new leg's own entry; her sync was fixed and re-confirmed
+separately afterward, execution 71148, not re-proven within 71104 itself):
+Client A got real content indexed correctly through the new leg;
+`google_sheets` branch unaffected
+(idempotent re-sync, empty diff, no error). **Pre-existing, unrelated bug
+found incidentally, not caused by this change:** the `shopify` branch
+failed (`Resolve Shopify Credential (UTIL-006)` → "resource could not be
+found" calling UTIL-006) — confirmed via `get_workflow_details` that
+UTIL-006 itself still exists; root cause not diagnosed further, logged as
+`TODOS.md`'s "Shopify KB ingestion is currently broken in production" (P1,
+separate from this card).
+
+---
+
+### Notion Fetch KB Leg — Zenny Runtime (BC-076-Card3b)
+**n8n ID:** `1o9Hr4Am1dgvEhmS` · **published**, active (no production
+trigger — called by SCH-004's `notion` branch only)
+
+**PURPOSE:** BC-076-Card3b. Replaces INT-012 as the Notion path into
+`zenny-business-kb` (the cross-archetype Business KB `Search_business_kb`
+tool actually queries) — INT-012 only ever wrote to the old, Email-Manager-
+specific `zenny-email-kb` index and never got the Generic KB Ingestion
+Core's hardening (orphan-cleanup, `sync_status` writes). Full design:
+`docs/designs/bc076-card3b-notion-kb-fix.md`.
+
+**TRIGGER:** `executeWorkflowTrigger` only — called by SCH-004 (production
+cadence) or manually for testing.
+
+**INPUT:** `{ client_id, source_ref }` — `source_ref` is the Notion KB
+root page ID, passed directly by the caller (unlike INT-012, which did its
+own internal `get_client_kb_source` lookup).
+
+**OUTPUT / END STATE (no HTTP response — Execute Workflow return value):**
+the Generic KB Ingestion Core's own return value: `{ p_client_id,
+p_source_type: 'notion', p_source_ref, p_sync_status }` (see that
+workflow's own entry for the `sync_status` JSON shape).
+
+**PIPELINE:** `List Child Pages` (native Notion node, `block.getAll`,
+`returnAll:true`, credential `zenny-notion-api` explicitly pinned by ID —
+not `newCredential()` placeholder, to avoid the exact wrong-credential-
+auto-assignment bug BC-047 hit once already) → on error, `Handle Listing
+Failure` short-circuits straight to the Core with `read_complete:false,
+records:[]`. On success → `Keep Only Child Pages` (filter, `type ===
+'child_page'`, `alwaysOutputData:true`) → `Has Child Pages?` (IF, real
+match vs synthetic empty item) → **false branch:** `Build Empty Result`
+straight to the Core with `read_complete:true, records:[]` (a genuinely
+0-child-page KB, not a failure) → **true branch:** `Loop Over Pages`
+(`splitInBatches`, batch size 1) → `Get Page Content` (`block.getMarkdown`)
+→ success/failure both feed `Build Records and Read Complete`, which computes
+`read_complete = (no page failed this run)` and builds `records:[{row_key,
+content}]` from whatever succeeded → `Call Generic KB Ingestion Core`
+(`source_type:'notion'`).
+
+**REAL DEPENDENCIES:** `zenny-notion-api` (existing credential, reused).
+`Zenny Runtime - Generic KB Ingestion Core` (`XxkqBACpoJiifl0T`, called,
+never modified).
+
+**REAL BUG FOUND AND FIXED DURING THIS CARD'S OWN LIVE TESTING (twice), not
+caught by `validate_workflow`:**
+1. `$('NodeName').all()` throws `ExpressionError` (not an empty array) when
+   that node never executed in a given run — e.g. `Format Page Failure`
+   when every page succeeded. Fixed with `try/catch` around both `.all()`
+   calls in `Build Records and Read Complete` (same pattern Generic KB
+   Ingestion Core's own author already used for `Compute Orphaned Row
+   Keys`).
+2. **Bigger one:** the SDK reference's zero-item-safety guidance claims
+   `splitInBatches` always fires its `onDone` branch even on 0 input items.
+   Live-verified this is false — when the node feeding `splitInBatches`
+   itself emits 0 items, `splitInBatches` is simply never started (same
+   skip-on-0-items rule as any ordinary node), so `onDone` never fires
+   either. Caught live against Carmelli Bakery's real page (flat content
+   blocks, 0 nested `child_page` blocks) — her sync silently never
+   completed, `sync_status`/`last_synced_at` stayed null. Fixed by adding
+   the explicit `Has Child Pages?` gate described above (`alwaysOutputData`
+   + a real-vs-synthetic-item IF), bypassing the loop entirely for the
+   0-item case rather than trusting `onDone`. Logged as a durable
+   `n8n-workflow-lifecycle-official` learning.
+
+**LAST VERIFIED:** BC-076-Card3b, 2026-09-03 — genuine live unpinned round
+trips via temporary harness workflows (both deleted/archived after):
+Client A (`baa673b5-...`, real content, 1 page) — `sync_status:
+{status:'success', synced_count:1}`, 1 new vector in
+`zenny-business-kb`'s `baa673b5-...` namespace, confirmed retrievable via a
+real `Search_business_kb` webhook call (real content returned, not a
+canned response). Carmelli Bakery (`eb27a21f-...`, 0 nested child pages) —
+`sync_status: {status:'success', synced_count:0, read_complete:true}`,
+correctly not a false failure — confirmed via a dedicated re-test
+(execution 71148) after the `splitInBatches.onDone` fix, not within the
+original sweep execution 71104 (which is where that bug was first caught,
+before the fix). Full SCH-004 sweep (execution 71104, see its entry above)
+separately confirmed the retargeted production routing itself works and
+doesn't disturb sibling branches.
+
+**KNOWN GAP, disclosed not hidden, tracked in `TODOS.md`:** only lists
+direct `child_page`-type children — a client whose real Notion content is
+flat blocks under the root (like Carmelli's) never gets indexed at all,
+correctly reported as `synced_count:0` rather than silently dropped or
+falsely failed, but still genuinely missing from `Search_business_kb`.
 
 ---
 
