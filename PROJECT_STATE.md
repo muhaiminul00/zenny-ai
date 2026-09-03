@@ -19,7 +19,37 @@ cut content were relocated to `TODOS.md` rather than silently dropped.
 
 ## Last Updated
 
-2026-09-02 (latest) — by /execute — **Admin Provisioning client-picker fix SHIPPED: "Add Admin" no longer requires picking a client.** Human feedback after live-testing the Bootstrap card (below): minting an admin/super_admin shouldn't need a "nominal home client" — it was only there to satisfy `dashboard_users.client_id`'s old `NOT NULL` constraint. Fixed at the schema level: `client_id` is now nullable with a strict CHECK (`client_user` → must be set; `admin`/`super_admin` → must be NULL). Migration order matters and was gotten right (drop NOT NULL → backfill existing admin rows to NULL → add CHECK), a real Codex-caught correction. **Real, independent bug found and fixed in the same pass:** `dashboard_admin_list_clients()`'s login-email lookup had no role filter — could show an admin's email as a client's "login" under the wrong timing; added an explicit role filter, regression-verified against all 6 real clients. `create_admin`'s Edge Function branch and `AddAdminTab` both simplified to drop the client field entirely; the 3 provisioning tabs got visually regrouped (client actions vs. "Internal accounts"). **Live-verified end to end:** schema, the list-view regression, `create_admin` via curl with a real super_admin JWT, the `dashboard_provision_user` (client_id, role) pairing across a real remap, `map_existing`/`SUPER_ADMIN_REQUIRED` regression-checked, and the UI via `gstack /browse` against a local dev server (all 3 tabs, zero console errors). 3 new `TODOS.md` items from Codex's outside-voice review: a deferred `useProvisionForm` DRY extraction (cross-model tension, human sided with the regression-risk argument over doing it now), RPC role-guard hardening, and a multi-login "oldest wins" ambiguity. **CRITICAL security bug found and fixed during `/review`'s adversarial pass, before merge:** `map_existing`/`create_client`'s remap paths never checked the target account's current role — any plain `admin` could have silently demoted the platform's only `super_admin` to a `client_user`. Fixed with a shared server-side guard (routed through a new `SECURITY DEFINER` RPC, `dashboard_get_user_role()`, after a direct table read hit the same `service_role`-has-no-grants-on-`dashboard_users` bug for the 3rd time this project). Re-verified live: the exact attack now 403s, unaffected accounts unaffected. 2 more `TODOS.md` items logged (remap-confirm UI context, CORS wildcard). Full detail: `Wiki/log.md` session-admin-provision-client-picker-fix-shipped, `Wiki/infra/dashboard-auth-mapping.md`.
+2026-09-03 (latest) — by /commander — **BC-076 Card 3b (Notion KB
+ingestion leg fix) `/plan-eng-review` CLEARED, 0 unresolved decisions.**
+Human questioned whether Card 4 (canary) was worth finishing now given the
+project is still in active build phase and Cards 3b/3c would likely change
+the ingestion leg set — resequenced to Card 3b → Card 3c → resume Card 4,
+rather than finishing Card 4 first or deferring it to a post-stable
+"pre-production monitoring" phase entirely (Card 4's own DB objects are
+leg-agnostic, so no rework risk from the reorder). Card 3b's review then
+ran with full Mandatory MCP Verification against live n8n/Supabase/Pinecone:
+confirmed INT-012 still writes to the wrong Pinecone index (`zenny-email-kb`,
+not `zenny-business-kb`) and — a new finding — never writes `sync_status`
+at all, making a silently-failing Notion sync currently invisible. Also
+found INT-011 (Draft Email) has only 3 executions ever, last 2026-09-01 —
+the "don't break a real live consumer" risk this card's own context brief
+worried about turned out to be near-zero in practice. **Locked design**
+(`docs/designs/bc076-card3b-notion-kb-fix.md`): build a NEW parallel
+"Notion Fetch KB Leg" workflow feeding the existing Generic KB Ingestion
+Core (D25) — not a re-point of INT-012 — leaving INT-012/INT-011 running
+untouched (deprecated in docs only). Codex outside-voice caught 2 real
+design gaps this review's own sections missed (an empty-KB parsing bug
+could wipe a client's real KB via orphan-cleanup; SCH-004's production
+routing retarget had no rollback/canary plan) — both folded in as D5/D6.
+2 new `TODOS.md` items logged (P3): a shared fetch-adapter contract across
+ingestion legs, and an audit of whether Notion's markdown export loses
+content inside nested toggles/columns/tables. Full detail:
+`Wiki/log.md` session-bc076-card3b-eng-review,
+`Wiki/platform-quirks/notion-pinecone-kb-pattern.md`.
+
+2026-09-03 (prior) — by /commander + /execute — **BC-076 Card 4 (canary/smoke-test) IN PROGRESS, paused for human review at T1 of 8.** Full `/plan-eng-review` + Codex outside-voice review completed and locked (`docs/designs/bc076-card4-canary-smoke-test.md`, branch `bc076-card4-canary-smoke-test`) — outside voice caught real scope creep in the original design (touching 2 shipped ingestion workflows to add a shared sync log) and forced a revision to a fully additive, canary-owned design (its own `canary_results` table, freshness via n8n's own execution-history API, retrieval probes against canary-owned fixture data, not real client content). **T1 (database) shipped and live-verified:** `control.canary_results` table + 3 `SECURITY DEFINER` RPCs (`insert_canary_result`/`get_recent_canary_results`/`prune_canary_results`), correctly locked to `service_role` only from creation. **Real, unrelated CRITICAL security bug found and fixed along the way (third occurrence of this vulnerability class):** `upsert_client_kb_source` (every KB ingestion leg's own sync-status writer, created 2026-09-02 during Card 3) had zero internal auth check and was `EXECUTE`-granted to both `anon` and `authenticated` — any caller could overwrite any client's KB source pointer. Fixed, live-verified via Security Advisor (cleared from both SECURITY DEFINER findings). Also discovered and logged as a durable pitfall: this Supabase project auto-grants `EXECUTE` to `anon`+`authenticated` on every NEW function by default — a bare `REVOKE ... FROM PUBLIC` does not remove these, an explicit `REVOKE ... FROM anon, authenticated` is required and was missed on my own first attempt at the 3 new canary RPCs before being caught and fixed same session. **T2-T8 remain** (fixture seeding across Sheets/Shopify/WooCommerce, the actual n8n canary workflow build — ~10+ nodes, validation, live testing, Workflow Registry entry, cross-tenant regression-guard check) — human chose to pause and review before continuing, not yet opened as a PR. Full detail: `Wiki/log.md` session-bc076-card4-anon-grant-third-occurrence-fixed, `Wiki/platform-quirks/anon-grant-exposure-bc052.md`.
+
+2026-09-02 (prior) — by /execute — **Admin Provisioning client-picker fix SHIPPED: "Add Admin" no longer requires picking a client.** Human feedback after live-testing the Bootstrap card (below): minting an admin/super_admin shouldn't need a "nominal home client" — it was only there to satisfy `dashboard_users.client_id`'s old `NOT NULL` constraint. Fixed at the schema level: `client_id` is now nullable with a strict CHECK (`client_user` → must be set; `admin`/`super_admin` → must be NULL). Migration order matters and was gotten right (drop NOT NULL → backfill existing admin rows to NULL → add CHECK), a real Codex-caught correction. **Real, independent bug found and fixed in the same pass:** `dashboard_admin_list_clients()`'s login-email lookup had no role filter — could show an admin's email as a client's "login" under the wrong timing; added an explicit role filter, regression-verified against all 6 real clients. `create_admin`'s Edge Function branch and `AddAdminTab` both simplified to drop the client field entirely; the 3 provisioning tabs got visually regrouped (client actions vs. "Internal accounts"). **Live-verified end to end:** schema, the list-view regression, `create_admin` via curl with a real super_admin JWT, the `dashboard_provision_user` (client_id, role) pairing across a real remap, `map_existing`/`SUPER_ADMIN_REQUIRED` regression-checked, and the UI via `gstack /browse` against a local dev server (all 3 tabs, zero console errors). 3 new `TODOS.md` items from Codex's outside-voice review: a deferred `useProvisionForm` DRY extraction (cross-model tension, human sided with the regression-risk argument over doing it now), RPC role-guard hardening, and a multi-login "oldest wins" ambiguity. **CRITICAL security bug found and fixed during `/review`'s adversarial pass, before merge:** `map_existing`/`create_client`'s remap paths never checked the target account's current role — any plain `admin` could have silently demoted the platform's only `super_admin` to a `client_user`. Fixed with a shared server-side guard (routed through a new `SECURITY DEFINER` RPC, `dashboard_get_user_role()`, after a direct table read hit the same `service_role`-has-no-grants-on-`dashboard_users` bug for the 3rd time this project). Re-verified live: the exact attack now 403s, unaffected accounts unaffected. 2 more `TODOS.md` items logged (remap-confirm UI context, CORS wildcard). Full detail: `Wiki/log.md` session-admin-provision-client-picker-fix-shipped, `Wiki/infra/dashboard-auth-mapping.md`.
 
 2026-09-02 (prior) — by /execute — **Admin Provisioning Bootstrap SHIPPED: `super_admin` tier, real client creation, and forced password-reset built and live-verified end to end.** Closes the admin-minting risk accepted at Card2a: minting an `admin`/`super_admin` now requires a dedicated `create_admin` Edge Function action, gated server-side on the CALLER already being `super_admin` — the original `map_existing` path can no longer assign anything but `client_user`. New `create_client` action creates a real client (`status='unprovisioned'`, archetype/schema both NULL until the client's own onboarding decides them) via a 3-write chain (client row → Auth user → mapping) with rollback at each step. **Two real bugs found and fixed live, neither caught by `tsc`/static review:** `control.dashboard_users` has zero `service_role` table grants (unlike `control.clients`), so the Edge Function's audit-column write was silently no-op'ing — fixed via a new `SECURITY DEFINER` RPC; `dashboard_admin_list_clients()`'s new `email` column returned `varchar(255)` against a declared `text` return type (same bug *class* as Card2a's `archetype_enum` mismatch) — fixed with an explicit cast. **Live-verified against a real admin session** (curl + a real password-grant JWT): platform 401s, `map_existing`'s role restriction, `create_admin`'s `super_admin`-only gate proven against a genuinely freshly-minted `admin` account (not hypothetical), forged-role-in-body ignored, duplicate-email 409, invalid-client-id 400, `dashboard_admin_list_clients()` regression-checked against all 6 real clients via PostgREST. All synthetic test accounts cleaned up after (zero leftover, confirmed). **Disclosed, not hidden:** promoting `admin@zenny.internal` to `super_admin` ahead of this shipping means the *old, still-deployed* dashboard code temporarily shows that account a client's orders view instead of the admin panel, until this merges and the container redeploys — no data risk, closes on ship. The new UI (Add Client/Add Admin tabs, client list, forced password-change) is `tsc`/`oxlint`-clean but not yet browser-click-tested (same structural gap Card2a's own T7 disclosed — the deployed container serves `main`). One new `TODOS.md` follow-up: a freshly created "unprovisioned" client can log in immediately but hits a clean RPC exception on every page until provisioning finishes. Full detail: `Wiki/log.md` session-admin-provisioning-bootstrap-shipped, `Wiki/infra/dashboard-auth-mapping.md`.
 
@@ -67,9 +97,10 @@ safety fix + Shopify/WooCommerce ingestion — all live-verified),
 BC-077/078 (migrated tooling from `role-modes` to `gstack-pilot`,
 safe-gate reconciled), Admin Provisioning Bootstrap (`super_admin` tier,
 real client creation, forced password-reset — all live-verified).
-**Next: BC-076 Card 4** (canary/smoke-test) — Cards 3b (Notion fix) and
-3c (Baserow infra) are real follow-ups, each needing their own
-`/plan-eng-review` pass before a Build Card.
+**Next: Card 3b (Notion fix) → Card 3c (Baserow infra) → finish BC-076
+Card 4** (canary/smoke-test, resequenced 2026-09-03 — see Last Updated
+below). Cards 3b/3c each need their own `/plan-eng-review` pass before
+a Build Card.
 Target architecture docs: `05_Platform_Builds/Zenny_SaaS/`
 MultiNode Runtime v1.0 + Channel Adapter v2.0. Full record:
 `docs/designs/zenny-saas-runtime-pivot.md`,
@@ -173,13 +204,34 @@ Client E (old): e5f6a7b8-0001-4c1d-9e2a-000000000005 — engagement — client_t
 
 **Admin Provisioning client-picker fix — SHIPPED** (see Last Updated
 above). **Admin Provisioning Bootstrap — SHIPPED.** **BC-076 Card 3 —
-SHIPPED** (Shopify + WooCommerce ingestion). Card 4 (canary/smoke-test)
-can now run against real, KB-populated test clients.
+SHIPPED** (Shopify + WooCommerce ingestion). **Card 4 (canary/smoke-test)
+— PAUSED, T1 of 8 done** (branch `bc076-card4-canary-smoke-test`, not yet
+PR'd; `control.canary_results` table + 3 RPCs already live in Supabase,
+leg-agnostic so no rework risk from resequencing below).
+
+**Resequencing decision (2026-09-03, /commander):** human raised the
+concern that finishing Card 4 now, before Cards 3b/3c change the
+ingestion leg set, risks rebuilding canary fixtures/config twice.
+Recommended and agreed: do **Card 3b → Card 3c → then resume Card 4's
+T2-T8** once the leg set is settled, rather than finishing Card 4 now or
+deferring it all the way to a post-stable "pre-production monitoring"
+phase. Reasoning: Card 4's retrieval-probe half is already decoupled
+from ingestion internals (one config-array entry per leg, per its
+locked design) so the rework risk is narrow — mainly the
+already-flagged-as-v1 freshness mechanism — but sequencing 3b/3c first
+avoids touching the canary build mid-flight at all.
 
 **Follow-ups, tracked not dropped:**
-- **Card 3b** (Notion leg fix — re-point INT-012 to `zenny-business-kb`,
-  add D19/D20-style hardening) — real, live-verified finding; not yet
-  specced, needs its own `/plan-eng-review` pass.
+- **Card 3b** (Notion leg fix) — `/plan-eng-review` **CLEARED 2026-09-03**
+  (`docs/designs/bc076-card3b-notion-kb-fix.md`, 0 unresolved decisions).
+  Locked: a NEW parallel "Notion Fetch KB Leg" workflow feeds the existing
+  Generic KB Ingestion Core (not a re-point of INT-012 — live verification
+  found INT-011/INT-012's real usage is near-zero, 3 executions ever, so
+  touching them wasn't worth the risk). Also found INT-012 never wrote
+  `sync_status` at all — a silent-failure blind spot closed by this fix.
+  Codex outside-voice caught 2 real gaps (empty-KB wipe safety, SCH-004
+  retarget rollback/canary), both folded in. **Ready to build — not yet
+  started.**
 - **Card 3c** (embedded Baserow — new self-hosted infra + client-facing
   catalog UI, then its ingestion leg) — not yet specced, needs its own
   `/plan-eng-review` pass.

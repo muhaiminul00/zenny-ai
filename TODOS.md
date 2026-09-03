@@ -140,6 +140,84 @@ including the deferred counter)
 **Depends on:** Whatever alerting infrastructure this project has (or
 builds) for `sync_status`.
 
+### Swap BC-076-Card4's canary freshness signal off n8n execution-history
+
+**What:** Card 4 (canary/smoke-test)'s freshness check reads n8n's own
+execution-history API for each ingestion workflow's last-run status — a
+self-referential n8n→n8n dependency accepted as "good enough for v1, not
+the permanent answer" during that card's `/plan-eng-review`. Once this
+TODO item (above — "wire sync_status failures to real alerting") is
+eventually built, the canary should read that durable log instead.
+
+**Why:** Execution-history-as-a-data-source is a known compromise: it
+wasn't designed to be a queryable freshness source, and is fragile to
+n8n version/API changes. The canary's own review deliberately chose it
+over touching 2 shipped ingestion workflows (real regression risk, caught
+by outside-voice review) — but the compromise should be revisited once a
+safer durable source exists, not left permanently.
+
+**Context:** Surfaced by Codex's outside-voice review during BC-076-Card4's
+`/plan-eng-review` (2026-09-03). Not built now — re-expanding Card 4 to
+touch the shipped ingestion workflows was explicitly rejected in the same
+review as scope creep.
+
+**Effort:** S (once the sync_status-to-alerting TODO ships — swap one data
+source for another, same freshness logic)
+**Priority:** P3
+**Depends on:** "Wire sync_status failures to real alerting" (above)
+landing first.
+
+### Generic KB Ingestion Core has no shared fetch-adapter contract
+
+**What:** Extract a shared fetch-adapter contract (pagination cursors,
+backoff, error classification) the way D25 already extracted embed/upsert/
+orphan-cleanup into the Generic KB Ingestion Core. Each ingestion leg
+(Sheets, Shopify, WooCommerce, and now Notion/Card3b) still hand-rolls its
+own fetch/pagination/error logic before handing off to the shared core.
+
+**Why:** Surfaced by Codex's outside-voice review during Card 3b's
+`/plan-eng-review` (2026-09-03). With Baserow (Card 3c) about to add a 4th
+independent fetch-side implementation, the fragmentation this flags becomes
+real, not hypothetical — same category of drift risk D25 itself was built
+to prevent, just one layer up the stack (fetch, not ingest).
+
+**Context:** Not built now — every current leg's fetch logic is small,
+correct, and independently reasoned about; building this ahead of real
+duplication pain would be premature abstraction for a system with only 4
+legs total. Revisit once Baserow (Card 3c) ships and the pattern across all
+4 legs is visible to actually design a shared contract against.
+
+**Effort:** M (needs 3-4 real leg implementations to design a contract
+against — building it against only 1-2 legs risks guessing the wrong shape)
+**Priority:** P3
+**Depends on:** Card 3c (Baserow) shipping, so the contract can be designed
+against a real 4th data point, not guessed at.
+
+### Notion leg may lose content inside nested blocks (toggles/columns/tables)
+
+**What:** Audit whether Notion's `getMarkdown` export (reused verbatim from
+INT-012/BC-047 in Card 3b's new Notion leg) actually flattens content
+inside toggles, columns, callouts, synced blocks, and tables cleanly, or
+silently drops it.
+
+**Why:** Surfaced by Codex's outside-voice review during Card 3b's
+`/plan-eng-review` (2026-09-03). If real, a client's actual KB content
+inside these block types would never reach the agent via `Search_business_kb`
+— a silent content-quality gap, not a crash or visible error.
+
+**Context:** Pre-existing since BC-047 (INT-012 uses the same `getMarkdown`
+approach), never audited. Card 3b's new Notion leg inherits this unchanged,
+by design (D1 — reuse INT-012's proven read logic verbatim). Unverified
+whether it's an actual problem for this project's real KB pages, which so
+far are simple text/paragraphs — needs a live test page using these block
+types to confirm either way.
+
+**Effort:** S (audit) / S-M (fix, if real — likely means walking Notion's
+block-children API recursively instead of relying on getMarkdown's flat
+export)
+**Priority:** P3
+**Depends on:** None — can be picked up independently.
+
 ## Product
 
 ### Real image-based product search + recommendation carousel
